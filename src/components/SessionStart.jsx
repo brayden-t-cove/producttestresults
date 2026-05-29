@@ -1,17 +1,76 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { PRODUCTS, CATEGORY_LABELS } from '../data/products.js';
-import { createSession, aiPopulateTests } from '../lib/api.js';
+import { createSession, aiPopulateTests, downloadCsvTemplate, importCsv } from '../lib/api.js';
 
 const CATEGORIES = ['hub', 'camera', 'sensor', 'app'];
 
+const SESSION_TYPES = [
+  {
+    id: 'e2e',
+    label: 'E2E',
+    icon: '🔄',
+    description: 'Full end-to-end product testing',
+  },
+  {
+    id: 'reproduction',
+    label: 'Issue Reproduction',
+    icon: '🐛',
+    description: 'Reproduce and document reported bugs',
+  },
+  {
+    id: 'regression',
+    label: 'Regression',
+    icon: '🔁',
+    description: 'Verify previously fixed issues remain resolved',
+  },
+  {
+    id: 'feature',
+    label: 'Feature / Targeted',
+    icon: '🎯',
+    description: 'Test a specific feature or acceptance criteria',
+  },
+];
+
+const SESSION_TYPE_LABELS = {
+  e2e: 'E2E Session',
+  reproduction: 'Reproduction Session',
+  regression: 'Regression Session',
+  feature: 'Feature Session',
+};
+
 export default function SessionStart({ onBack, onCreated }) {
+  const [sessionType, setSessionType] = useState('e2e');
   const [productId, setProductId] = useState('');
   const [firmware, setFirmware] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError] = useState('');
+  const [csvPreview, setCsvPreview] = useState(null); // { count, rows, type: 'testCases'|'issues', data }
+  const [csvError, setCsvError] = useState('');
+  const fileInputRef = useRef(null);
 
   const selectedProduct = PRODUCTS.find(p => p.id === productId);
+
+  async function handleCsvUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setCsvError('');
+    setCsvPreview(null);
+    try {
+      const text = await file.text();
+      const result = await importCsv(text, sessionType);
+      if (result.issues) {
+        setCsvPreview({ count: result.issues.length, rows: result.issues.slice(0, 3), type: 'issues', data: result.issues });
+      } else if (result.testCases) {
+        setCsvPreview({ count: result.testCases.length, rows: result.testCases.slice(0, 3), type: 'testCases', data: result.testCases });
+      }
+    } catch (err) {
+      setCsvError(err.message || 'CSV import failed');
+    }
+    // Reset input so same file can be re-uploaded
+    e.target.value = '';
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -21,6 +80,8 @@ export default function SessionStart({ onBack, onCreated }) {
     }
     setError('');
     setLoading(true);
+    setLoadingMsg('Creating session...');
+
     try {
       const session = await createSession({
         productId: selectedProduct.id,
@@ -29,6 +90,52 @@ export default function SessionStart({ onBack, onCreated }) {
         subcategory: selectedProduct.subcategory,
         firmware,
         notes,
+        type: sessionType,
+      });
+
+      let testCases = session.testCases || [];
+      let issues = session.issues || [];
+
+      if (csvPreview) {
+        if (csvPreview.type === 'testCases') {
+          testCases = csvPreview.data;
+        } else {
+          issues = csvPreview.data;
+        }
+        const { updateSession } = await import('../lib/api.js');
+        const updated = await updateSession(session.id, { testCases, issues });
+        onCreated(updated);
+        return;
+      }
+
+      // No CSV — session created with empty test cases, proceed directly
+      onCreated(session);
+    } catch (err) {
+      setError(err.message || 'Failed to create session');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAiPopulate(e) {
+    e.preventDefault();
+    if (!productId) {
+      setError('Please select a product.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    setLoadingMsg('Claude is populating your test cases...');
+
+    try {
+      const session = await createSession({
+        productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        category: selectedProduct.category,
+        subcategory: selectedProduct.subcategory,
+        firmware,
+        notes,
+        type: sessionType,
       });
 
       let testCases = [];
@@ -41,7 +148,7 @@ export default function SessionStart({ onBack, onCreated }) {
         });
         testCases = result.testCases || [];
       } catch (aiErr) {
-        console.warn('AI populate failed, proceeding without AI tests:', aiErr.message);
+        console.warn('AI populate failed:', aiErr.message);
       }
 
       const { updateSession } = await import('../lib/api.js');
@@ -59,14 +166,22 @@ export default function SessionStart({ onBack, onCreated }) {
       <div className="session-start">
         <div className="ai-loading">
           <div className="spinner spinner-lg" />
-          <p>Claude is populating your test cases...</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-            Generating tailored tests for {selectedProduct?.name}
-          </p>
+          <p>{loadingMsg}</p>
+          {selectedProduct && (
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+              {selectedProduct.name}
+            </p>
+          )}
         </div>
       </div>
     );
   }
+
+  const previewHeaders = csvPreview
+    ? csvPreview.rows.length > 0
+      ? Object.keys(csvPreview.rows[0]).filter(k => k !== 'id' && k !== 'status')
+      : []
+    : [];
 
   return (
     <div className="session-start">
@@ -75,12 +190,35 @@ export default function SessionStart({ onBack, onCreated }) {
           ← Back
         </button>
         <h1>New Testing Session</h1>
-        <p>Select a product to begin. Claude will auto-populate test cases.</p>
+        <p>Choose a session type, select a product, then import a CSV or auto-populate with AI.</p>
       </div>
 
       <form onSubmit={handleSubmit}>
         {error && <div className="error-msg">{error}</div>}
 
+        {/* Session Type Selector */}
+        <div className="form-group">
+          <label>Session Type</label>
+          <div className="session-type-cards">
+            {SESSION_TYPES.map(st => (
+              <div
+                key={st.id}
+                className={`session-type-card ${sessionType === st.id ? 'selected' : ''}`}
+                onClick={() => {
+                  setSessionType(st.id);
+                  setCsvPreview(null);
+                  setCsvError('');
+                }}
+              >
+                <span className="session-type-icon">{st.icon}</span>
+                <span className="session-type-label">{st.label}</span>
+                <span className="session-type-desc">{st.description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Product Selector */}
         <div className="form-group">
           <label>Product</label>
           <select value={productId} onChange={e => setProductId(e.target.value)} required>
@@ -111,13 +249,92 @@ export default function SessionStart({ onBack, onCreated }) {
             placeholder="Any context for this session — build notes, known issues, special focus areas..."
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            rows={4}
+            rows={3}
           />
         </div>
 
+        {/* CSV Section */}
+        <div className="csv-section">
+          <div className="csv-section-label">CSV Import</div>
+          <div className="csv-buttons-row">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => downloadCsvTemplate(sessionType)}
+            >
+              ↓ Download Template
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              ↑ Upload CSV
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              style={{ display: 'none' }}
+              onChange={handleCsvUpload}
+            />
+          </div>
+
+          {csvError && (
+            <div className="error-msg" style={{ marginTop: 8 }}>{csvError}</div>
+          )}
+
+          {csvPreview && (
+            <div className="csv-preview">
+              <div className="csv-preview-summary">
+                ✓ {csvPreview.count} {csvPreview.type === 'issues' ? 'issues' : 'test cases'} loaded
+                {csvPreview.count > 3 && ` (showing first 3)`}
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="csv-preview-table">
+                  <thead>
+                    <tr>
+                      {previewHeaders.slice(0, 4).map(h => (
+                        <th key={h}>{h}</th>
+                      ))}
+                      {previewHeaders.length > 4 && <th>...</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvPreview.rows.map((row, i) => (
+                      <tr key={i}>
+                        {previewHeaders.slice(0, 4).map(h => (
+                          <td key={h}>{String(row[h] ?? '').slice(0, 50)}{String(row[h] ?? '').length > 50 ? '…' : ''}</td>
+                        ))}
+                        {previewHeaders.length > 4 && <td>…</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {csvPreview.count > 3 && (
+                <div className="csv-preview-more">… and {csvPreview.count - 3} more</div>
+              )}
+            </div>
+          )}
+        </div>
+
         <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%' }}>
-          Start Session + Auto-populate Tests
+          Start {SESSION_TYPE_LABELS[sessionType]}
         </button>
+
+        {/* AI Fallback */}
+        <div className="ai-fallback">
+          <div className="ai-fallback-divider">or</div>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ width: '100%' }}
+            onClick={handleAiPopulate}
+          >
+            ✨ Or auto-populate with AI (requires API key)
+          </button>
+        </div>
       </form>
     </div>
   );

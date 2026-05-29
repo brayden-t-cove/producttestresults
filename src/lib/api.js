@@ -83,3 +83,30 @@ export async function aiSummarize(data) {
   }
   return res.json();
 }
+
+export async function downloadCsvTemplate(type) {
+  const res = await fetch(`${BASE}/csv-template/${type}`);
+  if (!res.ok) throw new Error('Failed to download template');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `template-${type}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function importCsv(csvText, type) {
+  const res = await fetch(`${BASE}/csv-import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ csvText, type }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'CSV import failed');
+  }
+  return res.json();
+}

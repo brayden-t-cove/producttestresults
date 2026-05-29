@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
+import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -14,6 +15,7 @@ const SESSIONS_DIR = join(__dirname, 'data', 'sessions');
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Ensure sessions dir exists
 if (!existsSync(SESSIONS_DIR)) {
@@ -69,7 +71,7 @@ app.get('/api/sessions/:id', async (req, res) => {
 // POST /api/sessions - create new session
 app.post('/api/sessions', async (req, res) => {
   try {
-    const { productId, productName, category, subcategory, firmware, notes } = req.body;
+    const { productId, productName, category, subcategory, firmware, notes, type } = req.body;
     const id = uuidv4();
     const session = {
       id,
@@ -79,6 +81,7 @@ app.post('/api/sessions', async (req, res) => {
       subcategory: subcategory || null,
       firmware: firmware || '',
       sessionNotes: notes || '',
+      type: type || 'e2e',
       createdAt: new Date().toISOString(),
       completedAt: null,
       status: 'active',
@@ -281,6 +284,106 @@ Write a professional summary with sections: Overview, Test Results, Key Issues, 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'AI call failed', details: err.message });
+  }
+});
+
+// GET /api/csv-template/:type
+app.get('/api/csv-template/:type', (req, res) => {
+  const { type } = req.params;
+  const template = CSV_TEMPLATES[type];
+  if (!template) return res.status(400).json({ error: `Unknown type: ${type}` });
+
+  function escapeField(val) {
+    const s = String(val ?? '');
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  const lines = [
+    template.headers.join(','),
+    ...template.exampleRows.map(row => row.map(escapeField).join(',')),
+  ];
+  const csv = lines.join('\r\n') + '\r\n';
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="template-${type}.csv"`);
+  res.send(csv);
+});
+
+// Simple CSV parser that handles quoted fields
+function parseCsv(text) {
+  // Strip BOM
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = [];
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const fields = [];
+    let i = 0;
+    while (i < line.length) {
+      if (line[i] === '"') {
+        // Quoted field
+        let val = '';
+        i++; // skip opening quote
+        while (i < line.length) {
+          if (line[i] === '"' && line[i + 1] === '"') {
+            val += '"';
+            i += 2;
+          } else if (line[i] === '"') {
+            i++; // skip closing quote
+            break;
+          } else {
+            val += line[i++];
+          }
+        }
+        fields.push(val);
+        if (line[i] === ',') i++; // skip comma
+      } else {
+        // Unquoted field
+        const end = line.indexOf(',', i);
+        if (end === -1) {
+          fields.push(line.slice(i));
+          break;
+        } else {
+          fields.push(line.slice(i, end));
+          i = end + 1;
+        }
+      }
+    }
+    rows.push(fields);
+  }
+  return rows;
+}
+
+// POST /api/csv-import
+app.post('/api/csv-import', (req, res) => {
+  const { csvText, type } = req.body;
+  if (!csvText || !type) return res.status(400).json({ error: 'csvText and type are required' });
+  const template = CSV_TEMPLATES[type];
+  if (!template) return res.status(400).json({ error: `Unknown type: ${type}` });
+
+  const rows = parseCsv(csvText);
+  if (rows.length < 2) return res.status(400).json({ error: 'CSV must have a header row and at least one data row' });
+
+  const [headerRow, ...dataRows] = rows;
+  const headers = headerRow.map(h => h.trim());
+
+  if (type === 'reproduction') {
+    const issues = dataRows.map(row => {
+      const obj = { id: uuidv4() };
+      headers.forEach((h, i) => { obj[h] = row[i] ?? ''; });
+      return obj;
+    });
+    return res.json({ issues });
+  } else {
+    const testCases = dataRows.map(row => {
+      const obj = { id: uuidv4(), status: 'pending' };
+      headers.forEach((h, i) => { obj[h] = row[i] ?? ''; });
+      return obj;
+    });
+    return res.json({ testCases });
   }
 });
 

@@ -3,10 +3,38 @@ import { updateSession } from '../lib/api.js';
 import IssueLogger from './IssueLogger.jsx';
 import IssueVerification from './IssueVerification.jsx';
 
-const STATUS_ORDER = { fail: 0, pending: 1, pass: 2, skip: 3 };
+const STATUS_ORDER = { fail: 0, 'reproduced': 0, 'regression-found': 0, pending: 1, pass: 2, skip: 3, 'cannot-reproduce': 2, 'fixed-verified': 2, 'needs-more-info': 1.5, 'cannot-test': 3 };
 
 function badgeClass(status) {
-  return `badge badge-${status}`;
+  const map = {
+    pass: 'badge-pass',
+    fail: 'badge-fail',
+    skip: 'badge-skip',
+    pending: 'badge-pending',
+    reproduced: 'badge-reproduced',
+    'cannot-reproduce': 'badge-cannot-reproduce',
+    'needs-more-info': 'badge-needs-more-info',
+    'regression-found': 'badge-regression-found',
+    'fixed-verified': 'badge-fixed-verified',
+    'cannot-test': 'badge-cannot-test',
+  };
+  return `badge ${map[status] || 'badge-pending'}`;
+}
+
+function statusLabel(status) {
+  const map = {
+    pass: 'Pass',
+    fail: 'Fail',
+    skip: 'Skip',
+    pending: 'Pending',
+    reproduced: 'Reproduced',
+    'cannot-reproduce': 'Cannot Reproduce',
+    'needs-more-info': 'Needs More Info',
+    'regression-found': 'Regression Found',
+    'fixed-verified': 'Fixed — Verified',
+    'cannot-test': 'Cannot Test',
+  };
+  return map[status] || status;
 }
 
 function severityClass(sev) {
@@ -14,7 +42,257 @@ function severityClass(sev) {
   return 'badge-' + sev.toLowerCase();
 }
 
+function RegressionRiskBadge({ risk }) {
+  if (!risk) return null;
+  const cls = `regression-risk-badge regression-risk-${risk.toLowerCase()}`;
+  return <span className={cls}>{risk}</span>;
+}
+
+function PriorityBadge({ priority }) {
+  if (!priority) return null;
+  const cls = `priority-badge priority-${priority.toLowerCase()}`;
+  return <span className={cls}>{priority}</span>;
+}
+
+function AreaBadge({ area }) {
+  if (!area) return null;
+  return <span className="area-badge">{area}</span>;
+}
+
+// Reproduction detail panel
+function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict }) {
+  return (
+    <>
+      <div className="test-detail-content">
+        <div className="test-detail-title">{test.title}</div>
+        <span className={badgeClass(test.status)} style={{ marginBottom: 20, display: 'inline-flex' }}>
+          {statusLabel(test.status)}
+        </span>
+
+        {test.description && (
+          <div className="test-detail-section">
+            <label>Description</label>
+            <p>{test.description}</p>
+          </div>
+        )}
+        {test.preconditions && (
+          <div className="test-detail-section">
+            <label>Preconditions</label>
+            <p>{test.preconditions}</p>
+          </div>
+        )}
+        {test.reproSteps && (
+          <div className="test-detail-section">
+            <label>Repro Steps</label>
+            <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, fontFamily: 'inherit' }}>{test.reproSteps}</pre>
+          </div>
+        )}
+        {test.expectedBehavior && (
+          <div className="test-detail-section">
+            <label>Expected Behavior</label>
+            <p>{test.expectedBehavior}</p>
+          </div>
+        )}
+        {test.sourceTicket && (
+          <div className="test-detail-section">
+            <label>Source Ticket</label>
+            <p>{test.sourceTicket}</p>
+          </div>
+        )}
+
+        <div className="verdict-buttons">
+          <button
+            className={`btn btn-reproduced ${test.status === 'reproduced' ? 'active' : ''}`}
+            onClick={() => onVerdict('reproduced')}
+          >
+            🐛 Reproduced
+          </button>
+          <button
+            className={`btn btn-cannot-reproduce ${test.status === 'cannot-reproduce' ? 'active' : ''}`}
+            onClick={() => onVerdict('cannot-reproduce')}
+          >
+            ✓ Cannot Reproduce
+          </button>
+          <button
+            className={`btn btn-needs-more-info ${test.status === 'needs-more-info' ? 'active' : ''}`}
+            onClick={() => onVerdict('needs-more-info')}
+          >
+            ? Needs More Info
+          </button>
+        </div>
+
+        <div className="test-detail-section" style={{ marginTop: 24 }}>
+          <label>Actual Behavior</label>
+          <textarea
+            value={testNote}
+            onChange={e => onNotesChange(e.target.value)}
+            onBlur={onNotesBlur}
+            placeholder="Describe the actual behavior observed..."
+            rows={4}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Regression detail panel
+function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict }) {
+  return (
+    <>
+      <div className="test-detail-content">
+        <div className="test-detail-title">{test.title}</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+          <span className={badgeClass(test.status)} style={{ display: 'inline-flex' }}>
+            {statusLabel(test.status)}
+          </span>
+          <RegressionRiskBadge risk={test.regressionRisk} />
+        </div>
+
+        {test.description && (
+          <div className="test-detail-section">
+            <label>Description</label>
+            <p>{test.description}</p>
+          </div>
+        )}
+        {test.fixedInFirmware && (
+          <div className="test-detail-section">
+            <label>Fixed In Firmware</label>
+            <p>{test.fixedInFirmware}</p>
+          </div>
+        )}
+        {test.originalIssueId && (
+          <div className="test-detail-section">
+            <label>Original Issue ID</label>
+            <p>{test.originalIssueId}</p>
+          </div>
+        )}
+        {test.reproSteps && (
+          <div className="test-detail-section">
+            <label>Repro Steps</label>
+            <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, fontFamily: 'inherit' }}>{test.reproSteps}</pre>
+          </div>
+        )}
+        {test.expectedBehavior && (
+          <div className="test-detail-section">
+            <label>Expected Behavior</label>
+            <p>{test.expectedBehavior}</p>
+          </div>
+        )}
+
+        <div className="verdict-buttons">
+          <button
+            className={`btn btn-regression-found ${test.status === 'regression-found' ? 'active' : ''}`}
+            onClick={() => onVerdict('regression-found')}
+          >
+            ✗ Regression Found
+          </button>
+          <button
+            className={`btn btn-fixed-verified ${test.status === 'fixed-verified' ? 'active' : ''}`}
+            onClick={() => onVerdict('fixed-verified')}
+          >
+            ✓ Fixed — Verified
+          </button>
+          <button
+            className={`btn btn-cannot-test ${test.status === 'cannot-test' ? 'active' : ''}`}
+            onClick={() => onVerdict('cannot-test')}
+          >
+            ⊘ Cannot Test
+          </button>
+        </div>
+
+        <div className="test-detail-section" style={{ marginTop: 24 }}>
+          <label>Notes</label>
+          <textarea
+            value={testNote}
+            onChange={e => onNotesChange(e.target.value)}
+            onBlur={onNotesBlur}
+            placeholder="Add notes about this regression test..."
+            rows={4}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// E2E / Feature detail panel
+function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, type }) {
+  return (
+    <>
+      <div className="test-detail-content">
+        <div className="test-detail-title">{test.title}</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+          <span className={badgeClass(test.status)} style={{ display: 'inline-flex' }}>
+            {statusLabel(test.status)}
+          </span>
+          {type === 'e2e' && <AreaBadge area={test.area} />}
+          {type === 'e2e' && <PriorityBadge priority={test.priority} />}
+        </div>
+
+        {test.description && (
+          <div className="test-detail-section">
+            <label>Description</label>
+            <p>{test.description}</p>
+          </div>
+        )}
+
+        {type === 'feature' && test.featureArea && (
+          <div className="test-detail-section">
+            <label>Feature Area</label>
+            <p>{test.featureArea}</p>
+          </div>
+        )}
+        {type === 'feature' && test.acceptanceCriteria && (
+          <div className="test-detail-section">
+            <label>Acceptance Criteria</label>
+            <p>{test.acceptanceCriteria}</p>
+          </div>
+        )}
+
+        <div className="test-detail-section">
+          <label>Expected Result</label>
+          <p>{test.expected || test.defaultExpected || '—'}</p>
+        </div>
+
+        <div className="verdict-buttons">
+          <button
+            className={`btn btn-pass ${test.status === 'pass' ? 'active' : ''}`}
+            onClick={() => onVerdict('pass')}
+          >
+            ✓ Pass
+          </button>
+          <button
+            className={`btn btn-fail ${test.status === 'fail' ? 'active' : ''}`}
+            onClick={() => onVerdict('fail')}
+          >
+            ✗ Fail
+          </button>
+          <button
+            className={`btn btn-skip ${test.status === 'skip' ? 'active' : ''}`}
+            onClick={() => onVerdict('skip')}
+          >
+            ⟳ Skip
+          </button>
+        </div>
+
+        <div className="test-detail-section" style={{ marginTop: 24 }}>
+          <label>Notes</label>
+          <textarea
+            value={testNote}
+            onChange={e => onNotesChange(e.target.value)}
+            onBlur={onNotesBlur}
+            placeholder="Add notes about this test result..."
+            rows={4}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
+  const sessionType = session.type || 'e2e';
   const [selectedTestId, setSelectedTestId] = useState(
     session.testCases.length > 0 ? session.testCases[0].id : null
   );
@@ -95,6 +373,8 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
     ? notes[selectedTestId]
     : (selectedTest?.notes || '');
 
+  const listItemLabel = sessionType === 'reproduction' ? 'issue' : 'test case';
+
   return (
     <div className="test-runner">
       {/* Header */}
@@ -123,12 +403,17 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
                 onClick={() => setSelectedTestId(t.id)}
               >
                 <span className="test-title">{t.title}</span>
-                <span className={badgeClass(t.status)}>{t.status}</span>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {sessionType === 'e2e' && t.area && <AreaBadge area={t.area} />}
+                  {sessionType === 'e2e' && t.priority && <PriorityBadge priority={t.priority} />}
+                  {sessionType === 'regression' && t.regressionRisk && <RegressionRiskBadge risk={t.regressionRisk} />}
+                  <span className={badgeClass(t.status)}>{statusLabel(t.status)}</span>
+                </div>
               </div>
             ))}
             {session.testCases.length === 0 && (
               <div style={{ padding: 16, color: 'var(--text-muted)', fontSize: 13 }}>
-                No test cases loaded.
+                No {listItemLabel}s loaded.
               </div>
             )}
           </div>
@@ -152,59 +437,35 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
         {/* Detail Panel */}
         <div className="test-detail">
           {selectedTest ? (
-            <>
-              <div className="test-detail-content">
-                <div className="test-detail-title">{selectedTest.title}</div>
-                <span className={badgeClass(selectedTest.status)} style={{ marginBottom: 20, display: 'inline-flex' }}>
-                  {selectedTest.status}
-                </span>
-
-                <div className="test-detail-section">
-                  <label>Description</label>
-                  <p>{selectedTest.description}</p>
-                </div>
-
-                <div className="test-detail-section">
-                  <label>Expected Result</label>
-                  <p>{selectedTest.expected || selectedTest.defaultExpected || '—'}</p>
-                </div>
-
-                <div className="verdict-buttons">
-                  <button
-                    className={`btn btn-pass ${selectedTest.status === 'pass' ? 'active' : ''}`}
-                    onClick={() => handleVerdict('pass')}
-                  >
-                    ✓ Pass
-                  </button>
-                  <button
-                    className={`btn btn-fail ${selectedTest.status === 'fail' ? 'active' : ''}`}
-                    onClick={() => handleVerdict('fail')}
-                  >
-                    ✗ Fail
-                  </button>
-                  <button
-                    className={`btn btn-skip ${selectedTest.status === 'skip' ? 'active' : ''}`}
-                    onClick={() => handleVerdict('skip')}
-                  >
-                    ⟳ Skip
-                  </button>
-                </div>
-
-                <div className="test-detail-section" style={{ marginTop: 24 }}>
-                  <label>Notes</label>
-                  <textarea
-                    value={testNote}
-                    onChange={e => setNotes(n => ({ ...n, [selectedTestId]: e.target.value }))}
-                    onBlur={handleNotesBlur}
-                    placeholder="Add notes about this test result..."
-                    rows={4}
-                  />
-                </div>
-              </div>
-            </>
+            sessionType === 'reproduction' ? (
+              <ReproductionDetail
+                test={selectedTest}
+                testNote={testNote}
+                onNotesChange={val => setNotes(n => ({ ...n, [selectedTestId]: val }))}
+                onNotesBlur={handleNotesBlur}
+                onVerdict={handleVerdict}
+              />
+            ) : sessionType === 'regression' ? (
+              <RegressionDetail
+                test={selectedTest}
+                testNote={testNote}
+                onNotesChange={val => setNotes(n => ({ ...n, [selectedTestId]: val }))}
+                onNotesBlur={handleNotesBlur}
+                onVerdict={handleVerdict}
+              />
+            ) : (
+              <StandardDetail
+                test={selectedTest}
+                testNote={testNote}
+                onNotesChange={val => setNotes(n => ({ ...n, [selectedTestId]: val }))}
+                onNotesBlur={handleNotesBlur}
+                onVerdict={handleVerdict}
+                type={sessionType}
+              />
+            )
           ) : (
             <div className="no-test-selected">
-              <p>Select a test case from the left panel.</p>
+              <p>Select a {listItemLabel} from the left panel.</p>
             </div>
           )}
         </div>

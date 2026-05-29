@@ -813,3 +813,184 @@ select { cursor: pointer; }
 }
 
 hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ============================================================
+   SESSION TYPE CARDS
+   ============================================================ */
+.session-type-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.session-type-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 180px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.session-type-card:hover {
+  border-color: var(--primary);
+  background: var(--card-hover);
+}
+.session-type-card.selected {
+  border-color: var(--primary);
+  background: var(--primary-dim);
+}
+.session-type-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.session-type-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.session-type-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ============================================================
+   CSV SECTION
+   ============================================================ */
+.csv-section {
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.csv-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.csv-buttons-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.csv-preview {
+  margin-top: 12px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+.csv-preview-summary {
+  font-size: 12px;
+  color: var(--pass);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.csv-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+}
+.csv-preview-table th,
+.csv-preview-table td {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.csv-preview-table th {
+  background: var(--card);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.csv-preview-more {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+/* ============================================================
+   AI FALLBACK
+   ============================================================ */
+.ai-fallback {
+  margin-top: 12px;
+}
+.ai-fallback-divider {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  position: relative;
+}
+.ai-fallback-divider::before,
+.ai-fallback-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 44%;
+  height: 1px;
+  background: var(--border);
+}
+.ai-fallback-divider::before { left: 0; }
+.ai-fallback-divider::after { right: 0; }
+
+/* ============================================================
+   TEST RUNNER TYPE-SPECIFIC
+   ============================================================ */
+.badge-reproduced { background: var(--fail-dim); color: var(--fail); }
+.badge-cannot-reproduce { background: var(--pass-dim); color: var(--pass); }
+.badge-needs-more-info { background: rgba(234,179,8,0.15); color: #eab308; }
+.badge-regression-found { background: var(--fail-dim); color: var(--fail); }
+.badge-fixed-verified { background: var(--pass-dim); color: var(--pass); }
+.badge-cannot-test { background: var(--skip-dim); color: var(--skip); }
+
+.btn-reproduced { background: var(--fail-dim); color: var(--fail); border: 1px solid var(--fail); }
+.btn-reproduced:hover, .btn-reproduced.active { background: var(--fail); color: #fff; }
+.btn-cannot-reproduce { background: var(--pass-dim); color: var(--pass); border: 1px solid var(--pass); }
+.btn-cannot-reproduce:hover, .btn-cannot-reproduce.active { background: var(--pass); color: #fff; }
+.btn-needs-more-info { background: rgba(234,179,8,0.15); color: #eab308; border: 1px solid #eab308; }
+.btn-needs-more-info:hover, .btn-needs-more-info.active { background: #eab308; color: #000; }
+.btn-regression-found { background: var(--fail-dim); color: var(--fail); border: 1px solid var(--fail); }
+.btn-regression-found:hover, .btn-regression-found.active { background: var(--fail); color: #fff; }
+.btn-fixed-verified { background: var(--pass-dim); color: var(--pass); border: 1px solid var(--pass); }
+.btn-fixed-verified:hover, .btn-fixed-verified.active { background: var(--pass); color: #fff; }
+.btn-cannot-test { background: var(--skip-dim); color: var(--skip); border: 1px solid var(--skip); }
+.btn-cannot-test:hover, .btn-cannot-test.active { background: var(--skip); color: #fff; }
+
+.regression-risk-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.regression-risk-high { background: var(--fail-dim); color: var(--fail); }
+.regression-risk-medium { background: rgba(234,179,8,0.15); color: #eab308; }
+.regression-risk-low { background: var(--pass-dim); color: var(--pass); }
+
+.area-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--primary-dim);
+  color: var(--primary);
+  font-weight: 500;
+}
+.priority-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.priority-p1 { background: var(--fail-dim); color: var(--fail); }
+.priority-p2 { background: rgba(234,179,8,0.15); color: #eab308; }
+.priority-p3 { background: var(--pass-dim); color: var(--pass); }
