@@ -1196,3 +1196,99 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   border-color: var(--primary);
   background: var(--primary-dim);
 }
+
+/* ============================================================
+   APP CONFIGURATIONS
+   ============================================================ */
+.app-config-section {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+  margin-top: 8px;
+}
+
+.app-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.app-config-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.app-config-form {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-top: 8px;
+}
+
+.platform-toggle {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.platform-toggle button {
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.platform-toggle button:hover {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.platform-toggle button.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* N/A badge */
+.badge-na {
+  background: rgba(136,136,160,0.15);
+  color: var(--text-muted);
+}
+
+/* N/A verdict button */
+.btn-na {
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.btn-na:hover {
+  background: var(--card-hover);
+  color: var(--text);
+}
+.btn-na.active {
+  background: rgba(136,136,160,0.2);
+  color: var(--text-muted);
+  border-color: var(--text-dim);
+}
+
+/* Not available in app banner */
+.not-available-banner {
+  background: rgba(234,179,8,0.1);
+  color: #eab308;
+  border: 1px solid rgba(234,179,8,0.25);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}

@@ -3,7 +3,7 @@ import { updateSession } from '../lib/api.js';
 import IssueLogger from './IssueLogger.jsx';
 import IssueVerification from './IssueVerification.jsx';
 
-const STATUS_ORDER = { fail: 0, 'reproduced': 0, 'regression-found': 0, pending: 1, pass: 2, skip: 3, 'cannot-reproduce': 2, 'fixed-verified': 2, 'needs-more-info': 1.5, 'cannot-test': 3 };
+const STATUS_ORDER = { fail: 0, 'reproduced': 0, 'regression-found': 0, pending: 1, pass: 2, skip: 3, na: 3, 'cannot-reproduce': 2, 'fixed-verified': 2, 'needs-more-info': 1.5, 'cannot-test': 3 };
 
 function badgeClass(status) {
   const map = {
@@ -11,6 +11,7 @@ function badgeClass(status) {
     fail: 'badge-fail',
     skip: 'badge-skip',
     pending: 'badge-pending',
+    na: 'badge-na',
     reproduced: 'badge-reproduced',
     'cannot-reproduce': 'badge-cannot-reproduce',
     'needs-more-info': 'badge-needs-more-info',
@@ -27,6 +28,7 @@ function statusLabel(status) {
     fail: 'Fail',
     skip: 'Skip',
     pending: 'Pending',
+    na: 'N/A',
     reproduced: 'Reproduced',
     'cannot-reproduce': 'Cannot Reproduce',
     'needs-more-info': 'Needs More Info',
@@ -217,10 +219,15 @@ function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdic
 }
 
 // E2E / Feature detail panel
-function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, type }) {
+function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, type, appConfigName }) {
   return (
     <>
       <div className="test-detail-content">
+        {test.notAvailableInApp && (
+          <div className="not-available-banner">
+            ⚠️ Not available in {appConfigName || 'this app'} — mark as N/A or test anyway
+          </div>
+        )}
         <div className="test-detail-title">{test.title}</div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <span className={badgeClass(test.status)} style={{ display: 'inline-flex' }}>
@@ -274,6 +281,12 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
           >
             ⟳ Skip
           </button>
+          <button
+            className={`btn btn-na ${test.status === 'na' ? 'active' : ''}`}
+            onClick={() => onVerdict('na')}
+          >
+            — N/A
+          </button>
         </div>
 
         <div className="test-detail-section" style={{ marginTop: 24 }}>
@@ -304,6 +317,7 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
   const selectedTest = session.testCases.find(t => t.id === selectedTestId);
 
   const completed = session.testCases.filter(t => t.status !== 'pending').length;
+  const naCount = session.testCases.filter(t => t.status === 'na').length;
   const total = session.testCases.length;
   const progress = total > 0 ? (completed / total) * 100 : 0;
 
@@ -385,10 +399,17 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
             fw {session.firmware}
           </span>
         )}
+        {session.appConfigName && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>
+            {session.appConfigName}
+          </span>
+        )}
         <div className="progress-bar-wrap">
           <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
         </div>
-        <span className="progress-text">{completed}/{total} done</span>
+        <span className="progress-text">
+          {completed}/{total} done{naCount > 0 ? ` · ${naCount} N/A` : ''}
+        </span>
         {saving && <span className="spinner" style={{ flexShrink: 0 }} />}
       </div>
 
@@ -407,7 +428,10 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
                   {sessionType === 'e2e' && t.area && <AreaBadge area={t.area} />}
                   {sessionType === 'e2e' && t.priority && <PriorityBadge priority={t.priority} />}
                   {sessionType === 'regression' && t.regressionRisk && <RegressionRiskBadge risk={t.regressionRisk} />}
-                  <span className={badgeClass(t.status)}>{statusLabel(t.status)}</span>
+                  {t.status === 'na' || (t.notAvailableInApp && t.status === 'pending')
+                    ? <span className="badge badge-na">N/A</span>
+                    : <span className={badgeClass(t.status)}>{statusLabel(t.status)}</span>
+                  }
                 </div>
               </div>
             ))}
@@ -461,6 +485,7 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
                 onNotesBlur={handleNotesBlur}
                 onVerdict={handleVerdict}
                 type={sessionType}
+                appConfigName={session.appConfigName}
               />
             )
           ) : (

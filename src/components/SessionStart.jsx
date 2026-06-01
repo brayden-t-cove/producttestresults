@@ -25,20 +25,25 @@ const SESSION_TYPE_LABELS = {
   feature: 'Feature Session',
 };
 
-function generateTestCases(product) {
+function generateTestCases(product, appConfig) {
   const seen = new Set();
   const tests = [];
 
   function addTest(t) {
     if (!seen.has(t.id)) {
       seen.add(t.id);
-      tests.push({
+      const tc = {
         ...t,
         id: crypto.randomUUID(),
         templateId: t.id,
         status: 'pending',
         notes: '',
-      });
+      };
+      if (appConfig && appConfig.unavailableCapabilities && t.capabilityId &&
+          appConfig.unavailableCapabilities.includes(t.capabilityId)) {
+        tc.notAvailableInApp = true;
+      }
+      tests.push(tc);
     }
   }
 
@@ -47,14 +52,21 @@ function generateTestCases(product) {
 
   (product.capabilities || []).forEach(capId => {
     const capTests = TEST_LIBRARY[capId] || [];
-    capTests.forEach(addTest);
+    capTests.forEach(t => addTest({ ...t, capabilityId: capId }));
   });
 
   return tests;
 }
 
+function platformLabel(platform) {
+  if (platform === 'ios') return 'iOS';
+  if (platform === 'android') return 'Android';
+  return 'iOS/Android';
+}
+
 export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedAppConfig, setSelectedAppConfig] = useState(null);
   const [sessionType, setSessionType] = useState('e2e');
   const [firmware, setFirmware] = useState('');
   const [addingFirmware, setAddingFirmware] = useState(false);
@@ -74,6 +86,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     setAddingFirmware(false);
     setNewFirmwareVersion('');
     setSavedFirmwares([]);
+    setSelectedAppConfig(null);
     if (selectedProduct) {
       getFirmwares(null, selectedProduct.id).then(setSavedFirmwares).catch(() => {});
     }
@@ -135,6 +148,8 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         firmware,
         notes,
         type: sessionType,
+        appConfigId: selectedAppConfig?.id || null,
+        appConfigName: selectedAppConfig?.appName || null,
       });
 
       let testCases;
@@ -145,10 +160,10 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           testCases = csvPreview.data;
         } else {
           issues = csvPreview.data;
-          testCases = generateTestCases(selectedProduct);
+          testCases = generateTestCases(selectedProduct, selectedAppConfig);
         }
       } else {
-        testCases = generateTestCases(selectedProduct);
+        testCases = generateTestCases(selectedProduct, selectedAppConfig);
       }
 
       const updated = await updateSession(session.id, { testCases, issues });
@@ -231,6 +246,43 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
             </div>
           )}
         </div>
+
+        {/* App Configuration Selector */}
+        {selectedProduct && (selectedProduct.appConfigs || []).length > 0 && (
+          <div className="form-group">
+            <label>APP CONFIGURATION <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 12, color: 'var(--text-muted)' }}>(optional)</span></label>
+            <div className="product-picker-grid">
+              <div
+                className={`product-picker-card ${selectedAppConfig === null ? 'selected' : ''}`}
+                onClick={() => setSelectedAppConfig(null)}
+              >
+                <span style={{ fontSize: 22 }}>🌐</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Generic — no specific app</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>All capabilities available</div>
+                </div>
+              </div>
+              {(selectedProduct.appConfigs || []).map(ac => (
+                <div
+                  key={ac.id}
+                  className={`product-picker-card ${selectedAppConfig?.id === ac.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedAppConfig(ac)}
+                >
+                  <span style={{ fontSize: 22 }}>📱</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{ac.appName}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {platformLabel(ac.platform)}
+                      {ac.unavailableCapabilities.length > 0
+                        ? ` · ${ac.unavailableCapabilities.length} feature${ac.unavailableCapabilities.length !== 1 ? 's' : ''} hidden`
+                        : ' · All features available'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Session Type Selector */}
         <div className="form-group">

@@ -78,8 +78,10 @@ export default function SessionSummary({ session, onBack }) {
   const passCount = testCases.filter(t => t.status === 'pass').length;
   const failCount = testCases.filter(t => t.status === 'fail').length;
   const skipCount = testCases.filter(t => t.status === 'skip').length;
+  const naCount = testCases.filter(t => t.status === 'na').length;
   const total = testCases.length;
-  const passRate = total > 0 ? Math.round((passCount / total) * 100) : 0;
+  const effectiveTotal = total - naCount;
+  const passRate = effectiveTotal > 0 ? Math.round((passCount / effectiveTotal) * 100) : 0;
 
   useEffect(() => {
     async function fetchSummary() {
@@ -147,6 +149,12 @@ export default function SessionSummary({ session, onBack }) {
           <div className="meta-label">Duration</div>
           <div className="meta-value">{formatDuration(session.createdAt, session.completedAt)}</div>
         </div>
+        {session.appConfigName && (
+          <div className="summary-meta-item">
+            <div className="meta-label">Tested On</div>
+            <div className="meta-value">{session.appConfigName}</div>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -167,6 +175,12 @@ export default function SessionSummary({ session, onBack }) {
           <span className="stat-number">{passRate}%</span>
           <span className="stat-label">Pass Rate</span>
         </div>
+        {naCount > 0 && (
+          <div className="stat-card" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+            <span className="stat-number" style={{ color: 'var(--text-muted)' }}>{naCount}</span>
+            <span className="stat-label">N/A</span>
+          </div>
+        )}
       </div>
 
       {/* Issues */}

@@ -60,6 +60,9 @@ function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, loading }) {
             <div key={s.id} className="session-card" onClick={() => onOpen(s.id)}>
               <div className="session-card-info">
                 <h3>{s.productName}</h3>
+                {s.appConfigName && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{s.appConfigName}</div>
+                )}
                 <div className="session-card-meta">
                   <span>{formatDate(s.date)}</span>
                   {s.issueCount > 0 && (

@@ -9,6 +9,121 @@ const CATEGORY_ICONS = {
   app: '📱',
 };
 
+// Show app configs for all categories except sensor and touchpad
+const SHOW_APP_CONFIGS_FOR = ['hub', 'camera', 'app'];
+
+// Helper: look up capability label by ID
+function getCapabilityLabel(capId) {
+  for (const groupList of Object.values(CAPABILITY_GROUPS)) {
+    for (const group of groupList) {
+      const cap = group.capabilities.find(c => c.id === capId);
+      if (cap) return cap.label;
+    }
+  }
+  return capId;
+}
+
+function platformLabel(platform) {
+  if (platform === 'ios') return 'iOS';
+  if (platform === 'android') return 'Android';
+  return 'iOS/Android';
+}
+
+function AppConfigForm({ capabilities, initialData, onSave, onCancel }) {
+  const [appName, setAppName] = useState(initialData?.appName || '');
+  const [platform, setPlatform] = useState(initialData?.platform || 'both');
+  const [unavailable, setUnavailable] = useState(new Set(initialData?.unavailableCapabilities || []));
+
+  function toggleUnavailable(capId) {
+    setUnavailable(prev => {
+      const next = new Set(prev);
+      if (next.has(capId)) next.delete(capId);
+      else next.add(capId);
+      return next;
+    });
+  }
+
+  function handleSave() {
+    if (!appName.trim()) return;
+    onSave({
+      id: initialData?.id || crypto.randomUUID(),
+      appName: appName.trim(),
+      platform,
+      unavailableCapabilities: Array.from(unavailable),
+    });
+  }
+
+  const capList = Array.from(capabilities);
+
+  return (
+    <div className="app-config-form">
+      <div className="form-group" style={{ marginBottom: 12 }}>
+        <label>App Name</label>
+        <input
+          type="text"
+          placeholder="e.g. InstaVision, Alula, Wyze App"
+          value={appName}
+          onChange={e => setAppName(e.target.value)}
+          autoFocus
+        />
+      </div>
+
+      <div className="form-group" style={{ marginBottom: 12 }}>
+        <label>Platform</label>
+        <div className="platform-toggle">
+          {[
+            { id: 'ios', label: 'iOS' },
+            { id: 'android', label: 'Android' },
+            { id: 'both', label: 'Both' },
+          ].map(opt => (
+            <button
+              key={opt.id}
+              type="button"
+              className={platform === opt.id ? 'active' : ''}
+              onClick={() => setPlatform(opt.id)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {capList.length > 0 && (
+        <div className="form-group" style={{ marginBottom: 12 }}>
+          <label>Check features that are NOT available in this app</label>
+          <div className="capability-checkboxes" style={{ background: 'var(--bg)', borderRadius: 4, padding: 8 }}>
+            {capList.map(capId => (
+              <label key={capId} className="capability-checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={unavailable.has(capId)}
+                  onChange={() => toggleUnavailable(capId)}
+                  style={{ width: 'auto', marginRight: 8 }}
+                />
+                {getCapabilityLabel(capId)}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={handleSave}
+          disabled={!appName.trim()}
+        >
+          {initialData ? 'Save Changes' : 'Add App'}
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function NewProduct({ product, onSave, onBack }) {
   const isEdit = !!product;
   const [name, setName] = useState(product?.name || '');
@@ -16,6 +131,9 @@ export default function NewProduct({ product, onSave, onBack }) {
   const [modelNumber, setModelNumber] = useState(product?.modelNumber || '');
   const [category, setCategory] = useState(product?.category || '');
   const [capabilities, setCapabilities] = useState(new Set(product?.capabilities || []));
+  const [appConfigs, setAppConfigs] = useState(product?.appConfigs || []);
+  const [showAddAppForm, setShowAddAppForm] = useState(false);
+  const [editingConfigId, setEditingConfigId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -48,6 +166,20 @@ export default function NewProduct({ product, onSave, onBack }) {
     });
   }
 
+  function handleAddAppConfig(config) {
+    setAppConfigs(prev => [...prev, config]);
+    setShowAddAppForm(false);
+  }
+
+  function handleEditAppConfig(config) {
+    setAppConfigs(prev => prev.map(ac => ac.id === config.id ? config : ac));
+    setEditingConfigId(null);
+  }
+
+  function handleRemoveAppConfig(id) {
+    setAppConfigs(prev => prev.filter(ac => ac.id !== id));
+  }
+
   async function handleSave(e) {
     e.preventDefault();
     if (!name.trim()) {
@@ -68,6 +200,7 @@ export default function NewProduct({ product, onSave, onBack }) {
         modelNumber: modelNumber.trim(),
         category,
         capabilities: Array.from(capabilities),
+        appConfigs,
       });
     } catch (err) {
       setError(err.message || 'Failed to save product.');
@@ -76,6 +209,7 @@ export default function NewProduct({ product, onSave, onBack }) {
   }
 
   const groups = category ? (CAPABILITY_GROUPS[category] || []) : [];
+  const showAppConfigs = SHOW_APP_CONFIGS_FOR.includes(category) && capabilities.size > 0;
 
   return (
     <div className="new-product-page">
@@ -178,10 +312,96 @@ export default function NewProduct({ product, onSave, onBack }) {
           </div>
         )}
 
+        {/* App Configurations Section */}
+        {showAppConfigs && (
+          <div className="app-config-section">
+            <div style={{ marginBottom: 12 }}>
+              <h3 style={{ marginBottom: 4 }}>App Configurations</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                Define which apps control this device and which features each app supports.
+              </p>
+            </div>
+
+            {appConfigs.length > 0 && (
+              <div className="app-config-list">
+                {appConfigs.map(ac => (
+                  <div key={ac.id}>
+                    {editingConfigId === ac.id ? (
+                      <AppConfigForm
+                        capabilities={capabilities}
+                        initialData={ac}
+                        onSave={handleEditAppConfig}
+                        onCancel={() => setEditingConfigId(null)}
+                      />
+                    ) : (
+                      <div className="app-config-item">
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontWeight: 600, fontSize: 14 }}>{ac.appName}</span>
+                          <span
+                            className="badge"
+                            style={{ marginLeft: 8, background: 'var(--primary-dim)', color: 'var(--primary)' }}
+                          >
+                            {platformLabel(ac.platform)}
+                          </span>
+                          <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--text-muted)' }}>
+                            {ac.unavailableCapabilities.length > 0
+                              ? `${ac.unavailableCapabilities.length} feature${ac.unavailableCapabilities.length !== 1 ? 's' : ''} hidden`
+                              : 'All features available'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => {
+                              setEditingConfigId(ac.id);
+                              setShowAddAppForm(false);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleRemoveAppConfig(ac.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showAddAppForm ? (
+              <AppConfigForm
+                capabilities={capabilities}
+                initialData={null}
+                onSave={handleAddAppConfig}
+                onCancel={() => setShowAddAppForm(false)}
+              />
+            ) : (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ marginTop: appConfigs.length > 0 ? 10 : 0 }}
+                onClick={() => {
+                  setShowAddAppForm(true);
+                  setEditingConfigId(null);
+                }}
+              >
+                + Add App
+              </button>
+            )}
+          </div>
+        )}
+
         <button
           type="submit"
           className="btn btn-primary btn-lg"
-          style={{ width: '100%', marginTop: 8 }}
+          style={{ width: '100%', marginTop: 16 }}
           disabled={saving}
         >
           {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Product'}
