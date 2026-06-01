@@ -124,7 +124,12 @@ export default function SessionSummary({ session, onBack }) {
     issues.filter(i => i.severity === sev)
   );
 
+  function handleExportPdf() {
+    window.print();
+  }
+
   return (
+    <div className="session-summary-wrapper">
     <div className="session-summary">
       <div className="summary-header">
         <h1>Session Complete</h1>
@@ -222,7 +227,11 @@ export default function SessionSummary({ session, onBack }) {
         <button className="btn btn-primary" onClick={handleCopy} disabled={loading}>
           {copyMsg || '📋 Copy Summary'}
         </button>
+        <button className="btn btn-secondary" onClick={handleExportPdf} disabled={loading}>
+          🖨 Export PDF
+        </button>
       </div>
+    </div>
     </div>
   );
 }

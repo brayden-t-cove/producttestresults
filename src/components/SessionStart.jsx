@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { CATEGORY_LABELS } from '../data/capabilities.js';
+import { CATEGORY_LABELS, CAPABILITY_GROUPS } from '../data/capabilities.js';
 import { BASELINE_TESTS, TEST_LIBRARY } from '../data/testLibrary.js';
 import { createSession, updateSession, downloadCsvTemplate, importCsv, getFirmwares, addFirmware } from '../lib/api.js';
 
@@ -25,22 +25,69 @@ const SESSION_TYPE_LABELS = {
   feature: 'Feature Session',
 };
 
+function getCapabilityPosition(category, capabilityId) {
+  const groups = CAPABILITY_GROUPS[category] || [];
+  for (let gi = 0; gi < groups.length; gi++) {
+    const caps = groups[gi].capabilities || [];
+    for (let ci = 0; ci < caps.length; ci++) {
+      if (caps[ci].id === capabilityId) {
+        return { sectionIndex: gi + 1, subsectionIndex: ci + 1 };
+      }
+    }
+  }
+  return null;
+}
+
 function generateTestCases(product, appConfig) {
   const seen = new Set();
   const tests = [];
 
-  function addTest(t) {
+  // Track baseline test index counter
+  let baselineCounter = 0;
+
+  // Track per-capability test index
+  const capTestCounters = {};
+
+  function addBaselineTest(t) {
     if (!seen.has(t.id)) {
       seen.add(t.id);
+      baselineCounter++;
       const tc = {
         ...t,
         id: crypto.randomUUID(),
         templateId: t.id,
         status: 'pending',
         notes: '',
+        testNumber: `0.${baselineCounter}`,
       };
-      if (appConfig && appConfig.unavailableCapabilities && t.capabilityId &&
-          appConfig.unavailableCapabilities.includes(t.capabilityId)) {
+      tests.push(tc);
+    }
+  }
+
+  function addCapabilityTest(t, capabilityId) {
+    if (!seen.has(t.id)) {
+      seen.add(t.id);
+      const pos = getCapabilityPosition(product.category, capabilityId);
+      if (!capTestCounters[capabilityId]) capTestCounters[capabilityId] = 0;
+      capTestCounters[capabilityId]++;
+      const testIndex = capTestCounters[capabilityId];
+      let testNumber;
+      if (pos) {
+        testNumber = `${pos.sectionIndex}.${pos.subsectionIndex}.${testIndex}`;
+      } else {
+        testNumber = `?.?.${testIndex}`;
+      }
+      const tc = {
+        ...t,
+        id: crypto.randomUUID(),
+        templateId: t.id,
+        status: 'pending',
+        notes: '',
+        capabilityId,
+        testNumber,
+      };
+      if (appConfig && appConfig.unavailableCapabilities &&
+          appConfig.unavailableCapabilities.includes(capabilityId)) {
         tc.notAvailableInApp = true;
       }
       tests.push(tc);
@@ -48,11 +95,11 @@ function generateTestCases(product, appConfig) {
   }
 
   const baselines = BASELINE_TESTS[product.category] || [];
-  baselines.forEach(addTest);
+  baselines.forEach(t => addBaselineTest(t));
 
   (product.capabilities || []).forEach(capId => {
     const capTests = TEST_LIBRARY[capId] || [];
-    capTests.forEach(t => addTest({ ...t, capabilityId: capId }));
+    capTests.forEach(t => addCapabilityTest(t, capId));
   });
 
   return tests;

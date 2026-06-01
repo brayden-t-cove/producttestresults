@@ -1282,6 +1282,93 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   border-color: var(--text-dim);
 }
 
+/* ============================================================
+   ACTION BAR (wrapping)
+   ============================================================ */
+.action-bar {
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   SKIP MODAL
+   ============================================================ */
+.skip-modal {
+  max-width: 480px;
+}
+
+/* ============================================================
+   SIDEBAR SECTION GROUPS
+   ============================================================ */
+.section-group {
+  margin-bottom: 4px;
+}
+
+.section-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.section-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.section-skip-btn {
+  font-size: 10px;
+  padding: 2px 6px;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+.section-skip-btn:hover {
+  opacity: 1;
+}
+
+.section-skip-inline {
+  padding: 8px 10px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+.section-skip-inline input {
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+/* ============================================================
+   SESSION SUMMARY WRAPPER (for print)
+   ============================================================ */
+.session-summary-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.session-summary-wrapper .session-summary {
+  flex: 1;
+}
+
+/* ============================================================
+   PRINT / PDF EXPORT
+   ============================================================ */
+@media print {
+  body { background: white !important; color: black !important; }
+  .app-layout > *:not(.session-summary-wrapper) { display: none !important; }
+  .summary-actions { display: none !important; }
+  .build-version { display: none !important; }
+  .session-summary { box-shadow: none !important; background: white !important; color: black !important; max-width: 100% !important; }
+  .stat-card { border: 1px solid #ccc !important; background: white !important; color: black !important; }
+  .badge { border: 1px solid #ccc !important; }
+}
+
 /* Not available in app banner */
 .not-available-banner {
   background: rgba(234,179,8,0.1);

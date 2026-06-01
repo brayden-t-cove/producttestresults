@@ -226,6 +226,7 @@ export default function App() {
           session={currentSession}
           onUpdate={handleSessionUpdated}
           onEnd={handleEndSession}
+          onExit={() => { setView('dashboard'); setCurrentSession(null); refreshSessions(); }}
           allSessions={sessions}
         />
       )}

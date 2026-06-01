@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { updateSession } from '../lib/api.js';
+import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 import IssueLogger from './IssueLogger.jsx';
 import IssueVerification from './IssueVerification.jsx';
 
@@ -61,12 +62,52 @@ function AreaBadge({ area }) {
   return <span className="area-badge">{area}</span>;
 }
 
+function TestNumberBadge({ testNumber }) {
+  if (!testNumber) return null;
+  return (
+    <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)', marginRight: 6 }}>
+      [{testNumber}]
+    </span>
+  );
+}
+
+// Group tests by section using testNumber prefix
+function groupTestsBySection(tests, category) {
+  const groups = CAPABILITY_GROUPS[category] || [];
+  const sectionMap = {};
+
+  for (const test of tests) {
+    const num = test.testNumber || '';
+    const parts = num.split('.');
+    const sectionNum = parseInt(parts[0], 10);
+
+    let sectionLabel;
+    if (isNaN(sectionNum) || sectionNum === 0) {
+      sectionLabel = 'General';
+    } else {
+      const grp = groups[sectionNum - 1];
+      sectionLabel = grp ? grp.label : `Section ${sectionNum}`;
+    }
+
+    const key = isNaN(sectionNum) ? 'general' : String(sectionNum);
+    if (!sectionMap[key]) {
+      sectionMap[key] = { sectionLabel, sectionIndex: isNaN(sectionNum) ? 0 : sectionNum, tests: [] };
+    }
+    sectionMap[key].tests.push(test);
+  }
+
+  return Object.values(sectionMap).sort((a, b) => a.sectionIndex - b.sectionIndex);
+}
+
 // Reproduction detail panel
 function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict }) {
   return (
     <>
       <div className="test-detail-content">
-        <div className="test-detail-title">{test.title}</div>
+        <div className="test-detail-title">
+          <TestNumberBadge testNumber={test.testNumber} />
+          {test.title}
+        </div>
         <span className={badgeClass(test.status)} style={{ marginBottom: 20, display: 'inline-flex' }}>
           {statusLabel(test.status)}
         </span>
@@ -143,7 +184,10 @@ function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdic
   return (
     <>
       <div className="test-detail-content">
-        <div className="test-detail-title">{test.title}</div>
+        <div className="test-detail-title">
+          <TestNumberBadge testNumber={test.testNumber} />
+          {test.title}
+        </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
           <span className={badgeClass(test.status)} style={{ display: 'inline-flex' }}>
             {statusLabel(test.status)}
@@ -228,7 +272,10 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
             ⚠️ Not available in {appConfigName || 'this app'} — mark as N/A or test anyway
           </div>
         )}
-        <div className="test-detail-title">{test.title}</div>
+        <div className="test-detail-title">
+          <TestNumberBadge testNumber={test.testNumber} />
+          {test.title}
+        </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <span className={badgeClass(test.status)} style={{ display: 'inline-flex' }}>
             {statusLabel(test.status)}
@@ -304,7 +351,7 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
   );
 }
 
-export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
+export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessions }) {
   const sessionType = session.type || 'e2e';
   const [selectedTestId, setSelectedTestId] = useState(
     session.testCases.length > 0 ? session.testCases[0].id : null
@@ -314,6 +361,13 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
   const [showVerification, setShowVerification] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Skip remaining pending modal state
+  const [showSkipAllModal, setShowSkipAllModal] = useState(false);
+  const [skipAllReason, setSkipAllReason] = useState('');
+
+  // Skip section inline state: { sectionIndex: number, reason: string } or null
+  const [skipSectionState, setSkipSectionState] = useState(null);
+
   const selectedTest = session.testCases.find(t => t.id === selectedTestId);
 
   const completed = session.testCases.filter(t => t.status !== 'pending').length;
@@ -321,10 +375,9 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
   const total = session.testCases.length;
   const progress = total > 0 ? (completed / total) * 100 : 0;
 
-  async function saveTestUpdate(testId, updates) {
-    const newTestCases = session.testCases.map(t =>
-      t.id === testId ? { ...t, ...updates } : t
-    );
+  const pendingCount = session.testCases.filter(t => t.status === 'pending').length;
+
+  async function saveTestCases(newTestCases) {
     try {
       setSaving(true);
       const updated = await updateSession(session.id, { testCases: newTestCases });
@@ -334,6 +387,13 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function saveTestUpdate(testId, updates) {
+    const newTestCases = session.testCases.map(t =>
+      t.id === testId ? { ...t, ...updates } : t
+    );
+    await saveTestCases(newTestCases);
   }
 
   function handleVerdict(status) {
@@ -383,11 +443,50 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
     }
   }
 
+  async function handleSaveAndExit() {
+    // Auto-save is already active; just navigate away without completing
+    try {
+      const updated = await updateSession(session.id, { status: 'active' });
+      onUpdate(updated);
+    } catch (e) {
+      console.error(e);
+    }
+    onExit();
+  }
+
+  async function handleConfirmSkipAll() {
+    const reason = skipAllReason.trim();
+    const newTestCases = session.testCases.map(t =>
+      t.status === 'pending' ? { ...t, status: 'skip', notes: reason || t.notes } : t
+    );
+    await saveTestCases(newTestCases);
+    setShowSkipAllModal(false);
+    setSkipAllReason('');
+  }
+
+  async function handleConfirmSkipSection(sectionIndex, reason) {
+    const sectionPrefix = String(sectionIndex) + '.';
+    const newTestCases = session.testCases.map(t => {
+      const num = t.testNumber || '';
+      const inSection = sectionIndex === 0
+        ? num.startsWith('0.')
+        : num.startsWith(sectionPrefix);
+      if (inSection && t.status === 'pending') {
+        return { ...t, status: 'skip', notes: reason || t.notes };
+      }
+      return t;
+    });
+    await saveTestCases(newTestCases);
+    setSkipSectionState(null);
+  }
+
   const testNote = notes[selectedTestId] !== undefined
     ? notes[selectedTestId]
     : (selectedTest?.notes || '');
 
   const listItemLabel = sessionType === 'reproduction' ? 'issue' : 'test case';
+
+  const sectionGroups = groupTestsBySection(session.testCases, session.category);
 
   return (
     <div className="test-runner">
@@ -417,22 +516,72 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
         {/* Sidebar */}
         <div className="test-sidebar">
           <div className="test-list">
-            {session.testCases.map(t => (
-              <div
-                key={t.id}
-                className={`test-list-item ${t.id === selectedTestId ? 'selected' : ''}`}
-                onClick={() => setSelectedTestId(t.id)}
-              >
-                <span className="test-title">{t.title}</span>
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  {sessionType === 'e2e' && t.area && <AreaBadge area={t.area} />}
-                  {sessionType === 'e2e' && t.priority && <PriorityBadge priority={t.priority} />}
-                  {sessionType === 'regression' && t.regressionRisk && <RegressionRiskBadge risk={t.regressionRisk} />}
-                  {t.status === 'na' || (t.notAvailableInApp && t.status === 'pending')
-                    ? <span className="badge badge-na">N/A</span>
-                    : <span className={badgeClass(t.status)}>{statusLabel(t.status)}</span>
-                  }
+            {sectionGroups.map(group => (
+              <div key={group.sectionIndex} className="section-group">
+                <div className="section-group-header">
+                  <span className="section-group-label">
+                    {group.sectionIndex} · {group.sectionLabel}
+                  </span>
+                  <button
+                    className="btn btn-ghost btn-sm section-skip-btn"
+                    onClick={() => setSkipSectionState(
+                      skipSectionState?.sectionIndex === group.sectionIndex
+                        ? null
+                        : { sectionIndex: group.sectionIndex, reason: '' }
+                    )}
+                  >
+                    Skip Section
+                  </button>
                 </div>
+                {skipSectionState?.sectionIndex === group.sectionIndex && (
+                  <div className="section-skip-inline">
+                    <input
+                      type="text"
+                      placeholder="Reason (optional)"
+                      value={skipSectionState.reason}
+                      onChange={e => setSkipSectionState(s => ({ ...s, reason: e.target.value }))}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleConfirmSkipSection(group.sectionIndex, skipSectionState.reason);
+                        if (e.key === 'Escape') setSkipSectionState(null);
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleConfirmSkipSection(group.sectionIndex, skipSectionState.reason)}
+                      >
+                        Skip
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setSkipSectionState(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {group.tests.map(t => (
+                  <div
+                    key={t.id}
+                    className={`test-list-item ${t.id === selectedTestId ? 'selected' : ''}`}
+                    onClick={() => setSelectedTestId(t.id)}
+                  >
+                    <span className="test-title">
+                      <TestNumberBadge testNumber={t.testNumber} />
+                      {t.title}
+                    </span>
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {sessionType === 'e2e' && t.area && <AreaBadge area={t.area} />}
+                      {sessionType === 'e2e' && t.priority && <PriorityBadge priority={t.priority} />}
+                      {sessionType === 'regression' && t.regressionRisk && <RegressionRiskBadge risk={t.regressionRisk} />}
+                      {t.status === 'na' || (t.notAvailableInApp && t.status === 'pending')
+                        ? <span className="badge badge-na">N/A</span>
+                        : <span className={badgeClass(t.status)}>{statusLabel(t.status)}</span>
+                      }
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
             {session.testCases.length === 0 && (
@@ -497,18 +646,62 @@ export default function TestRunner({ session, onUpdate, onEnd, allSessions }) {
       </div>
 
       {/* Action Bar */}
-      <div className="test-action-bar">
+      <div className="test-action-bar action-bar">
         <button className="btn btn-secondary" onClick={() => setShowIssueLogger(true)}>
           🐛 Log Issue
         </button>
         <button className="btn btn-secondary" onClick={() => setShowVerification(true)}>
           ✓ Verify Known Issue
         </button>
+        <button
+          className="btn btn-secondary"
+          onClick={() => { setShowSkipAllModal(true); setSkipAllReason(''); }}
+          disabled={pendingCount === 0}
+        >
+          ⏭ Skip Remaining
+        </button>
         <div className="spacer" />
+        <button className="btn btn-ghost" onClick={handleSaveAndExit}>
+          Save &amp; Exit
+        </button>
         <button className="btn btn-primary" onClick={handleEndSession}>
           End Session →
         </button>
       </div>
+
+      {/* Skip All Pending Modal */}
+      {showSkipAllModal && (
+        <div className="modal-overlay">
+          <div className="modal skip-modal">
+            <div className="modal-header">
+              <h3>Skip Remaining Pending Tests</h3>
+              <button className="modal-close" onClick={() => setShowSkipAllModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: 16, color: 'var(--text-muted)' }}>
+                {pendingCount} test{pendingCount !== 1 ? 's are' : ' is'} still pending.
+              </p>
+              <div className="form-group">
+                <label>Reason for skipping (applied to all):</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Not applicable to this firmware version"
+                  value={skipAllReason}
+                  onChange={e => setSkipAllReason(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setShowSkipAllModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleConfirmSkipAll}>
+                Skip All Pending
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showIssueLogger && (
         <IssueLogger
