@@ -13,6 +13,7 @@ const app = express();
 const PORT = 3001;
 const SESSIONS_DIR = join(__dirname, 'data', 'sessions');
 const DEVICES_FILE = join(__dirname, 'data', 'devices.json');
+const FIRMWARES_FILE = join(__dirname, 'data', 'firmwares.json');
 
 app.use(cors());
 app.use(express.json());
@@ -25,6 +26,37 @@ if (!existsSync(SESSIONS_DIR)) {
 if (!existsSync(DEVICES_FILE)) {
   await writeFile(DEVICES_FILE, JSON.stringify([], null, 2));
 }
+if (!existsSync(FIRMWARES_FILE)) {
+  await writeFile(FIRMWARES_FILE, JSON.stringify([], null, 2));
+}
+
+// GET /api/firmwares?deviceName=xxx
+app.get('/api/firmwares', async (req, res) => {
+  try {
+    const data = JSON.parse(await readFile(FIRMWARES_FILE, 'utf8'));
+    const { deviceName } = req.query;
+    res.json(deviceName ? data.filter(f => f.deviceName === deviceName) : data);
+  } catch {
+    res.json([]);
+  }
+});
+
+// POST /api/firmwares
+app.post('/api/firmwares', async (req, res) => {
+  try {
+    const { deviceName, version } = req.body;
+    if (!deviceName || !version) return res.status(400).json({ error: 'deviceName and version required' });
+    const data = JSON.parse(await readFile(FIRMWARES_FILE, 'utf8'));
+    const existing = data.find(f => f.deviceName === deviceName && f.version === version);
+    if (existing) return res.json(existing);
+    const entry = { id: uuidv4(), deviceName, version: version.trim() };
+    data.push(entry);
+    await writeFile(FIRMWARES_FILE, JSON.stringify(data, null, 2));
+    res.status(201).json(entry);
+  } catch {
+    res.status(500).json({ error: 'Failed to save firmware' });
+  }
+});
 
 // GET /api/devices
 app.get('/api/devices', async (req, res) => {

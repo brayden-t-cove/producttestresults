@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { PRODUCTS, CATEGORY_LABELS } from '../data/products.js';
-import { createSession, aiPopulateTests, downloadCsvTemplate, importCsv, getDevices, addDevice } from '../lib/api.js';
+import { createSession, aiPopulateTests, downloadCsvTemplate, importCsv, getDevices, addDevice, getFirmwares, addFirmware } from '../lib/api.js';
 
 const CATEGORIES = ['hub', 'camera', 'sensor', 'app'];
 
@@ -46,6 +46,10 @@ export default function SessionStart({ onBack, onCreated }) {
   const [newDeviceName, setNewDeviceName] = useState('');
   const [savedDevices, setSavedDevices] = useState([]);
   const [firmware, setFirmware] = useState('');
+  const [addingFirmware, setAddingFirmware] = useState(false);
+  const [newFirmwareVersion, setNewFirmwareVersion] = useState('');
+  const [savedFirmwares, setSavedFirmwares] = useState([]);
+  const newFirmwareInputRef = useRef(null);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
@@ -66,7 +70,39 @@ export default function SessionStart({ onBack, onCreated }) {
     setDeviceName('');
     setAddingDevice(false);
     setNewDeviceName('');
+    setFirmware('');
+    setSavedFirmwares([]);
   }, [productId]);
+
+  useEffect(() => {
+    setFirmware('');
+    setAddingFirmware(false);
+    setNewFirmwareVersion('');
+    if (deviceName) {
+      getFirmwares(deviceName).then(setSavedFirmwares).catch(() => {});
+    } else {
+      setSavedFirmwares([]);
+    }
+  }, [deviceName]);
+
+  useEffect(() => {
+    if (addingFirmware) newFirmwareInputRef.current?.focus();
+  }, [addingFirmware]);
+
+  async function handleAddFirmware() {
+    const version = newFirmwareVersion.trim();
+    const key = deviceName || selectedProduct?.name;
+    if (!version || !key) return;
+    try {
+      const entry = await addFirmware(key, version);
+      setSavedFirmwares(prev => [...prev.filter(f => f.id !== entry.id), entry]);
+      setFirmware(entry.version);
+    } catch {
+      setFirmware(version);
+    }
+    setAddingFirmware(false);
+    setNewFirmwareVersion('');
+  }
 
   useEffect(() => {
     if (addingDevice) newDeviceInputRef.current?.focus();
@@ -313,15 +349,41 @@ export default function SessionStart({ onBack, onCreated }) {
           </div>
         )}
 
-        <div className="form-group">
-          <label>Firmware Version</label>
-          <input
-            type="text"
-            placeholder="e.g. 3.4.2-beta, 2024.11.01"
-            value={firmware}
-            onChange={e => setFirmware(e.target.value)}
-          />
-        </div>
+        {selectedProduct && (
+          <div className="form-group">
+            <label>Firmware Version</label>
+            {!addingFirmware ? (
+              <select value={firmware} onChange={e => {
+                if (e.target.value === '__add__') {
+                  setAddingFirmware(true);
+                  setFirmware('');
+                } else {
+                  setFirmware(e.target.value);
+                }
+              }}>
+                <option value="">— Select or add firmware —</option>
+                {savedFirmwares.map(f => (
+                  <option key={f.id} value={f.version}>{f.version}</option>
+                ))}
+                <option value="__add__">+ Add new firmware version...</option>
+              </select>
+            ) : (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  ref={newFirmwareInputRef}
+                  type="text"
+                  placeholder="e.g. 3.4.2-beta, 2024.11.01"
+                  value={newFirmwareVersion}
+                  onChange={e => setNewFirmwareVersion(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddFirmware(); } if (e.key === 'Escape') { setAddingFirmware(false); setNewFirmwareVersion(''); } }}
+                  style={{ flex: 1 }}
+                />
+                <button type="button" className="btn btn-primary btn-sm" onClick={handleAddFirmware} disabled={!newFirmwareVersion.trim()}>Save</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setAddingFirmware(false); setNewFirmwareVersion(''); }}>Cancel</button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="form-group">
           <label>Session Notes</label>

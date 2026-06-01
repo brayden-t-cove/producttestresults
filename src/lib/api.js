@@ -98,6 +98,21 @@ export async function downloadCsvTemplate(type) {
   URL.revokeObjectURL(url);
 }
 
+export async function getFirmwares(deviceName) {
+  const res = await fetch(`${BASE}/firmwares?deviceName=${encodeURIComponent(deviceName)}`);
+  return res.json();
+}
+
+export async function addFirmware(deviceName, version) {
+  const res = await fetch(`${BASE}/firmwares`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceName, version }),
+  });
+  if (!res.ok) throw new Error('Failed to save firmware');
+  return res.json();
+}
+
 export async function getDevices() {
   const res = await fetch(`${BASE}/devices`);
   return res.json();
