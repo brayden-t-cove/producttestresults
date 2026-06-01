@@ -14,7 +14,7 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete }) {
+export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onBack }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   function handleDeleteClick(product) {
@@ -30,6 +30,9 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
 
   return (
     <div className="catalog-page">
+      <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>
+        ← Back
+      </button>
       <div className="catalog-header">
         <div>
           <h1>Product Catalog</h1>

@@ -197,6 +197,7 @@ export default function App() {
             onEdit={product => { setEditingProduct(product); setView('editProduct'); }}
             onStartTest={handleStartTestFromCatalog}
             onDelete={handleDeleteProduct}
+            onBack={() => setView('dashboard')}
           />
         </div>
       )}
