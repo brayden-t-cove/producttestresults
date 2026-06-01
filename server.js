@@ -539,6 +539,215 @@ app.post('/api/csv-import', (req, res) => {
   }
 });
 
+// GET /api/issues - flat list of all issues across all sessions
+app.get('/api/issues', async (req, res) => {
+  const SEVERITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+  try {
+    const files = await readdir(SESSIONS_DIR);
+    const jsonFiles = files.filter(f => f.endsWith('.json'));
+    const allIssues = [];
+    for (const file of jsonFiles) {
+      const raw = await readFile(join(SESSIONS_DIR, file), 'utf-8');
+      const session = JSON.parse(raw);
+      const issues = session.issues || [];
+      const verifications = session.verifications || [];
+      for (const issue of issues) {
+        // Derive status from verifications
+        const issueVerifs = verifications.filter(v => v.issueId === issue.id);
+        let status = 'Open';
+        if (issueVerifs.length > 0) {
+          const latestVerif = issueVerifs[issueVerifs.length - 1];
+          if (latestVerif.result === 'Fixed' || latestVerif.result === 'fixed-verified') status = 'Fixed';
+          else if (latestVerif.result === 'Cannot Reproduce' || latestVerif.result === 'cannot-reproduce') status = 'Cannot Reproduce';
+        }
+        allIssues.push({
+          ...issue,
+          sessionId: session.id,
+          productName: session.productName,
+          sessionDate: session.createdAt,
+          firmware: session.firmware || '',
+          verificationHistory: issueVerifs,
+          derivedStatus: status,
+        });
+      }
+    }
+    allIssues.sort((a, b) => {
+      const sa = SEVERITY_ORDER[a.severity] ?? 99;
+      const sb = SEVERITY_ORDER[b.severity] ?? 99;
+      if (sa !== sb) return sa - sb;
+      return new Date(b.sessionDate) - new Date(a.sessionDate);
+    });
+    res.json(allIssues);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load issues' });
+  }
+});
+
+// GET /api/analytics - pre-computed analytics across all sessions
+app.get('/api/analytics', async (req, res) => {
+  try {
+    const files = await readdir(SESSIONS_DIR);
+    const jsonFiles = files.filter(f => f.endsWith('.json'));
+    const sessions = await Promise.all(
+      jsonFiles.map(async f => JSON.parse(await readFile(join(SESSIONS_DIR, f), 'utf-8')))
+    );
+
+    let totalTests = 0, passCount = 0, failCount = 0, skipCount = 0, naCount = 0;
+    const productMap = {};
+    const testFailMap = {};
+    const issueSeverityBreakdown = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    const issueCategoryBreakdown = {};
+
+    for (const session of sessions) {
+      const tc = session.testCases || [];
+      const issues = session.issues || [];
+      const verifications = session.verifications || [];
+
+      let sPass = 0, sFail = 0, sSkip = 0, sNa = 0;
+      for (const t of tc) {
+        totalTests++;
+        if (t.status === 'pass') { passCount++; sPass++; }
+        else if (t.status === 'fail') { failCount++; sFail++; }
+        else if (t.status === 'skip') { skipCount++; sSkip++; }
+        else if (t.status === 'na') { naCount++; sNa++; }
+
+        if (t.status === 'fail' && t.title) {
+          const key = t.testNumber ? `${t.testNumber}|${t.title}` : t.title;
+          if (!testFailMap[key]) testFailMap[key] = { title: t.title, testNumber: t.testNumber || '', failCount: 0, totalCount: 0 };
+          testFailMap[key].failCount++;
+        }
+        if (t.title) {
+          const key = t.testNumber ? `${t.testNumber}|${t.title}` : t.title;
+          if (!testFailMap[key]) testFailMap[key] = { title: t.title, testNumber: t.testNumber || '', failCount: 0, totalCount: 0 };
+          testFailMap[key].totalCount++;
+        }
+      }
+
+      const sTotal = sPass + sFail + sSkip + sNa;
+      const sPassRate = sTotal > 0 ? sPass / sTotal : 0;
+
+      const pName = session.productName || 'Unknown';
+      if (!productMap[pName]) {
+        productMap[pName] = {
+          productName: pName,
+          catalogId: session.productId || null,
+          sessionCount: 0,
+          totalPass: 0, totalFail: 0, totalSkip: 0, totalNa: 0,
+          sessions: [],
+          openIssues: 0,
+        };
+      }
+      const pm = productMap[pName];
+      pm.sessionCount++;
+      pm.totalPass += sPass; pm.totalFail += sFail; pm.totalSkip += sSkip; pm.totalNa += sNa;
+      pm.sessions.push({
+        sessionId: session.id,
+        date: session.createdAt,
+        firmware: session.firmware || '',
+        passRate: sPassRate,
+        passCount: sPass, failCount: sFail, skipCount: sSkip, naCount: sNa,
+      });
+
+      // Issues
+      const SEVERITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+      for (const issue of issues) {
+        const sev = issue.severity;
+        if (sev in issueSeverityBreakdown) issueSeverityBreakdown[sev]++;
+        const cat = issue.issueCategory || issue.category || 'Other';
+        issueCategoryBreakdown[cat] = (issueCategoryBreakdown[cat] || 0) + 1;
+
+        // Check if open
+        const issueVerifs = verifications.filter(v => v.issueId === issue.id);
+        let isOpen = true;
+        if (issueVerifs.length > 0) {
+          const latest = issueVerifs[issueVerifs.length - 1];
+          if (latest.result === 'Fixed' || latest.result === 'fixed-verified' ||
+              latest.result === 'Cannot Reproduce' || latest.result === 'cannot-reproduce') {
+            isOpen = false;
+          }
+        }
+        if (isOpen) pm.openIssues++;
+      }
+    }
+
+    // Build productStats
+    const productStats = Object.values(productMap).map(pm => {
+      const tot = pm.totalPass + pm.totalFail + pm.totalSkip + pm.totalNa;
+      return {
+        productName: pm.productName,
+        catalogId: pm.catalogId,
+        sessionCount: pm.sessionCount,
+        passRate: tot > 0 ? pm.totalPass / tot : 0,
+        sessions: pm.sessions.sort((a, b) => new Date(a.date) - new Date(b.date)),
+        openIssues: pm.openIssues,
+      };
+    }).sort((a, b) => a.passRate - b.passRate);
+
+    // Top failing tests (min 1 fail, top 10 by failCount)
+    const topFailingTests = Object.values(testFailMap)
+      .filter(t => t.failCount >= 1)
+      .sort((a, b) => b.failCount - a.failCount)
+      .slice(0, 10);
+
+    // Open issues by product
+    const openIssuesByProduct = Object.values(productMap).map(pm => {
+      // Count by severity
+      let crit = 0, high = 0, medLow = 0, oldestDays = 0;
+      for (const session of sessions.filter(s => s.productName === pm.productName)) {
+        for (const issue of (session.issues || [])) {
+          const issueVerifs = (session.verifications || []).filter(v => v.issueId === issue.id);
+          let isOpen = true;
+          if (issueVerifs.length > 0) {
+            const latest = issueVerifs[issueVerifs.length - 1];
+            if (latest.result === 'Fixed' || latest.result === 'fixed-verified' ||
+                latest.result === 'Cannot Reproduce' || latest.result === 'cannot-reproduce') {
+              isOpen = false;
+            }
+          }
+          if (isOpen) {
+            if (issue.severity === 'Critical') crit++;
+            else if (issue.severity === 'High') high++;
+            else medLow++;
+            const days = Math.floor((Date.now() - new Date(session.createdAt)) / 86400000);
+            if (days > oldestDays) oldestDays = days;
+          }
+        }
+      }
+      return {
+        productName: pm.productName,
+        openCount: pm.openIssues,
+        critical: crit,
+        high,
+        medLow,
+        oldestDays,
+      };
+    }).filter(p => p.openCount > 0).sort((a, b) => b.openCount - a.openCount);
+
+    res.json({
+      overallStats: {
+        sessionCount: sessions.length,
+        totalTests,
+        passCount,
+        failCount,
+        skipCount,
+        naCount,
+        overallPassRate: totalTests > 0 ? passCount / totalTests : 0,
+      },
+      productStats,
+      issueSeverityBreakdown,
+      issueCategoryBreakdown,
+      topFailingTests,
+      openIssuesByProduct,
+      totalIssues: Object.values(issueSeverityBreakdown).reduce((a, b) => a + b, 0),
+      totalOpenIssues: openIssuesByProduct.reduce((a, p) => a + p.openCount, 0),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to compute analytics' });
+  }
+});
+
 // GET /api/settings - return masked API key status
 app.get('/api/settings', (req, res) => {
   const key = process.env.ANTHROPIC_API_KEY || '';

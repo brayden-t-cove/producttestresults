@@ -6,6 +6,8 @@ import TestRunner from './components/TestRunner.jsx';
 import SessionSummary from './components/SessionSummary.jsx';
 import ProductCatalog from './components/ProductCatalog.jsx';
 import NewProduct from './components/NewProduct.jsx';
+import AnalyticsPage from './components/AnalyticsPage.jsx';
+import IssuesPage from './components/IssuesPage.jsx';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -71,7 +73,7 @@ function SettingsModal({ onClose }) {
   );
 }
 
-function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, loading }) {
+function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, loading }) {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -79,8 +81,10 @@ function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, lo
           <h1>QA Testing Platform</h1>
           <p>Security hardware testing sessions</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
+          <button className="btn btn-ghost" onClick={onAnalytics}>📊 Analytics</button>
+          <button className="btn btn-ghost" onClick={onIssues}>🐛 Issues</button>
           <button className="btn btn-secondary" onClick={onCatalog}>
             📦 Product Catalog
           </button>
@@ -244,6 +248,8 @@ export default function App() {
           onOpen={handleOpenSession}
           onCatalog={() => setView('catalog')}
           onSettings={() => setShowSettings(true)}
+          onAnalytics={() => setView('analytics')}
+          onIssues={() => setView('issues')}
         />
       )}
 
@@ -293,6 +299,21 @@ export default function App() {
         <SessionSummary
           session={currentSession}
           onBack={handleBackToDashboard}
+        />
+      )}
+
+      {view === 'analytics' && (
+        <AnalyticsPage
+          onBack={() => setView('dashboard')}
+          onGoToIssues={(product) => {
+            setView('issues');
+          }}
+        />
+      )}
+
+      {view === 'issues' && (
+        <IssuesPage
+          onBack={() => setView('dashboard')}
         />
       )}
     </div>
