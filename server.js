@@ -99,7 +99,7 @@ app.get('/api/catalog/:id', async (req, res) => {
 // POST /api/catalog
 app.post('/api/catalog', async (req, res) => {
   try {
-    const { name, manufacturer, modelNumber, category, capabilities } = req.body;
+    const { name, manufacturer, modelNumber, version, category, capabilities, appConfigs } = req.body;
     if (!name || !category) return res.status(400).json({ error: 'name and category required' });
     const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
     const entry = {
@@ -107,8 +107,10 @@ app.post('/api/catalog', async (req, res) => {
       name: name.trim(),
       manufacturer: (manufacturer || '').trim(),
       modelNumber: (modelNumber || '').trim(),
+      version: (version || '').trim(),
       category,
       capabilities: capabilities || [],
+      appConfigs: appConfigs || [],
       createdAt: new Date().toISOString(),
     };
     data.push(entry);
