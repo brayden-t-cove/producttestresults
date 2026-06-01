@@ -3,14 +3,17 @@ import cors from 'cors';
 import { readdir, readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
+import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, '.env') });
 const app = express();
 const PORT = 3001;
+const ENV_FILE = join(__dirname, '.env');
 const SESSIONS_DIR = join(__dirname, 'data', 'sessions');
 const DEVICES_FILE = join(__dirname, 'data', 'devices.json');
 const FIRMWARES_FILE = join(__dirname, 'data', 'firmwares.json');
@@ -533,6 +536,43 @@ app.post('/api/csv-import', (req, res) => {
       return obj;
     });
     return res.json({ testCases });
+  }
+});
+
+// GET /api/settings - return masked API key status
+app.get('/api/settings', (req, res) => {
+  const key = process.env.ANTHROPIC_API_KEY || '';
+  res.json({
+    hasApiKey: !!key,
+    apiKeyPreview: key ? `${key.slice(0, 8)}...${key.slice(-4)}` : null,
+  });
+});
+
+// POST /api/settings - save API key to .env and hot-reload
+app.post('/api/settings', async (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    if (!apiKey || typeof apiKey !== 'string') return res.status(400).json({ error: 'apiKey required' });
+    const trimmed = apiKey.trim();
+
+    // Read existing .env or start fresh
+    let envContent = '';
+    if (existsSync(ENV_FILE)) {
+      envContent = await readFile(ENV_FILE, 'utf8');
+    }
+
+    // Replace or append ANTHROPIC_API_KEY line
+    if (/^ANTHROPIC_API_KEY=.*/m.test(envContent)) {
+      envContent = envContent.replace(/^ANTHROPIC_API_KEY=.*/m, `ANTHROPIC_API_KEY=${trimmed}`);
+    } else {
+      envContent = envContent.trimEnd() + `\nANTHROPIC_API_KEY=${trimmed}\n`;
+    }
+
+    await writeFile(ENV_FILE, envContent);
+    process.env.ANTHROPIC_API_KEY = trimmed; // hot-reload without restart
+    res.json({ success: true, apiKeyPreview: `${trimmed.slice(0, 8)}...${trimmed.slice(-4)}` });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save API key' });
   }
 });
 

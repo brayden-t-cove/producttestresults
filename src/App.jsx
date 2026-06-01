@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry } from './lib/api.js';
+import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, getSettings, saveSettings } from './lib/api.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
 import TestRunner from './components/TestRunner.jsx';
@@ -14,7 +14,64 @@ function formatDate(iso) {
   });
 }
 
-function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, loading }) {
+function SettingsModal({ onClose }) {
+  const [apiKey, setApiKey] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    getSettings().then(d => { if (d.apiKeyPreview) setPreview(d.apiKeyPreview); }).catch(() => {});
+  }, []);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    if (!apiKey.trim()) return;
+    setSaving(true); setMsg('');
+    try {
+      const result = await saveSettings(apiKey.trim());
+      setPreview(result.apiKeyPreview);
+      setApiKey('');
+      setMsg('✓ API key saved — AI features are now active.');
+    } catch {
+      setMsg('Failed to save. Try again.');
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+        <h2 style={{ marginBottom: 16 }}>⚙️ Settings</h2>
+        <div className="form-group">
+          <label>Anthropic API Key</label>
+          {preview && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Current: <code>{preview}</code></div>}
+          <form onSubmit={handleSave} style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="password"
+              placeholder="sk-ant-..."
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              style={{ flex: 1 }}
+              autoComplete="off"
+            />
+            <button className="btn btn-primary" disabled={saving || !apiKey.trim()}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </form>
+          {msg && <div style={{ fontSize: 13, marginTop: 8, color: msg.startsWith('✓') ? 'var(--pass)' : 'var(--fail)' }}>{msg}</div>}
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+            Used for AI features: test population, issue suggestions, repro steps, session summaries. Saved to your local .env file.
+          </p>
+        </div>
+        <div style={{ marginTop: 16, textAlign: 'right' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, loading }) {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -23,13 +80,11 @@ function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, loading }) {
           <p>Security hardware testing sessions</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
           <button className="btn btn-secondary" onClick={onCatalog}>
             📦 Product Catalog
           </button>
-          <button
-            className="btn btn-primary btn-lg"
-            onClick={onNew}
-          >
+          <button className="btn btn-primary btn-lg" onClick={onNew}>
             + New Session
           </button>
         </div>
@@ -88,6 +143,7 @@ export default function App() {
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [catalog, setCatalog] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   async function refreshSessions() {
     try {
@@ -174,6 +230,7 @@ export default function App() {
 
   return (
     <div className="app-layout">
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       <div style={{ position: 'fixed', bottom: 8, right: 12, fontSize: 11, color: 'var(--text-muted)', opacity: 0.5, pointerEvents: 'none', userSelect: 'none', zIndex: 9999 }}>
         {BUILD_VERSION} · {BUILD_DATE}
       </div>
@@ -186,6 +243,7 @@ export default function App() {
           onNew={() => setView('sessionStart')}
           onOpen={handleOpenSession}
           onCatalog={() => setView('catalog')}
+          onSettings={() => setShowSettings(true)}
         />
       )}
 

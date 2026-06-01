@@ -11,6 +11,7 @@
     "@anthropic-ai/sdk": "^0.30.0",
     "concurrently": "^9.0.0",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^4.19.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

@@ -186,3 +186,19 @@ export async function deleteCatalogEntry(id) {
   if (!res.ok) throw new Error('Failed to delete catalog entry');
   return res.json();
 }
+
+export async function getSettings() {
+  const res = await fetch(`${BASE}/settings`);
+  if (!res.ok) throw new Error('Failed to get settings');
+  return res.json();
+}
+
+export async function saveSettings(apiKey) {
+  const res = await fetch(`${BASE}/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apiKey }),
+  });
+  if (!res.ok) throw new Error('Failed to save settings');
+  return res.json();
+}
