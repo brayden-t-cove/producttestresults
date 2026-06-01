@@ -159,24 +159,51 @@ export async function getCatalogEntry(id) {
   return res.json();
 }
 
+async function apiThrow(res, context) {
+  let body;
+  try { body = await res.json(); } catch { body = {}; }
+  const code = body.code || `HTTP_${res.status}`;
+  const detail = body.detail ? ` — ${body.detail}` : '';
+  throw Object.assign(new Error(`[${code}] ${body.error || context}${detail}`), { code, status: res.status, body });
+}
+
 export async function createCatalogEntry(data) {
-  const res = await fetch(`${BASE}/catalog`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error('Failed to create catalog entry');
+  let res;
+  try {
+    res = await fetch(`${BASE}/catalog`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch (e) {
+    throw Object.assign(new Error(`[NET_ERROR] Cannot reach API server — is it running? (${e.message})`), { code: 'NET_ERROR' });
+  }
+  if (!res.ok) await apiThrow(res, 'Failed to create catalog entry');
   return res.json();
 }
 
 export async function updateCatalogEntry(id, data) {
-  const res = await fetch(`${BASE}/catalog/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error('Failed to update catalog entry');
+  let res;
+  try {
+    res = await fetch(`${BASE}/catalog/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch (e) {
+    throw Object.assign(new Error(`[NET_ERROR] Cannot reach API server — is it running? (${e.message})`), { code: 'NET_ERROR' });
+  }
+  if (!res.ok) await apiThrow(res, 'Failed to update catalog entry');
   return res.json();
+}
+
+export async function getDebugInfo() {
+  try {
+    const res = await fetch(`${BASE}/debug`);
+    return res.json();
+  } catch (e) {
+    return { status: 'unreachable', error: e.message };
+  }
 }
 
 export async function deleteCatalogEntry(id) {

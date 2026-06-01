@@ -72,6 +72,29 @@ app.post('/api/firmwares', async (req, res) => {
   }
 });
 
+// ── Debug / health endpoint ───────────────────────────────────────────────────
+
+app.get('/api/debug', async (req, res) => {
+  const checks = {};
+  try {
+    const raw = await readFile(CATALOG_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    checks.catalogFile = { ok: true, entries: parsed.length, path: CATALOG_FILE };
+  } catch (e) {
+    checks.catalogFile = { ok: false, error: e.message, path: CATALOG_FILE };
+  }
+  try {
+    await readFile(FIRMWARES_FILE, 'utf8');
+    checks.firmwaresFile = { ok: true };
+  } catch (e) {
+    checks.firmwaresFile = { ok: false, error: e.message };
+  }
+  checks.server = { ok: true, port: PORT, uptime: Math.round(process.uptime()) + 's', nodeVersion: process.version };
+  checks.env = { anthropicKeySet: !!process.env.ANTHROPIC_API_KEY };
+  const allOk = Object.values(checks).every(c => c.ok);
+  res.status(allOk ? 200 : 500).json({ status: allOk ? 'ok' : 'degraded', checks });
+});
+
 // ── Catalog endpoints ─────────────────────────────────────────────────────────
 
 // GET /api/catalog
@@ -100,8 +123,13 @@ app.get('/api/catalog/:id', async (req, res) => {
 app.post('/api/catalog', async (req, res) => {
   try {
     const { name, manufacturer, modelNumber, version, category, capabilities, appConfigs } = req.body;
-    if (!name || !category) return res.status(400).json({ error: 'name and category required' });
-    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    if (!name || !category) return res.status(400).json({ error: 'name and category required', code: 'CAT_001_MISSING_FIELDS' });
+    let data;
+    try {
+      data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to read catalog file', code: 'CAT_002_READ_ERROR', detail: e.message });
+    }
     const entry = {
       id: uuidv4(),
       name: name.trim(),
@@ -114,24 +142,37 @@ app.post('/api/catalog', async (req, res) => {
       createdAt: new Date().toISOString(),
     };
     data.push(entry);
-    await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    try {
+      await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to write catalog file', code: 'CAT_003_WRITE_ERROR', detail: e.message });
+    }
     res.status(201).json(entry);
-  } catch {
-    res.status(500).json({ error: 'Failed to create catalog entry' });
+  } catch (e) {
+    res.status(500).json({ error: 'Unexpected error creating catalog entry', code: 'CAT_004_UNKNOWN', detail: e.message });
   }
 });
 
 // PUT /api/catalog/:id
 app.put('/api/catalog/:id', async (req, res) => {
   try {
-    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    let data;
+    try {
+      data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to read catalog file', code: 'CAT_005_READ_ERROR', detail: e.message });
+    }
     const idx = data.findIndex(e => e.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    if (idx === -1) return res.status(404).json({ error: 'Not found', code: 'CAT_006_NOT_FOUND' });
     data[idx] = { ...data[idx], ...req.body, id: data[idx].id, createdAt: data[idx].createdAt };
-    await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    try {
+      await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to write catalog file', code: 'CAT_007_WRITE_ERROR', detail: e.message });
+    }
     res.json(data[idx]);
-  } catch {
-    res.status(500).json({ error: 'Failed to update catalog entry' });
+  } catch (e) {
+    res.status(500).json({ error: 'Unexpected error updating catalog entry', code: 'CAT_008_UNKNOWN', detail: e.message });
   }
 });
 

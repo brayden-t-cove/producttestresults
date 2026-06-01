@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CAPABILITY_GROUPS, CATEGORY_LABELS, CATEGORIES } from '../data/capabilities.js';
+import { getDebugInfo } from '../lib/api.js';
 
 const CATEGORY_ICONS = {
   hub: '🏠',
@@ -160,6 +161,7 @@ export default function NewProduct({ product, onSave, onBack, catalog }) {
   const [editingConfigId, setEditingConfigId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [debugInfo, setDebugInfo] = useState(null);
 
   useEffect(() => {
     if (!isEdit) {
@@ -230,6 +232,7 @@ export default function NewProduct({ product, onSave, onBack, catalog }) {
     } catch (err) {
       setError(err.message || 'Failed to save product.');
       setSaving(false);
+      getDebugInfo().then(setDebugInfo).catch(() => setDebugInfo({ status: 'unreachable' }));
     }
   }
 
@@ -246,7 +249,39 @@ export default function NewProduct({ product, onSave, onBack, catalog }) {
       </div>
 
       <form onSubmit={handleSave}>
-        {error && <div className="error-msg">{error}</div>}
+        {error && (
+          <div>
+            <div className="error-msg">{error}</div>
+            {debugInfo && (
+              <div style={{ marginTop: 8, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: 12, fontSize: 12, fontFamily: 'monospace' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text-muted)' }}>
+                  DEBUG INFO
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ marginLeft: 8, fontSize: 11, padding: '1px 6px' }}
+                    onClick={() => navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2))}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <div style={{ color: debugInfo.status === 'ok' ? 'var(--pass)' : 'var(--fail)', marginBottom: 4 }}>
+                  Server status: {debugInfo.status ?? 'unknown'}
+                </div>
+                {debugInfo.checks && Object.entries(debugInfo.checks).map(([key, val]) => (
+                  <div key={key} style={{ marginBottom: 2 }}>
+                    <span style={{ color: val.ok ? 'var(--pass)' : 'var(--fail)' }}>{val.ok ? '✓' : '✗'}</span>
+                    {' '}{key}
+                    {val.error && <span style={{ color: 'var(--fail)' }}> — {val.error}</span>}
+                    {val.entries != null && <span style={{ color: 'var(--text-muted)' }}> ({val.entries} entries)</span>}
+                    {val.uptime && <span style={{ color: 'var(--text-muted)' }}> uptime {val.uptime}</span>}
+                  </div>
+                ))}
+                {debugInfo.error && <div style={{ color: 'var(--fail)' }}>{debugInfo.error}</div>}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="form-group">
           <label>Product Name <span style={{ color: 'var(--fail)', fontWeight: 700 }}>*</span></label>
