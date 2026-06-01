@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { listSessions } from './lib/api.js';
+import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry } from './lib/api.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
 import TestRunner from './components/TestRunner.jsx';
 import SessionSummary from './components/SessionSummary.jsx';
+import ProductCatalog from './components/ProductCatalog.jsx';
+import NewProduct from './components/NewProduct.jsx';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -12,7 +14,7 @@ function formatDate(iso) {
   });
 }
 
-function Dashboard({ sessions, onNew, onOpen, loading }) {
+function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, loading }) {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -20,9 +22,17 @@ function Dashboard({ sessions, onNew, onOpen, loading }) {
           <h1>QA Testing Platform</h1>
           <p>Security hardware testing sessions</p>
         </div>
-        <button className="btn btn-primary btn-lg" onClick={onNew}>
-          + New Session
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-secondary" onClick={onCatalog}>
+            📦 Product Catalog
+          </button>
+          <button
+            className="btn btn-primary btn-lg"
+            onClick={onNew}
+          >
+            + New Session
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -31,6 +41,18 @@ function Dashboard({ sessions, onNew, onOpen, loading }) {
         <div className="empty-state">
           <h3>No sessions yet</h3>
           <p>Start your first QA testing session to get going.</p>
+          {catalog.length === 0 && (
+            <p style={{ marginTop: 8, fontSize: 13 }}>
+              First, add a product to your{' '}
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ display: 'inline', padding: '2px 6px' }}
+                onClick={onCatalog}
+              >
+                Product Catalog
+              </button>.
+            </p>
+          )}
         </div>
       ) : (
         <div className="sessions-list">
@@ -61,6 +83,8 @@ export default function App() {
   const [currentSession, setCurrentSession] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
+  const [catalog, setCatalog] = useState([]);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   async function refreshSessions() {
     try {
@@ -74,8 +98,18 @@ export default function App() {
     }
   }
 
+  async function refreshCatalog() {
+    try {
+      const data = await getCatalog();
+      setCatalog(data);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   useEffect(() => {
     refreshSessions();
+    refreshCatalog();
   }, []);
 
   async function handleOpenSession(id) {
@@ -115,25 +149,74 @@ export default function App() {
     refreshSessions();
   }
 
+  async function handleSaveProduct(productData) {
+    if (productData.id) {
+      await updateCatalogEntry(productData.id, productData);
+    } else {
+      await createCatalogEntry(productData);
+    }
+    await refreshCatalog();
+    setEditingProduct(null);
+    setView('catalog');
+  }
+
+  async function handleDeleteProduct(id) {
+    await deleteCatalogEntry(id);
+    await refreshCatalog();
+  }
+
+  function handleStartTestFromCatalog(product) {
+    setView('sessionStart');
+  }
+
   return (
     <div className="app-layout">
       <div style={{ position: 'fixed', bottom: 8, right: 12, fontSize: 11, color: 'var(--text-muted)', opacity: 0.5, pointerEvents: 'none', userSelect: 'none', zIndex: 9999 }}>
         {BUILD_VERSION} · {BUILD_DATE}
       </div>
+
       {view === 'dashboard' && (
         <Dashboard
           sessions={sessions}
+          catalog={catalog}
           loading={loadingSessions}
           onNew={() => setView('sessionStart')}
           onOpen={handleOpenSession}
+          onCatalog={() => setView('catalog')}
         />
       )}
+
+      {view === 'catalog' && (
+        <div className="dashboard">
+          <ProductCatalog
+            products={catalog}
+            onAdd={() => { setEditingProduct(null); setView('newProduct'); }}
+            onEdit={product => { setEditingProduct(product); setView('editProduct'); }}
+            onStartTest={handleStartTestFromCatalog}
+            onDelete={handleDeleteProduct}
+          />
+        </div>
+      )}
+
+      {(view === 'newProduct' || view === 'editProduct') && (
+        <div className="dashboard">
+          <NewProduct
+            product={editingProduct}
+            onSave={handleSaveProduct}
+            onBack={() => setView('catalog')}
+          />
+        </div>
+      )}
+
       {view === 'sessionStart' && (
         <SessionStart
+          catalog={catalog}
           onBack={() => setView('dashboard')}
           onCreated={handleSessionCreated}
+          onGoToCatalog={() => setView('catalog')}
         />
       )}
+
       {view === 'runner' && currentSession && (
         <TestRunner
           session={currentSession}
@@ -142,6 +225,7 @@ export default function App() {
           allSessions={sessions}
         />
       )}
+
       {view === 'summary' && currentSession && (
         <SessionSummary
           session={currentSession}

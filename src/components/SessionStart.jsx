@@ -1,34 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
-import { PRODUCTS, CATEGORY_LABELS } from '../data/products.js';
-import { createSession, aiPopulateTests, downloadCsvTemplate, importCsv, getDevices, addDevice, getFirmwares, addFirmware } from '../lib/api.js';
+import { CATEGORY_LABELS } from '../data/capabilities.js';
+import { BASELINE_TESTS, TEST_LIBRARY } from '../data/testLibrary.js';
+import { createSession, updateSession, downloadCsvTemplate, importCsv, getFirmwares, addFirmware } from '../lib/api.js';
 
-const CATEGORIES = ['hub', 'camera', 'sensor', 'app'];
+const CATEGORY_ICONS = {
+  hub: '🏠',
+  touchpad: '⌨️',
+  camera: '📷',
+  sensor: '📡',
+  app: '📱',
+};
 
 const SESSION_TYPES = [
-  {
-    id: 'e2e',
-    label: 'E2E',
-    icon: '🔄',
-    description: 'Full end-to-end product testing',
-  },
-  {
-    id: 'reproduction',
-    label: 'Issue Reproduction',
-    icon: '🐛',
-    description: 'Reproduce and document reported bugs',
-  },
-  {
-    id: 'regression',
-    label: 'Regression',
-    icon: '🔁',
-    description: 'Verify previously fixed issues remain resolved',
-  },
-  {
-    id: 'feature',
-    label: 'Feature / Targeted',
-    icon: '🎯',
-    description: 'Test a specific feature or acceptance criteria',
-  },
+  { id: 'e2e', label: 'E2E', icon: '🔄', description: 'Full end-to-end product testing' },
+  { id: 'reproduction', label: 'Issue Reproduction', icon: '🐛', description: 'Reproduce and document reported bugs' },
+  { id: 'regression', label: 'Regression', icon: '🔁', description: 'Verify previously fixed issues remain resolved' },
+  { id: 'feature', label: 'Feature / Targeted', icon: '🎯', description: 'Test a specific feature or acceptance criteria' },
 ];
 
 const SESSION_TYPE_LABELS = {
@@ -38,13 +25,37 @@ const SESSION_TYPE_LABELS = {
   feature: 'Feature Session',
 };
 
-export default function SessionStart({ onBack, onCreated }) {
+function generateTestCases(product) {
+  const seen = new Set();
+  const tests = [];
+
+  function addTest(t) {
+    if (!seen.has(t.id)) {
+      seen.add(t.id);
+      tests.push({
+        ...t,
+        id: crypto.randomUUID(),
+        templateId: t.id,
+        status: 'pending',
+        notes: '',
+      });
+    }
+  }
+
+  const baselines = BASELINE_TESTS[product.category] || [];
+  baselines.forEach(addTest);
+
+  (product.capabilities || []).forEach(capId => {
+    const capTests = TEST_LIBRARY[capId] || [];
+    capTests.forEach(addTest);
+  });
+
+  return tests;
+}
+
+export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog }) {
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [sessionType, setSessionType] = useState('e2e');
-  const [productId, setProductId] = useState('');
-  const [deviceName, setDeviceName] = useState('');
-  const [addingDevice, setAddingDevice] = useState(false);
-  const [newDeviceName, setNewDeviceName] = useState('');
-  const [savedDevices, setSavedDevices] = useState([]);
   const [firmware, setFirmware] = useState('');
   const [addingFirmware, setAddingFirmware] = useState(false);
   const [newFirmwareVersion, setNewFirmwareVersion] = useState('');
@@ -57,33 +68,16 @@ export default function SessionStart({ onBack, onCreated }) {
   const [csvPreview, setCsvPreview] = useState(null);
   const [csvError, setCsvError] = useState('');
   const fileInputRef = useRef(null);
-  const newDeviceInputRef = useRef(null);
-
-  const selectedProduct = PRODUCTS.find(p => p.id === productId);
-  const categoryDevices = savedDevices.filter(d => d.category === selectedProduct?.category);
-
-  useEffect(() => {
-    getDevices().then(setSavedDevices).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    setDeviceName('');
-    setAddingDevice(false);
-    setNewDeviceName('');
-    setFirmware('');
-    setSavedFirmwares([]);
-  }, [productId]);
 
   useEffect(() => {
     setFirmware('');
     setAddingFirmware(false);
     setNewFirmwareVersion('');
-    if (deviceName) {
-      getFirmwares(deviceName).then(setSavedFirmwares).catch(() => {});
-    } else {
-      setSavedFirmwares([]);
+    setSavedFirmwares([]);
+    if (selectedProduct) {
+      getFirmwares(null, selectedProduct.id).then(setSavedFirmwares).catch(() => {});
     }
-  }, [deviceName]);
+  }, [selectedProduct]);
 
   useEffect(() => {
     if (addingFirmware) newFirmwareInputRef.current?.focus();
@@ -91,10 +85,9 @@ export default function SessionStart({ onBack, onCreated }) {
 
   async function handleAddFirmware() {
     const version = newFirmwareVersion.trim();
-    const key = deviceName || selectedProduct?.name;
-    if (!version || !key) return;
+    if (!version || !selectedProduct) return;
     try {
-      const entry = await addFirmware(key, version);
+      const entry = await addFirmware(selectedProduct.id, version);
       setSavedFirmwares(prev => [...prev.filter(f => f.id !== entry.id), entry]);
       setFirmware(entry.version);
     } catch {
@@ -102,27 +95,6 @@ export default function SessionStart({ onBack, onCreated }) {
     }
     setAddingFirmware(false);
     setNewFirmwareVersion('');
-  }
-
-  useEffect(() => {
-    if (addingDevice) newDeviceInputRef.current?.focus();
-  }, [addingDevice]);
-
-  async function handleAddDevice() {
-    const name = newDeviceName.trim();
-    if (!name || !selectedProduct) return;
-    try {
-      const device = await addDevice(name, selectedProduct.category);
-      setSavedDevices(prev => [...prev.filter(d => d.id !== device.id), device]);
-      setDeviceName(device.name);
-      setAddingDevice(false);
-      setNewDeviceName('');
-    } catch {
-      // silently fall back to using the typed name
-      setDeviceName(name);
-      setAddingDevice(false);
-      setNewDeviceName('');
-    }
   }
 
   async function handleCsvUpload(e) {
@@ -141,14 +113,13 @@ export default function SessionStart({ onBack, onCreated }) {
     } catch (err) {
       setCsvError(err.message || 'CSV import failed');
     }
-    // Reset input so same file can be re-uploaded
     e.target.value = '';
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!productId) {
-      setError('Please select a product.');
+    if (!selectedProduct) {
+      setError('Please select a product from your catalog.');
       return;
     }
     setError('');
@@ -158,16 +129,15 @@ export default function SessionStart({ onBack, onCreated }) {
     try {
       const session = await createSession({
         productId: selectedProduct.id,
-        productName: deviceName || selectedProduct.name,
-        productCategory: selectedProduct.name,
+        productName: selectedProduct.name,
         category: selectedProduct.category,
-        subcategory: selectedProduct.subcategory,
+        catalogId: selectedProduct.id,
         firmware,
         notes,
         type: sessionType,
       });
 
-      let testCases = session.testCases || [];
+      let testCases;
       let issues = session.issues || [];
 
       if (csvPreview) {
@@ -175,59 +145,13 @@ export default function SessionStart({ onBack, onCreated }) {
           testCases = csvPreview.data;
         } else {
           issues = csvPreview.data;
+          testCases = generateTestCases(selectedProduct);
         }
-        const { updateSession } = await import('../lib/api.js');
-        const updated = await updateSession(session.id, { testCases, issues });
-        onCreated(updated);
-        return;
+      } else {
+        testCases = generateTestCases(selectedProduct);
       }
 
-      // No CSV — session created with empty test cases, proceed directly
-      onCreated(session);
-    } catch (err) {
-      setError(err.message || 'Failed to create session');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleAiPopulate(e) {
-    e.preventDefault();
-    if (!productId) {
-      setError('Please select a product.');
-      return;
-    }
-    setError('');
-    setLoading(true);
-    setLoadingMsg('Claude is populating your test cases...');
-
-    try {
-      const session = await createSession({
-        productId: selectedProduct.id,
-        productName: deviceName || selectedProduct.name,
-        productCategory: selectedProduct.name,
-        category: selectedProduct.category,
-        subcategory: selectedProduct.subcategory,
-        firmware,
-        notes,
-        type: sessionType,
-      });
-
-      let testCases = [];
-      try {
-        const result = await aiPopulateTests({
-          productName: selectedProduct.name,
-          category: selectedProduct.category,
-          subcategory: selectedProduct.subcategory,
-          firmware,
-        });
-        testCases = result.testCases || [];
-      } catch (aiErr) {
-        console.warn('AI populate failed:', aiErr.message);
-      }
-
-      const { updateSession } = await import('../lib/api.js');
-      const updated = await updateSession(session.id, { testCases });
+      const updated = await updateSession(session.id, { testCases, issues });
       onCreated(updated);
     } catch (err) {
       setError(err.message || 'Failed to create session');
@@ -243,9 +167,7 @@ export default function SessionStart({ onBack, onCreated }) {
           <div className="spinner spinner-lg" />
           <p>{loadingMsg}</p>
           {selectedProduct && (
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-              {selectedProduct.name}
-            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{selectedProduct.name}</p>
           )}
         </div>
       </div>
@@ -265,11 +187,50 @@ export default function SessionStart({ onBack, onCreated }) {
           ← Back
         </button>
         <h1>New Testing Session</h1>
-        <p>Choose a session type, select a product, then import a CSV or auto-populate with AI.</p>
+        <p>Select a product from your catalog, choose a session type, then start testing.</p>
       </div>
 
       <form onSubmit={handleSubmit}>
         {error && <div className="error-msg">{error}</div>}
+
+        {/* Product Picker */}
+        <div className="form-group">
+          <label>Select Product</label>
+          {catalog.length === 0 ? (
+            <div className="error-msg" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              No products in catalog.{' '}
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={onGoToCatalog}
+              >
+                Add a product first
+              </button>
+            </div>
+          ) : (
+            <div className="product-picker-grid">
+              {catalog.map(product => (
+                <div
+                  key={product.id}
+                  className={`product-picker-card ${selectedProduct?.id === product.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedProduct(product)}
+                >
+                  <span style={{ fontSize: 22, lineHeight: 1 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{product.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {CATEGORY_LABELS[product.category] || product.category}
+                      {product.manufacturer ? ` · ${product.manufacturer}` : ''}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+                      {(product.capabilities || []).length} capabilities → {countTests(product)} test cases
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Session Type Selector */}
         <div className="form-group">
@@ -293,62 +254,7 @@ export default function SessionStart({ onBack, onCreated }) {
           </div>
         </div>
 
-        {/* Product Selector */}
-        <div className="form-group">
-          <label>Product</label>
-          <select value={productId} onChange={e => setProductId(e.target.value)} required>
-            <option value="">Select a product...</option>
-            {CATEGORIES.map(cat => (
-              <optgroup key={cat} label={CATEGORY_LABELS[cat]}>
-                {PRODUCTS.filter(p => p.category === cat).map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-
-        {selectedProduct && (
-          <div className="form-group">
-            <label>Product Name <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(specific device model)</span></label>
-            {!addingDevice ? (
-              <select value={deviceName} onChange={e => {
-                if (e.target.value === '__add__') {
-                  setAddingDevice(true);
-                  setDeviceName('');
-                } else {
-                  setDeviceName(e.target.value);
-                }
-              }}>
-                <option value="">— Generic ({selectedProduct.name}) —</option>
-                {categoryDevices.map(d => (
-                  <option key={d.id} value={d.name}>{d.name}</option>
-                ))}
-                <option value="__add__">+ Add new device...</option>
-              </select>
-            ) : (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  ref={newDeviceInputRef}
-                  type="text"
-                  placeholder={`e.g. Eufy C210, Wyze Cam v3`}
-                  value={newDeviceName}
-                  onChange={e => setNewDeviceName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddDevice(); } if (e.key === 'Escape') { setAddingDevice(false); setNewDeviceName(''); } }}
-                  style={{ flex: 1 }}
-                />
-                <button type="button" className="btn btn-primary btn-sm" onClick={handleAddDevice} disabled={!newDeviceName.trim()}>Save</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setAddingDevice(false); setNewDeviceName(''); }}>Cancel</button>
-              </div>
-            )}
-            {deviceName && !addingDevice && (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                Testing: <strong style={{ color: 'var(--text-primary)' }}>{deviceName}</strong> ({selectedProduct.name})
-              </div>
-            )}
-          </div>
-        )}
-
+        {/* Firmware */}
         {selectedProduct && (
           <div className="form-group">
             <label>Firmware Version</label>
@@ -375,7 +281,10 @@ export default function SessionStart({ onBack, onCreated }) {
                   placeholder="e.g. 3.4.2-beta, 2024.11.01"
                   value={newFirmwareVersion}
                   onChange={e => setNewFirmwareVersion(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddFirmware(); } if (e.key === 'Escape') { setAddingFirmware(false); setNewFirmwareVersion(''); } }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleAddFirmware(); }
+                    if (e.key === 'Escape') { setAddingFirmware(false); setNewFirmwareVersion(''); }
+                  }}
                   style={{ flex: 1 }}
                 />
                 <button type="button" className="btn btn-primary btn-sm" onClick={handleAddFirmware} disabled={!newFirmwareVersion.trim()}>Save</button>
@@ -385,6 +294,7 @@ export default function SessionStart({ onBack, onCreated }) {
           </div>
         )}
 
+        {/* Session Notes */}
         <div className="form-group">
           <label>Session Notes</label>
           <textarea
@@ -397,7 +307,7 @@ export default function SessionStart({ onBack, onCreated }) {
 
         {/* CSV Section */}
         <div className="csv-section">
-          <div className="csv-section-label">CSV Import</div>
+          <div className="csv-section-label">CSV Import (optional — overrides auto-generated test cases)</div>
           <div className="csv-buttons-row">
             <button
               type="button"
@@ -429,16 +339,14 @@ export default function SessionStart({ onBack, onCreated }) {
           {csvPreview && (
             <div className="csv-preview">
               <div className="csv-preview-summary">
-                ✓ {csvPreview.count} {csvPreview.type === 'issues' ? 'issues' : 'test cases'} loaded
+                ✓ {csvPreview.count} {csvPreview.type === 'issues' ? 'issues' : 'test cases'} loaded from CSV
                 {csvPreview.count > 3 && ` (showing first 3)`}
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="csv-preview-table">
                   <thead>
                     <tr>
-                      {previewHeaders.slice(0, 4).map(h => (
-                        <th key={h}>{h}</th>
-                      ))}
+                      {previewHeaders.slice(0, 4).map(h => <th key={h}>{h}</th>)}
                       {previewHeaders.length > 4 && <th>...</th>}
                     </tr>
                   </thead>
@@ -461,23 +369,25 @@ export default function SessionStart({ onBack, onCreated }) {
           )}
         </div>
 
-        <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%' }}>
+        <button
+          type="submit"
+          className="btn btn-primary btn-lg"
+          style={{ width: '100%' }}
+          disabled={catalog.length === 0}
+        >
           Start {SESSION_TYPE_LABELS[sessionType]}
         </button>
-
-        {/* AI Fallback */}
-        <div className="ai-fallback">
-          <div className="ai-fallback-divider">or</div>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ width: '100%' }}
-            onClick={handleAiPopulate}
-          >
-            ✨ Or auto-populate with AI (requires API key)
-          </button>
-        </div>
       </form>
     </div>
   );
+}
+
+function countTests(product) {
+  const seen = new Set();
+  const baselines = BASELINE_TESTS[product.category] || [];
+  baselines.forEach(t => seen.add(t.id));
+  (product.capabilities || []).forEach(capId => {
+    (TEST_LIBRARY[capId] || []).forEach(t => seen.add(t.id));
+  });
+  return seen.size;
 }

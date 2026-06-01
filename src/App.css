@@ -994,3 +994,205 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .priority-p1 { background: var(--fail-dim); color: var(--fail); }
 .priority-p2 { background: rgba(234,179,8,0.15); color: #eab308; }
 .priority-p3 { background: var(--pass-dim); color: var(--pass); }
+
+/* ============================================================
+   DANGER BUTTON
+   ============================================================ */
+.btn-danger {
+  background: var(--fail-dim);
+  color: var(--fail);
+  border-color: rgba(239,68,68,0.3);
+}
+.btn-danger:hover:not(:disabled) { background: var(--fail); color: #fff; }
+
+/* ============================================================
+   PRODUCT CATALOG
+   ============================================================ */
+.catalog-page {
+  width: 100%;
+}
+
+.catalog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .catalog-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .catalog-grid { grid-template-columns: 1fr; }
+}
+
+.catalog-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color var(--transition), background var(--transition);
+}
+.catalog-card:hover {
+  border-color: var(--primary);
+  background: var(--card-hover);
+}
+
+.catalog-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.catalog-card-icon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.catalog-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.catalog-card-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.catalog-card-date {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.capability-count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--primary-dim);
+  color: var(--primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   NEW PRODUCT FORM
+   ============================================================ */
+.new-product-page {
+  width: 100%;
+  max-width: 680px;
+}
+
+.new-product-header {
+  margin-bottom: 28px;
+}
+
+.capability-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.capability-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.capability-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.capability-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 8px;
+}
+
+@media (max-width: 600px) {
+  .capability-checkboxes { grid-template-columns: repeat(2, 1fr); }
+}
+
+.capability-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-bottom: 0;
+  transition: background var(--transition);
+}
+.capability-checkbox-item:hover {
+  background: var(--card-hover);
+}
+
+/* ============================================================
+   PRODUCT PICKER (session start)
+   ============================================================ */
+.product-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 6px;
+}
+
+@media (max-width: 600px) {
+  .product-picker-grid { grid-template-columns: 1fr; }
+}
+
+.product-picker-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.product-picker-card:hover {
+  border-color: var(--primary);
+  background: var(--card-hover);
+}
+.product-picker-card.selected {
+  border-color: var(--primary);
+  background: var(--primary-dim);
+}

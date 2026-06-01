@@ -14,6 +14,7 @@ const PORT = 3001;
 const SESSIONS_DIR = join(__dirname, 'data', 'sessions');
 const DEVICES_FILE = join(__dirname, 'data', 'devices.json');
 const FIRMWARES_FILE = join(__dirname, 'data', 'firmwares.json');
+const CATALOG_FILE = join(__dirname, 'data', 'catalog.json');
 
 app.use(cors());
 app.use(express.json());
@@ -29,13 +30,22 @@ if (!existsSync(DEVICES_FILE)) {
 if (!existsSync(FIRMWARES_FILE)) {
   await writeFile(FIRMWARES_FILE, JSON.stringify([], null, 2));
 }
+if (!existsSync(CATALOG_FILE)) {
+  await writeFile(CATALOG_FILE, JSON.stringify([], null, 2));
+}
 
-// GET /api/firmwares?deviceName=xxx
+// GET /api/firmwares?catalogId=xxx (or ?deviceName=xxx for backward compat)
 app.get('/api/firmwares', async (req, res) => {
   try {
     const data = JSON.parse(await readFile(FIRMWARES_FILE, 'utf8'));
-    const { deviceName } = req.query;
-    res.json(deviceName ? data.filter(f => f.deviceName === deviceName) : data);
+    const { catalogId, deviceName } = req.query;
+    if (catalogId) {
+      res.json(data.filter(f => f.catalogId === catalogId || f.deviceName === catalogId));
+    } else if (deviceName) {
+      res.json(data.filter(f => f.deviceName === deviceName || f.catalogId === deviceName));
+    } else {
+      res.json(data);
+    }
   } catch {
     res.json([]);
   }
@@ -44,17 +54,93 @@ app.get('/api/firmwares', async (req, res) => {
 // POST /api/firmwares
 app.post('/api/firmwares', async (req, res) => {
   try {
-    const { deviceName, version } = req.body;
-    if (!deviceName || !version) return res.status(400).json({ error: 'deviceName and version required' });
+    const { catalogId, deviceName, version } = req.body;
+    const key = catalogId || deviceName;
+    if (!key || !version) return res.status(400).json({ error: 'catalogId (or deviceName) and version required' });
     const data = JSON.parse(await readFile(FIRMWARES_FILE, 'utf8'));
-    const existing = data.find(f => f.deviceName === deviceName && f.version === version);
+    const existing = data.find(f => (f.catalogId === key || f.deviceName === key) && f.version === version);
     if (existing) return res.json(existing);
-    const entry = { id: uuidv4(), deviceName, version: version.trim() };
+    const entry = { id: uuidv4(), catalogId: catalogId || null, deviceName: deviceName || key, version: version.trim() };
     data.push(entry);
     await writeFile(FIRMWARES_FILE, JSON.stringify(data, null, 2));
     res.status(201).json(entry);
   } catch {
     res.status(500).json({ error: 'Failed to save firmware' });
+  }
+});
+
+// ── Catalog endpoints ─────────────────────────────────────────────────────────
+
+// GET /api/catalog
+app.get('/api/catalog', async (req, res) => {
+  try {
+    const data = await readFile(CATALOG_FILE, 'utf8');
+    res.json(JSON.parse(data));
+  } catch {
+    res.json([]);
+  }
+});
+
+// GET /api/catalog/:id
+app.get('/api/catalog/:id', async (req, res) => {
+  try {
+    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    const entry = data.find(e => e.id === req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Not found' });
+    res.json(entry);
+  } catch {
+    res.status(500).json({ error: 'Failed to read catalog' });
+  }
+});
+
+// POST /api/catalog
+app.post('/api/catalog', async (req, res) => {
+  try {
+    const { name, manufacturer, modelNumber, category, capabilities } = req.body;
+    if (!name || !category) return res.status(400).json({ error: 'name and category required' });
+    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    const entry = {
+      id: uuidv4(),
+      name: name.trim(),
+      manufacturer: (manufacturer || '').trim(),
+      modelNumber: (modelNumber || '').trim(),
+      category,
+      capabilities: capabilities || [],
+      createdAt: new Date().toISOString(),
+    };
+    data.push(entry);
+    await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    res.status(201).json(entry);
+  } catch {
+    res.status(500).json({ error: 'Failed to create catalog entry' });
+  }
+});
+
+// PUT /api/catalog/:id
+app.put('/api/catalog/:id', async (req, res) => {
+  try {
+    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    const idx = data.findIndex(e => e.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    data[idx] = { ...data[idx], ...req.body, id: data[idx].id, createdAt: data[idx].createdAt };
+    await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    res.json(data[idx]);
+  } catch {
+    res.status(500).json({ error: 'Failed to update catalog entry' });
+  }
+});
+
+// DELETE /api/catalog/:id
+app.delete('/api/catalog/:id', async (req, res) => {
+  try {
+    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    const idx = data.findIndex(e => e.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    const [removed] = data.splice(idx, 1);
+    await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    res.json(removed);
+  } catch {
+    res.status(500).json({ error: 'Failed to delete catalog entry' });
   }
 });
 
