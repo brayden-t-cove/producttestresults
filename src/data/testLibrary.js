@@ -1153,6 +1153,72 @@ export const TEST_LIBRARY = {
       expected: 'Spotlight responds to app toggle commands within 3 seconds.',
     },
   ],
+  'light-spotlight': [
+    {
+      id: 'cam-light-spot-event',
+      title: 'Spotlight activates on event',
+      description: 'Trigger a motion or detection event in low light. Verify spotlight activates.',
+      expected: 'Spotlight turns on automatically within 2 seconds of event trigger.',
+    },
+    {
+      id: 'cam-light-spot-manual',
+      title: 'Spotlight manual control',
+      description: 'Toggle spotlight on and off manually from the app.',
+      expected: 'Spotlight responds to manual toggle within 3 seconds.',
+    },
+    {
+      id: 'cam-light-spot-brightness',
+      title: 'Spotlight brightness adjustment',
+      description: 'Adjust spotlight brightness to low, medium, and high from app settings.',
+      expected: 'Brightness level changes visibly and matches the selected setting.',
+    },
+  ],
+  'light-redblue-strobe': [
+    {
+      id: 'cam-strobe-alarm',
+      title: 'Red/Blue strobe activates on alarm',
+      description: 'Trigger an alarm event and verify the red/blue strobe activates.',
+      expected: 'Red/blue strobe activates within 3 seconds of alarm trigger.',
+    },
+    {
+      id: 'cam-strobe-manual',
+      title: 'Red/Blue strobe manual trigger',
+      description: 'Manually activate the strobe from the app.',
+      expected: 'Strobe activates and alternates red/blue as expected.',
+    },
+    {
+      id: 'cam-strobe-cancel',
+      title: 'Red/Blue strobe cancels on alarm clear',
+      description: 'Clear or cancel the alarm event and verify the strobe stops.',
+      expected: 'Strobe stops within 3 seconds of alarm being cancelled.',
+    },
+  ],
+  'light-floodlight': [
+    {
+      id: 'cam-light-flood-motion',
+      title: 'Floodlight activates on motion',
+      description: 'Trigger motion detection in dark conditions and verify floodlight response.',
+      expected: 'Floodlight activates automatically when motion is detected.',
+    },
+    {
+      id: 'cam-light-flood-brightness',
+      title: 'Floodlight brightness levels',
+      description: 'Adjust floodlight brightness from app at low, medium, and high settings.',
+      expected: 'Floodlight brightness changes according to the selected level.',
+    },
+    {
+      id: 'cam-light-flood-manual',
+      title: 'Floodlight manual control',
+      description: 'Manually toggle the floodlight on and off from the app.',
+      expected: 'Floodlight turns on and off within 3 seconds of app command.',
+    },
+    {
+      id: 'cam-light-flood-schedule',
+      title: 'Floodlight schedule',
+      description: 'Create a floodlight on/off schedule and verify it fires at the correct time.',
+      expected: 'Floodlight activates and deactivates according to the configured schedule.',
+    },
+  ],
   'form-pan-tilt': [
     {
       id: 'cam-pt-pan',

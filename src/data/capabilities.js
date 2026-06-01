@@ -79,15 +79,23 @@ export const CAPABILITY_GROUPS = {
     { label: 'Audio', capabilities: [
       { id: 'listen-only', label: 'Listen Only' },
       { id: 'two-way-audio', label: 'Two-Way Audio' },
+      { id: 'built-in-siren', label: 'Built-in Siren' },
     ]},
-    { label: 'Detection', capabilities: [
+    { label: 'Lighting', capabilities: [
+      { id: 'light-spotlight', label: 'Spotlight' },
+      { id: 'light-redblue-strobe', label: 'Red/Blue Strobe' },
+      { id: 'light-floodlight', label: 'Floodlight' },
+    ]},
+    { label: 'Edge Based Features', capabilities: [
       { id: 'motion-detection', label: 'Motion Detection' },
       { id: 'person-detection', label: 'Person Detection' },
+      { id: 'custom-zones', label: 'Custom Motion Zones' },
+      { id: 'distance-detection', label: 'Distance Detection' },
+    ]},
+    { label: 'Cloud Based Features', capabilities: [
       { id: 'package-detection', label: 'Package Detection' },
       { id: 'vehicle-detection', label: 'Vehicle Detection' },
       { id: 'animal-detection', label: 'Animal Detection' },
-      { id: 'custom-zones', label: 'Custom Motion Zones' },
-      { id: 'distance-detection', label: 'Distance Detection' },
     ]},
     { label: 'Recording', capabilities: [
       { id: 'local-sd', label: 'Local (SD Card)' },
@@ -97,7 +105,6 @@ export const CAPABILITY_GROUPS = {
     ]},
     { label: 'Extras', capabilities: [
       { id: 'privacy-shutter', label: 'Privacy Shutter' },
-      { id: 'built-in-siren', label: 'Built-in Siren' },
       { id: 'doorbell-button', label: 'Doorbell Button' },
       { id: 'wired-chime', label: 'Wired Chime Support' },
       { id: 'optical-zoom', label: 'Optical Zoom' },
