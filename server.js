@@ -12,6 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = 3001;
 const SESSIONS_DIR = join(__dirname, 'data', 'sessions');
+const DEVICES_FILE = join(__dirname, 'data', 'devices.json');
 
 app.use(cors());
 app.use(express.json());
@@ -21,6 +22,36 @@ app.use(express.urlencoded({ extended: true }));
 if (!existsSync(SESSIONS_DIR)) {
   await mkdir(SESSIONS_DIR, { recursive: true });
 }
+if (!existsSync(DEVICES_FILE)) {
+  await writeFile(DEVICES_FILE, JSON.stringify([], null, 2));
+}
+
+// GET /api/devices
+app.get('/api/devices', async (req, res) => {
+  try {
+    const data = await readFile(DEVICES_FILE, 'utf8');
+    res.json(JSON.parse(data));
+  } catch {
+    res.json([]);
+  }
+});
+
+// POST /api/devices
+app.post('/api/devices', async (req, res) => {
+  try {
+    const { name, category } = req.body;
+    if (!name || !category) return res.status(400).json({ error: 'name and category required' });
+    const data = JSON.parse(await readFile(DEVICES_FILE, 'utf8'));
+    const existing = data.find(d => d.name.toLowerCase() === name.toLowerCase() && d.category === category);
+    if (existing) return res.json(existing);
+    const device = { id: uuidv4(), name: name.trim(), category };
+    data.push(device);
+    await writeFile(DEVICES_FILE, JSON.stringify(data, null, 2));
+    res.status(201).json(device);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save device' });
+  }
+});
 
 function getAnthropicClient() {
   if (!process.env.ANTHROPIC_API_KEY) {

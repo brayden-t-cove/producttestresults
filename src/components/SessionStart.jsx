@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { PRODUCTS, CATEGORY_LABELS } from '../data/products.js';
-import { createSession, aiPopulateTests, downloadCsvTemplate, importCsv } from '../lib/api.js';
+import { createSession, aiPopulateTests, downloadCsvTemplate, importCsv, getDevices, addDevice } from '../lib/api.js';
 
 const CATEGORIES = ['hub', 'camera', 'sensor', 'app'];
 
@@ -41,16 +41,53 @@ const SESSION_TYPE_LABELS = {
 export default function SessionStart({ onBack, onCreated }) {
   const [sessionType, setSessionType] = useState('e2e');
   const [productId, setProductId] = useState('');
+  const [deviceName, setDeviceName] = useState('');
+  const [addingDevice, setAddingDevice] = useState(false);
+  const [newDeviceName, setNewDeviceName] = useState('');
+  const [savedDevices, setSavedDevices] = useState([]);
   const [firmware, setFirmware] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError] = useState('');
-  const [csvPreview, setCsvPreview] = useState(null); // { count, rows, type: 'testCases'|'issues', data }
+  const [csvPreview, setCsvPreview] = useState(null);
   const [csvError, setCsvError] = useState('');
   const fileInputRef = useRef(null);
+  const newDeviceInputRef = useRef(null);
 
   const selectedProduct = PRODUCTS.find(p => p.id === productId);
+  const categoryDevices = savedDevices.filter(d => d.category === selectedProduct?.category);
+
+  useEffect(() => {
+    getDevices().then(setSavedDevices).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setDeviceName('');
+    setAddingDevice(false);
+    setNewDeviceName('');
+  }, [productId]);
+
+  useEffect(() => {
+    if (addingDevice) newDeviceInputRef.current?.focus();
+  }, [addingDevice]);
+
+  async function handleAddDevice() {
+    const name = newDeviceName.trim();
+    if (!name || !selectedProduct) return;
+    try {
+      const device = await addDevice(name, selectedProduct.category);
+      setSavedDevices(prev => [...prev.filter(d => d.id !== device.id), device]);
+      setDeviceName(device.name);
+      setAddingDevice(false);
+      setNewDeviceName('');
+    } catch {
+      // silently fall back to using the typed name
+      setDeviceName(name);
+      setAddingDevice(false);
+      setNewDeviceName('');
+    }
+  }
 
   async function handleCsvUpload(e) {
     const file = e.target.files[0];
@@ -85,7 +122,8 @@ export default function SessionStart({ onBack, onCreated }) {
     try {
       const session = await createSession({
         productId: selectedProduct.id,
-        productName: selectedProduct.name,
+        productName: deviceName || selectedProduct.name,
+        productCategory: selectedProduct.name,
         category: selectedProduct.category,
         subcategory: selectedProduct.subcategory,
         firmware,
@@ -130,7 +168,8 @@ export default function SessionStart({ onBack, onCreated }) {
     try {
       const session = await createSession({
         productId: selectedProduct.id,
-        productName: selectedProduct.name,
+        productName: deviceName || selectedProduct.name,
+        productCategory: selectedProduct.name,
         category: selectedProduct.category,
         subcategory: selectedProduct.subcategory,
         firmware,
@@ -232,6 +271,47 @@ export default function SessionStart({ onBack, onCreated }) {
             ))}
           </select>
         </div>
+
+        {selectedProduct && (
+          <div className="form-group">
+            <label>Product Name <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(specific device model)</span></label>
+            {!addingDevice ? (
+              <select value={deviceName} onChange={e => {
+                if (e.target.value === '__add__') {
+                  setAddingDevice(true);
+                  setDeviceName('');
+                } else {
+                  setDeviceName(e.target.value);
+                }
+              }}>
+                <option value="">— Generic ({selectedProduct.name}) —</option>
+                {categoryDevices.map(d => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
+                ))}
+                <option value="__add__">+ Add new device...</option>
+              </select>
+            ) : (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  ref={newDeviceInputRef}
+                  type="text"
+                  placeholder={`e.g. Eufy C210, Wyze Cam v3`}
+                  value={newDeviceName}
+                  onChange={e => setNewDeviceName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddDevice(); } if (e.key === 'Escape') { setAddingDevice(false); setNewDeviceName(''); } }}
+                  style={{ flex: 1 }}
+                />
+                <button type="button" className="btn btn-primary btn-sm" onClick={handleAddDevice} disabled={!newDeviceName.trim()}>Save</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setAddingDevice(false); setNewDeviceName(''); }}>Cancel</button>
+              </div>
+            )}
+            {deviceName && !addingDevice && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                Testing: <strong style={{ color: 'var(--text-primary)' }}>{deviceName}</strong> ({selectedProduct.name})
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="form-group">
           <label>Firmware Version</label>

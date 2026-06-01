@@ -98,6 +98,21 @@ export async function downloadCsvTemplate(type) {
   URL.revokeObjectURL(url);
 }
 
+export async function getDevices() {
+  const res = await fetch(`${BASE}/devices`);
+  return res.json();
+}
+
+export async function addDevice(name, category) {
+  const res = await fetch(`${BASE}/devices`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, category }),
+  });
+  if (!res.ok) throw new Error('Failed to save device');
+  return res.json();
+}
+
 export async function importCsv(csvText, type) {
   const res = await fetch(`${BASE}/csv-import`, {
     method: 'POST',
