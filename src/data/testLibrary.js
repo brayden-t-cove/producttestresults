@@ -1982,4 +1982,774 @@ export const TEST_LIBRARY = {
       expected: 'HomeKit integration links successfully and devices appear in the Home app.',
     },
   ],
+
+  // ─── CAMERA SETTINGS ───────────────────────────────────────────────────────
+  'cam-set-motion-sensitivity': [
+    {
+      id: 'cam-set-motion-sens-low',
+      title: 'Motion sensitivity Low — slow walk does not trigger',
+      description: 'Set motion sensitivity to Low in camera settings. Walk slowly past the camera at a distance.',
+      expected: 'No motion event is triggered by slow or distant movement at Low sensitivity.',
+    },
+    {
+      id: 'cam-set-motion-sens-high',
+      title: 'Motion sensitivity High — slow walk triggers event',
+      description: 'Set motion sensitivity to High. Walk slowly past the camera at the same distance used in the Low test.',
+      expected: 'Motion event is triggered by slow movement at High sensitivity.',
+    },
+    {
+      id: 'cam-set-motion-sens-medium',
+      title: 'Motion sensitivity Medium — moderate threshold',
+      description: 'Set motion sensitivity to Medium. Verify that only noticeable movement triggers an event.',
+      expected: 'Medium sensitivity triggers on clear motion but not on very subtle or distant movement.',
+    },
+  ],
+  'cam-set-recording-schedule': [
+    {
+      id: 'cam-set-rec-sched-active',
+      title: 'Recording occurs within scheduled window',
+      description: 'Create a recording schedule for the current time window. Trigger a motion event.',
+      expected: 'Recording is saved during the scheduled window.',
+    },
+    {
+      id: 'cam-set-rec-sched-inactive',
+      title: 'No recording outside scheduled window',
+      description: 'Set a recording schedule that excludes the current time. Trigger a motion event.',
+      expected: 'No recording is saved outside the scheduled window.',
+    },
+    {
+      id: 'cam-set-rec-sched-persist',
+      title: 'Recording schedule persists after camera reboot',
+      description: 'Configure a recording schedule, then reboot the camera. Check settings afterward.',
+      expected: 'Recording schedule is preserved after reboot.',
+    },
+  ],
+  'cam-set-night-vision': [
+    {
+      id: 'cam-set-nv-toggle-off',
+      title: 'Night vision toggle Off — no IR in darkness',
+      description: 'Turn night vision Off in settings. Reduce ambient light below 5 lux.',
+      expected: 'Camera does not switch to IR mode; image may appear dark or use color night vision if available.',
+    },
+    {
+      id: 'cam-set-nv-toggle-on',
+      title: 'Night vision toggle On — IR activates in darkness',
+      description: 'Turn night vision On in settings. Reduce ambient light below 5 lux.',
+      expected: 'Camera activates IR night vision mode automatically in low light.',
+    },
+    {
+      id: 'cam-set-nv-auto',
+      title: 'Night vision Auto mode switches based on light',
+      description: 'Set night vision to Auto. Alternate between bright and dark lighting conditions.',
+      expected: 'Camera automatically switches between color and IR modes based on ambient light level.',
+    },
+  ],
+  'cam-set-flip-rotation': [
+    {
+      id: 'cam-set-flip-vertical',
+      title: 'Vertical flip corrects upside-down mount',
+      description: 'Mount camera upside down. Enable vertical flip in settings. Check live view.',
+      expected: 'Live view image is correctly oriented after enabling vertical flip.',
+    },
+    {
+      id: 'cam-set-flip-horizontal',
+      title: 'Horizontal flip mirrors the image',
+      description: 'Enable horizontal flip in camera settings. Compare live view orientation.',
+      expected: 'Live view image is horizontally mirrored after enabling the setting.',
+    },
+    {
+      id: 'cam-set-rotation-persist',
+      title: 'Flip/rotation setting persists after reboot',
+      description: 'Set a flip or rotation option, then reboot the camera. Check the live view.',
+      expected: 'Flip/rotation setting is retained and applied correctly after reboot.',
+    },
+  ],
+  'cam-set-wdr': [
+    {
+      id: 'cam-set-wdr-on',
+      title: 'WDR On improves high-contrast scene detail',
+      description: 'Frame a scene with both bright windows and dark indoor areas. Enable WDR.',
+      expected: 'Image shows improved detail in both highlights and shadows with WDR enabled.',
+    },
+    {
+      id: 'cam-set-wdr-off',
+      title: 'WDR Off — image reverts to standard range',
+      description: 'Disable WDR in settings. View the same high-contrast scene.',
+      expected: 'Image shows typical single-exposure dynamic range without WDR processing.',
+    },
+    {
+      id: 'cam-set-wdr-persist',
+      title: 'WDR setting persists after camera reboot',
+      description: 'Enable WDR, reboot the camera, and verify the setting is retained.',
+      expected: 'WDR setting is preserved after reboot.',
+    },
+  ],
+  'cam-set-bitrate': [
+    {
+      id: 'cam-set-bitrate-low',
+      title: 'Low bitrate reduces stream bandwidth',
+      description: 'Set bitrate/quality to Low. Monitor network usage while streaming live view.',
+      expected: 'Bandwidth usage decreases noticeably compared to higher bitrate setting.',
+    },
+    {
+      id: 'cam-set-bitrate-high',
+      title: 'High bitrate improves stream quality',
+      description: 'Set bitrate/quality to High. Compare image sharpness to Low setting.',
+      expected: 'Image quality is visibly improved at High bitrate with higher bandwidth usage.',
+    },
+    {
+      id: 'cam-set-bitrate-persist',
+      title: 'Bitrate setting persists after reboot',
+      description: 'Set a specific bitrate, reboot the camera, and verify the setting.',
+      expected: 'Selected bitrate is retained after camera reboot.',
+    },
+  ],
+  'cam-set-framerate': [
+    {
+      id: 'cam-set-fps-low',
+      title: 'Low frame rate reduces motion smoothness',
+      description: 'Set frame rate to the lowest option (e.g., 15fps). View live stream with moving subject.',
+      expected: 'Motion appears noticeably choppier compared to higher frame rate settings.',
+    },
+    {
+      id: 'cam-set-fps-high',
+      title: 'High frame rate produces smoother motion',
+      description: 'Set frame rate to highest option (e.g., 30fps). View live stream with moving subject.',
+      expected: 'Motion is smooth and fluid at the higher frame rate.',
+    },
+    {
+      id: 'cam-set-fps-persist',
+      title: 'Frame rate setting persists after reboot',
+      description: 'Set frame rate, reboot the camera, and confirm the setting is retained.',
+      expected: 'Frame rate setting is preserved after reboot.',
+    },
+  ],
+  'cam-set-mic-sensitivity': [
+    {
+      id: 'cam-set-mic-low',
+      title: 'Low mic sensitivity — quiet sounds not captured',
+      description: 'Set microphone sensitivity to Low. Speak softly near the camera while monitoring audio in the app.',
+      expected: 'Quiet speech is not clearly captured or is very faint at Low sensitivity.',
+    },
+    {
+      id: 'cam-set-mic-high',
+      title: 'High mic sensitivity — quiet sounds captured',
+      description: 'Set microphone sensitivity to High. Speak softly at the same distance.',
+      expected: 'Quiet speech is captured clearly at High sensitivity.',
+    },
+    {
+      id: 'cam-set-mic-persist',
+      title: 'Mic sensitivity setting persists after reboot',
+      description: 'Set mic sensitivity, reboot the camera, and confirm the setting is retained.',
+      expected: 'Microphone sensitivity setting is preserved after reboot.',
+    },
+  ],
+  'cam-set-speaker-volume': [
+    {
+      id: 'cam-set-spk-low',
+      title: 'Low speaker volume — audio quiet at camera',
+      description: 'Set speaker volume to low. Initiate two-way audio and speak from the app.',
+      expected: 'Audio at the camera speaker is noticeably quiet at low volume setting.',
+    },
+    {
+      id: 'cam-set-spk-high',
+      title: 'High speaker volume — audio louder at camera',
+      description: 'Set speaker volume to high. Speak from the app and evaluate volume at camera.',
+      expected: 'Audio at the camera speaker is clearly louder at high volume setting.',
+    },
+    {
+      id: 'cam-set-spk-persist',
+      title: 'Speaker volume setting persists after reboot',
+      description: 'Set speaker volume, reboot the camera, and confirm the setting.',
+      expected: 'Speaker volume setting is preserved after reboot.',
+    },
+  ],
+  'cam-set-notif-cooldown': [
+    {
+      id: 'cam-set-cooldown-active',
+      title: 'Notification cooldown suppresses repeat alerts',
+      description: 'Set notification cooldown to 5 minutes. Trigger two motion events within 2 minutes.',
+      expected: 'Only one notification is received during the cooldown window.',
+    },
+    {
+      id: 'cam-set-cooldown-expired',
+      title: 'Notification sent after cooldown expires',
+      description: 'Trigger a motion event, wait for cooldown to expire, trigger another event.',
+      expected: 'Second notification is received after the cooldown period ends.',
+    },
+    {
+      id: 'cam-set-cooldown-persist',
+      title: 'Cooldown setting persists after reboot',
+      description: 'Set cooldown value, reboot, verify the setting remains.',
+      expected: 'Notification cooldown setting is preserved after reboot.',
+    },
+  ],
+  'cam-set-zone-schedule': [
+    {
+      id: 'cam-set-zoneschedule-active',
+      title: 'Activity zone active during scheduled time',
+      description: 'Configure an activity zone schedule for the current time. Trigger motion within the zone.',
+      expected: 'Motion event is triggered within the scheduled window.',
+    },
+    {
+      id: 'cam-set-zoneschedule-inactive',
+      title: 'Activity zone inactive outside scheduled time',
+      description: 'Set schedule to exclude current time. Trigger motion within the zone.',
+      expected: 'No motion event is triggered outside the scheduled window.',
+    },
+    {
+      id: 'cam-set-zoneschedule-persist',
+      title: 'Zone schedule persists after reboot',
+      description: 'Set a zone schedule, reboot, and verify the setting.',
+      expected: 'Activity zone schedule is preserved after reboot.',
+    },
+  ],
+  'cam-set-privacy-schedule': [
+    {
+      id: 'cam-set-privacysched-on',
+      title: 'Privacy mode activates at scheduled time',
+      description: 'Set privacy mode schedule to activate at the current time.',
+      expected: 'Camera enters privacy mode at the scheduled start time; live view is blocked.',
+    },
+    {
+      id: 'cam-set-privacysched-off',
+      title: 'Privacy mode deactivates at scheduled end',
+      description: 'Allow the privacy schedule end time to pass.',
+      expected: 'Camera exits privacy mode at the scheduled end time; live view resumes.',
+    },
+    {
+      id: 'cam-set-privacysched-persist',
+      title: 'Privacy schedule persists after reboot',
+      description: 'Set privacy mode schedule, reboot, verify the setting.',
+      expected: 'Privacy mode schedule is preserved after reboot.',
+    },
+  ],
+  'cam-set-led-toggle': [
+    {
+      id: 'cam-set-led-off',
+      title: 'LED status light disabled via app',
+      description: 'Toggle the LED status light Off in camera settings. Observe the LED.',
+      expected: 'LED no longer illuminates or blinks after being disabled.',
+    },
+    {
+      id: 'cam-set-led-on',
+      title: 'LED status light enabled via app',
+      description: 'Toggle the LED status light On in camera settings. Observe the LED.',
+      expected: 'LED illuminates or blinks to indicate camera status after being enabled.',
+    },
+    {
+      id: 'cam-set-led-persist',
+      title: 'LED toggle setting persists after reboot',
+      description: 'Set LED toggle, reboot the camera, and verify the setting.',
+      expected: 'LED toggle setting is preserved after reboot.',
+    },
+  ],
+  'cam-set-autotrack': [
+    {
+      id: 'cam-set-autotrack-follow',
+      title: 'Auto-tracking follows subject across FOV',
+      description: 'Enable auto-tracking in camera settings. Walk across the camera field of view.',
+      expected: 'Camera pan/tilt follows the moving subject across the frame.',
+    },
+    {
+      id: 'cam-set-autotrack-return',
+      title: 'Camera returns to home when subject leaves frame',
+      description: 'With auto-tracking enabled, walk into frame then exit the camera FOV.',
+      expected: 'Camera returns to the home position after the subject leaves the frame.',
+    },
+    {
+      id: 'cam-set-autotrack-disable',
+      title: 'Disable auto-tracking stops following',
+      description: 'Disable auto-tracking. Walk across the camera FOV.',
+      expected: 'Camera does not follow the subject; stays in the current position.',
+    },
+  ],
+  'cam-set-spotlight-settings': [
+    {
+      id: 'cam-set-spotlight-motion-trigger',
+      title: 'Spotlight activates on motion trigger',
+      description: 'Set spotlight trigger to "motion only". Trigger motion detection in dark conditions.',
+      expected: 'Spotlight activates when motion is detected.',
+    },
+    {
+      id: 'cam-set-spotlight-brightness',
+      title: 'Spotlight brightness low/high changes visible output',
+      description: 'Set spotlight brightness to low, then high. Compare light output.',
+      expected: 'Spotlight brightness is visibly different between low and high settings.',
+    },
+    {
+      id: 'cam-set-spotlight-schedule',
+      title: 'Spotlight only activates during scheduled hours',
+      description: 'Set a spotlight schedule that excludes the current time. Trigger motion.',
+      expected: 'Spotlight does not activate for motion events outside the scheduled hours.',
+    },
+  ],
+  'cam-set-floodlight-settings': [
+    {
+      id: 'cam-set-floodlight-motion-trigger',
+      title: 'Floodlight activates on motion trigger',
+      description: 'Set floodlight trigger to "motion only". Trigger motion in dark conditions.',
+      expected: 'Floodlight activates when motion is detected.',
+    },
+    {
+      id: 'cam-set-floodlight-brightness',
+      title: 'Floodlight brightness levels change output',
+      description: 'Adjust floodlight brightness from low to high. Compare light output.',
+      expected: 'Floodlight output is visibly brighter at higher brightness settings.',
+    },
+    {
+      id: 'cam-set-floodlight-schedule',
+      title: 'Floodlight schedule restricts activation window',
+      description: 'Set a floodlight schedule excluding the current time. Trigger motion.',
+      expected: 'Floodlight does not activate for motion events outside the scheduled window.',
+    },
+  ],
+
+  // ─── SENSOR SETTINGS ───────────────────────────────────────────────────────
+  'sen-set-entry-delay': [
+    {
+      id: 'sen-set-entry-delay-countdown',
+      title: 'Entry delay countdown shown after sensor trigger',
+      description: 'Set entry delay to 30 seconds on an entry sensor. Arm system. Open the entry door.',
+      expected: 'App shows a 30-second entry delay countdown before alarm activates.',
+    },
+    {
+      id: 'sen-set-entry-delay-disarm',
+      title: 'Disarm within entry delay prevents alarm',
+      description: 'Trigger entry sensor with delay active. Disarm the system before countdown expires.',
+      expected: 'No alarm is triggered when system is disarmed within the entry delay window.',
+    },
+    {
+      id: 'sen-set-entry-delay-expire',
+      title: 'Alarm triggers when entry delay expires',
+      description: 'Trigger entry sensor with delay active. Allow countdown to expire without disarming.',
+      expected: 'Alarm activates after the entry delay expires.',
+    },
+  ],
+  'sen-set-exit-delay': [
+    {
+      id: 'sen-set-exit-delay-countdown',
+      title: 'Exit delay countdown shown after arm command',
+      description: 'Set exit delay to 30 seconds. Arm the system from app or keypad.',
+      expected: 'App shows a 30-second exit delay countdown before system fully arms.',
+    },
+    {
+      id: 'sen-set-exit-delay-door-open',
+      title: 'Opening entry door during exit delay does not alarm',
+      description: 'Arm system with exit delay. Open the entry door during the delay window.',
+      expected: 'No alarm is triggered when entry door is opened during the exit delay period.',
+    },
+    {
+      id: 'sen-set-exit-delay-arm',
+      title: 'System arms fully after exit delay expires',
+      description: 'Arm system with exit delay. Allow countdown to expire.',
+      expected: 'System fully arms after the exit delay expires and entry door triggers would cause alarm.',
+    },
+  ],
+  'sen-set-chime-type': [
+    {
+      id: 'sen-set-chime-change',
+      title: 'Change chime type — new chime plays on trigger',
+      description: 'Change the chime type in app settings. Trigger the sensor.',
+      expected: 'The newly selected chime type plays when the sensor is triggered.',
+    },
+    {
+      id: 'sen-set-chime-each-type',
+      title: 'Test each available chime type',
+      description: 'Cycle through all available chime types in settings. Trigger sensor after each change.',
+      expected: 'Each chime type produces a distinct sound when triggered.',
+    },
+    {
+      id: 'sen-set-chime-persist',
+      title: 'Selected chime type persists after hub reboot',
+      description: 'Select a chime type, reboot the hub, trigger the sensor.',
+      expected: 'The selected chime type is retained and plays correctly after hub reboot.',
+    },
+  ],
+  'sen-set-chime-volume': [
+    {
+      id: 'sen-set-chime-vol-low',
+      title: 'Chime volume Low — quiet chime on trigger',
+      description: 'Set chime volume to Low. Trigger the sensor.',
+      expected: 'Chime plays at a noticeably quiet volume.',
+    },
+    {
+      id: 'sen-set-chime-vol-high',
+      title: 'Chime volume High — loud chime on trigger',
+      description: 'Set chime volume to High. Trigger the sensor.',
+      expected: 'Chime plays at a clearly louder volume compared to Low setting.',
+    },
+    {
+      id: 'sen-set-chime-vol-persist',
+      title: 'Chime volume persists after hub reboot',
+      description: 'Set chime volume, reboot hub, trigger sensor.',
+      expected: 'Chime volume setting is preserved after reboot.',
+    },
+  ],
+  'sen-set-motion-sensitivity': [
+    {
+      id: 'sen-set-motion-sens-low',
+      title: 'Motion sensitivity Low — small movements ignored',
+      description: 'Set motion PIR sensitivity to Low. Make small, slow movements at the edge of the detection zone.',
+      expected: 'Small or distant movements do not trigger the sensor at Low sensitivity.',
+    },
+    {
+      id: 'sen-set-motion-sens-high',
+      title: 'Motion sensitivity High — small movements detected',
+      description: 'Set sensitivity to High. Make the same small movements.',
+      expected: 'Small movements trigger the sensor at High sensitivity.',
+    },
+    {
+      id: 'sen-set-motion-sens-persist',
+      title: 'Motion sensitivity setting persists after reboot',
+      description: 'Set sensitivity level, reboot hub, verify setting.',
+      expected: 'Motion sensitivity setting is preserved after hub reboot.',
+    },
+  ],
+  'sen-set-supervision': [
+    {
+      id: 'sen-set-supervision-interval',
+      title: 'Supervision check-in received at configured interval',
+      description: 'Set supervision interval. Wait for the interval to pass.',
+      expected: 'Hub receives a supervision signal from the sensor at the configured interval.',
+    },
+    {
+      id: 'sen-set-supervision-alert',
+      title: 'Supervision failure alert when sensor goes silent',
+      description: 'Set supervision interval. Remove sensor battery or block RF signal beyond the interval.',
+      expected: 'Hub/app generates a supervision failure alert when check-in is missed.',
+    },
+    {
+      id: 'sen-set-supervision-persist',
+      title: 'Supervision interval setting persists after reboot',
+      description: 'Set supervision interval, reboot hub, verify setting.',
+      expected: 'Supervision interval setting is preserved after hub reboot.',
+    },
+  ],
+  'sen-set-pet-immunity': [
+    {
+      id: 'sen-set-petimmunity-low',
+      title: 'Low pet immunity threshold — small pet may trigger',
+      description: 'Set pet immunity level to Low. Have a small pet move through the detection zone.',
+      expected: 'Small pet triggers the sensor at the Low immunity setting.',
+    },
+    {
+      id: 'sen-set-petimmunity-high',
+      title: 'High pet immunity threshold — small pet ignored',
+      description: 'Set pet immunity level to High. Have a small pet move through the detection zone.',
+      expected: 'Small pet does not trigger the sensor at High immunity level.',
+    },
+    {
+      id: 'sen-set-petimmunity-human',
+      title: 'Human still triggers sensor at high pet immunity',
+      description: 'Set pet immunity to High. Walk through the detection zone.',
+      expected: 'Human movement still triggers the sensor regardless of pet immunity level.',
+    },
+  ],
+
+  // ─── HUB SETTINGS ──────────────────────────────────────────────────────────
+  'hub-set-entry-delay': [
+    {
+      id: 'hub-set-entry-delay-countdown',
+      title: 'Entry delay countdown shown in app after trigger',
+      description: 'Set hub entry delay to 30 seconds. Arm system. Trigger an entry sensor.',
+      expected: 'App shows a 30-second countdown before alarm activates.',
+    },
+    {
+      id: 'hub-set-entry-delay-disarm',
+      title: 'Disarm within entry delay prevents alarm',
+      description: 'Trigger entry sensor with hub delay active. Disarm before countdown expires.',
+      expected: 'No alarm triggers when disarmed within the entry delay window.',
+    },
+    {
+      id: 'hub-set-entry-delay-expire',
+      title: 'Alarm triggers after entry delay expires',
+      description: 'Trigger entry sensor with delay. Let countdown expire without disarming.',
+      expected: 'Alarm activates after the full entry delay elapses.',
+    },
+  ],
+  'hub-set-exit-delay': [
+    {
+      id: 'hub-set-exit-delay-countdown',
+      title: 'Exit delay countdown visible after arm command',
+      description: 'Set hub exit delay to 30 seconds. Arm system from app.',
+      expected: 'App shows 30-second exit delay countdown before system fully arms.',
+    },
+    {
+      id: 'hub-set-exit-delay-no-alarm',
+      title: 'Entry during exit delay does not alarm',
+      description: 'Arm system with exit delay. Open entry door during delay window.',
+      expected: 'No alarm triggered while opening entry door within exit delay period.',
+    },
+    {
+      id: 'hub-set-exit-delay-persist',
+      title: 'Exit delay setting persists after hub reboot',
+      description: 'Set exit delay, reboot hub, verify setting.',
+      expected: 'Exit delay setting is preserved after reboot.',
+    },
+  ],
+  'hub-set-alarm-duration': [
+    {
+      id: 'hub-set-alarm-dur-short',
+      title: 'Alarm stops after configured duration',
+      description: 'Set alarm duration to 60 seconds. Trigger alarm. Allow it to run without cancellation.',
+      expected: 'Alarm siren and alerts stop automatically after 60 seconds.',
+    },
+    {
+      id: 'hub-set-alarm-dur-long',
+      title: 'Longer alarm duration extends siren',
+      description: 'Set alarm duration to 5 minutes. Trigger alarm. Allow it to run.',
+      expected: 'Siren continues for 5 minutes before stopping automatically.',
+    },
+    {
+      id: 'hub-set-alarm-dur-persist',
+      title: 'Alarm duration setting persists after hub reboot',
+      description: 'Set alarm duration, reboot hub, verify setting.',
+      expected: 'Alarm duration setting is preserved after reboot.',
+    },
+  ],
+  'hub-set-siren-volume': [
+    {
+      id: 'hub-set-siren-vol-low',
+      title: 'Siren volume Low — quieter alarm',
+      description: 'Set siren volume to Low. Trigger alarm and measure audibility.',
+      expected: 'Siren is clearly quieter than the default/high volume setting.',
+    },
+    {
+      id: 'hub-set-siren-vol-high',
+      title: 'Siren volume High — loud alarm',
+      description: 'Set siren volume to High. Trigger alarm and measure audibility.',
+      expected: 'Siren is at maximum volume; clearly audible at 10+ feet.',
+    },
+    {
+      id: 'hub-set-siren-vol-persist',
+      title: 'Siren volume setting persists after hub reboot',
+      description: 'Set siren volume, reboot hub, verify setting.',
+      expected: 'Siren volume setting is preserved after reboot.',
+    },
+  ],
+  'hub-set-dialer-delay': [
+    {
+      id: 'hub-set-dialer-delay-active',
+      title: 'Dialer delay postpones monitoring center contact',
+      description: 'Set dialer delay to 30 seconds. Trigger alarm. Cancel within the delay window.',
+      expected: 'Monitoring center is not contacted when alarm is cancelled within the dialer delay.',
+    },
+    {
+      id: 'hub-set-dialer-delay-expire',
+      title: 'Monitoring center contacted after dialer delay expires',
+      description: 'Trigger alarm. Allow dialer delay to expire without cancelling.',
+      expected: 'Monitoring center receives alarm signal after the dialer delay elapses.',
+    },
+    {
+      id: 'hub-set-dialer-delay-persist',
+      title: 'Dialer delay setting persists after hub reboot',
+      description: 'Set dialer delay, reboot hub, verify setting.',
+      expected: 'Dialer delay setting is preserved after reboot.',
+    },
+  ],
+  'hub-set-ac-loss-notif': [
+    {
+      id: 'hub-set-acloss-delay',
+      title: 'AC loss notification delayed by configured interval',
+      description: 'Set AC power loss notification delay to 30 minutes. Disconnect AC power from hub.',
+      expected: 'No notification is sent for at least 30 minutes after AC power loss.',
+    },
+    {
+      id: 'hub-set-acloss-notif-sent',
+      title: 'AC loss notification sent after delay expires',
+      description: 'Keep AC disconnected beyond the configured delay.',
+      expected: 'AC loss notification is sent to the app after the delay period.',
+    },
+    {
+      id: 'hub-set-acloss-restore-no-notif',
+      title: 'No alert if AC restored within delay',
+      description: 'Disconnect AC power, then reconnect before the delay expires.',
+      expected: 'No AC loss notification is sent when power is restored within the delay window.',
+    },
+  ],
+  'hub-set-low-battery': [
+    {
+      id: 'hub-set-lowbatt-alert',
+      title: 'Low battery alert triggered at configured threshold',
+      description: 'Set low battery threshold to 30%. Allow hub battery to deplete to that level (or simulate).',
+      expected: 'Low battery alert is sent to the app when battery reaches the configured threshold.',
+    },
+    {
+      id: 'hub-set-lowbatt-above-threshold',
+      title: 'No low battery alert above configured threshold',
+      description: 'Verify no alert is sent when battery is above the threshold.',
+      expected: 'No low battery notification is received while battery remains above the threshold.',
+    },
+    {
+      id: 'hub-set-lowbatt-persist',
+      title: 'Low battery threshold setting persists after hub reboot',
+      description: 'Set low battery threshold, reboot hub, verify setting.',
+      expected: 'Low battery threshold setting is preserved after reboot.',
+    },
+  ],
+
+  // ─── APP SETTINGS ──────────────────────────────────────────────────────────
+  'app-set-notif-sound': [
+    {
+      id: 'app-set-notif-sound-change',
+      title: 'Change notification sound — new sound plays on event',
+      description: 'Change notification sound in app settings. Trigger an event.',
+      expected: 'The newly selected notification sound plays when an event notification arrives.',
+    },
+    {
+      id: 'app-set-notif-sound-each',
+      title: 'Preview each available notification sound',
+      description: 'Select each available notification sound and use any preview function.',
+      expected: 'Each sound plays a distinct tone when previewed.',
+    },
+    {
+      id: 'app-set-notif-sound-persist',
+      title: 'Notification sound persists after app restart',
+      description: 'Set notification sound, close and reopen app, verify setting.',
+      expected: 'Selected notification sound is retained after app restart.',
+    },
+  ],
+  'app-set-auto-arm': [
+    {
+      id: 'app-set-autoarm-schedule',
+      title: 'Auto-arm activates at scheduled time',
+      description: 'Set auto-arm schedule for a time within the next 10 minutes. Wait for the scheduled time.',
+      expected: 'System arms automatically at the configured time.',
+    },
+    {
+      id: 'app-set-autoarm-outside-schedule',
+      title: 'Auto-arm does not trigger outside scheduled time',
+      description: 'Set auto-arm schedule for a future time. Verify system does not arm at other times.',
+      expected: 'System does not auto-arm outside the configured schedule window.',
+    },
+    {
+      id: 'app-set-autoarm-persist',
+      title: 'Auto-arm schedule persists after app restart',
+      description: 'Set auto-arm schedule, restart app, verify setting.',
+      expected: 'Auto-arm schedule is preserved after app restart.',
+    },
+  ],
+  'app-set-disarm-timeout': [
+    {
+      id: 'app-set-disarm-timeout-active',
+      title: 'Disarm timeout re-arms system after configured period',
+      description: 'Set disarm timeout to 5 minutes. Disarm the system. Wait for the timeout.',
+      expected: 'System automatically re-arms after the configured disarm timeout period.',
+    },
+    {
+      id: 'app-set-disarm-timeout-cancel',
+      title: 'Re-arm cancelled if manual arm/disarm occurs during timeout',
+      description: 'Disarm system with timeout active. Manually arm then disarm before timeout.',
+      expected: 'Timeout clock resets or is cancelled by manual arm/disarm interaction.',
+    },
+    {
+      id: 'app-set-disarm-timeout-persist',
+      title: 'Disarm timeout setting persists after app restart',
+      description: 'Set disarm timeout, restart app, verify setting.',
+      expected: 'Disarm timeout setting is retained after app restart.',
+    },
+  ],
+  'app-set-video-quality': [
+    {
+      id: 'app-set-vidqual-low',
+      title: 'Low video quality reduces bandwidth in live view',
+      description: 'Set video quality preference to Low. Open live view and monitor bandwidth.',
+      expected: 'Bandwidth usage is lower and image quality is reduced compared to High setting.',
+    },
+    {
+      id: 'app-set-vidqual-high',
+      title: 'High video quality improves live view clarity',
+      description: 'Set video quality preference to High. Open live view and compare image quality.',
+      expected: 'Image quality is noticeably sharper with higher bandwidth usage.',
+    },
+    {
+      id: 'app-set-vidqual-persist',
+      title: 'Video quality preference persists after app restart',
+      description: 'Set video quality, restart app, verify setting.',
+      expected: 'Video quality preference is preserved after app restart.',
+    },
+  ],
+  'app-set-download-quality': [
+    {
+      id: 'app-set-dlqual-low',
+      title: 'Low download quality produces smaller clip file',
+      description: 'Set download quality to Low. Download an event clip. Check file size.',
+      expected: 'Downloaded clip file is smaller than a clip downloaded at High quality.',
+    },
+    {
+      id: 'app-set-dlqual-high',
+      title: 'High download quality produces larger higher-quality clip',
+      description: 'Set download quality to High. Download an event clip. Check file size and quality.',
+      expected: 'Downloaded clip is larger and of higher visual quality than Low setting.',
+    },
+    {
+      id: 'app-set-dlqual-persist',
+      title: 'Download quality setting persists after app restart',
+      description: 'Set download quality, restart app, verify setting.',
+      expected: 'Download quality setting is retained after app restart.',
+    },
+  ],
+
+  // ─── TOUCHPAD SETTINGS ─────────────────────────────────────────────────────
+  'tp-set-brightness': [
+    {
+      id: 'tp-set-brightness-low',
+      title: 'Low display brightness — dim screen',
+      description: 'Set touchpad display brightness to the lowest level in app settings.',
+      expected: 'Touchpad display is noticeably dimmer at the lowest brightness setting.',
+    },
+    {
+      id: 'tp-set-brightness-high',
+      title: 'High display brightness — bright screen',
+      description: 'Set touchpad display brightness to the highest level.',
+      expected: 'Touchpad display is at maximum brightness.',
+    },
+    {
+      id: 'tp-set-brightness-persist',
+      title: 'Display brightness persists after reboot',
+      description: 'Set brightness level, reboot touchpad, verify the setting.',
+      expected: 'Display brightness setting is retained after reboot.',
+    },
+  ],
+  'tp-set-volume': [
+    {
+      id: 'tp-set-volume-low',
+      title: 'Low volume level — quiet chime/beeps',
+      description: 'Set touchpad volume to Low. Arm or trigger an event to hear the beep/chime.',
+      expected: 'Touchpad audio is noticeably quieter at the Low volume setting.',
+    },
+    {
+      id: 'tp-set-volume-high',
+      title: 'High volume level — loud chime/beeps',
+      description: 'Set touchpad volume to High. Arm or trigger an event.',
+      expected: 'Touchpad audio is clearly louder at the High volume setting.',
+    },
+    {
+      id: 'tp-set-volume-persist',
+      title: 'Volume setting persists after reboot',
+      description: 'Set volume level, reboot touchpad, verify setting.',
+      expected: 'Volume setting is preserved after reboot.',
+    },
+  ],
+  'tp-set-button-tone': [
+    {
+      id: 'tp-set-btntone-on',
+      title: 'Button tone enabled — beep on keypress',
+      description: 'Enable button tone in touchpad settings. Press any key on the touchpad.',
+      expected: 'A brief tone sounds with each key press.',
+    },
+    {
+      id: 'tp-set-btntone-off',
+      title: 'Button tone disabled — silent keypress',
+      description: 'Disable button tone. Press any key on the touchpad.',
+      expected: 'No tone sounds when keys are pressed.',
+    },
+    {
+      id: 'tp-set-btntone-persist',
+      title: 'Button tone setting persists after reboot',
+      description: 'Set button tone, reboot touchpad, verify setting.',
+      expected: 'Button tone setting is preserved after reboot.',
+    },
+  ],
 };

@@ -99,8 +99,136 @@ function groupTestsBySection(tests, category) {
   return Object.values(sectionMap).sort((a, b) => a.sectionIndex - b.sectionIndex);
 }
 
+// Evidence fields component
+function EvidenceFields({ test, onEvidenceChange }) {
+  return (
+    <div className="evidence-field">
+      <div className="form-group" style={{ marginBottom: 10 }}>
+        <label>Evidence URL</label>
+        <input
+          type="text"
+          placeholder="https://... (screenshot, video link)"
+          value={test.evidenceUrl || ''}
+          onChange={e => onEvidenceChange({ evidenceUrl: e.target.value })}
+        />
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', textTransform: 'none', letterSpacing: 0, fontSize: 13, fontWeight: 400, color: 'var(--text)', marginBottom: 0 }}>
+        <input
+          type="checkbox"
+          style={{ width: 'auto' }}
+          checked={test.evidencePending || false}
+          onChange={e => onEvidenceChange({ evidencePending: e.target.checked })}
+        />
+        Evidence obtained — will upload after testing
+      </label>
+    </div>
+  );
+}
+
+// Extra tests section component
+function ExtraTestsSection({ test, onExtraTestsChange }) {
+  const extraTests = test.extraTests || [];
+  const hasYes = extraTests.length > 0;
+  const [showRows, setShowRows] = useState(hasYes);
+
+  function handleYesNo(yes) {
+    if (yes) {
+      if (extraTests.length === 0) {
+        onExtraTestsChange([{ description: '', result: null }]);
+      }
+      setShowRows(true);
+    } else {
+      setShowRows(false);
+    }
+  }
+
+  function updateRow(index, updates) {
+    const updated = extraTests.map((r, i) => i === index ? { ...r, ...updates } : r);
+    onExtraTestsChange(updated);
+  }
+
+  function addRow() {
+    onExtraTestsChange([...extraTests, { description: '', result: null }]);
+  }
+
+  function removeRow(index) {
+    if (extraTests.length <= 1) return;
+    onExtraTestsChange(extraTests.filter((_, i) => i !== index));
+  }
+
+  const isYes = showRows;
+
+  return (
+    <div className="extra-tests-section">
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: isYes ? 12 : 0 }}>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Was there anything else tested not listed above?</span>
+          <div className="extra-yes-no">
+            <button
+              className={isYes ? 'active' : ''}
+              onClick={() => handleYesNo(true)}
+            >
+              Yes
+            </button>
+            <button
+              className={!isYes ? 'active' : ''}
+              onClick={() => handleYesNo(false)}
+            >
+              No
+            </button>
+          </div>
+        </div>
+
+        {isYes && (
+          <div>
+            {extraTests.map((row, i) => (
+              <div key={i} className="extra-test-row">
+                <input
+                  type="text"
+                  placeholder="Describe what was tested..."
+                  value={row.description}
+                  onChange={e => updateRow(i, { description: e.target.value })}
+                />
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button
+                    className={`btn btn-sm btn-pass ${row.result === 'pass' ? 'active' : ''}`}
+                    onClick={() => updateRow(i, { result: row.result === 'pass' ? null : 'pass' })}
+                  >
+                    Pass
+                  </button>
+                  <button
+                    className={`btn btn-sm btn-fail ${row.result === 'fail' ? 'active' : ''}`}
+                    onClick={() => updateRow(i, { result: row.result === 'fail' ? null : 'fail' })}
+                  >
+                    Fail
+                  </button>
+                </div>
+                {extraTests.length > 1 && (
+                  <button
+                    onClick={() => removeRow(i)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 16, padding: '0 4px', flexShrink: 0 }}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 13, padding: '4px 0', marginTop: 4 }}
+              onClick={addRow}
+            >
+              + Add another
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Reproduction detail panel
-function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict }) {
+function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, onEvidenceChange, onExtraTestsChange }) {
   return (
     <>
       <div className="test-detail-content">
@@ -143,6 +271,19 @@ function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerd
           </div>
         )}
 
+        <div className="test-detail-section" style={{ marginTop: 0 }}>
+          <label>Actual Behavior</label>
+          <textarea
+            value={testNote}
+            onChange={e => onNotesChange(e.target.value)}
+            onBlur={onNotesBlur}
+            placeholder="Describe the actual behavior observed..."
+            rows={4}
+          />
+        </div>
+
+        <EvidenceFields test={test} onEvidenceChange={onEvidenceChange} />
+
         <div className="verdict-buttons">
           <button
             className={`btn btn-reproduced ${test.status === 'reproduced' ? 'active' : ''}`}
@@ -164,23 +305,14 @@ function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerd
           </button>
         </div>
 
-        <div className="test-detail-section" style={{ marginTop: 24 }}>
-          <label>Actual Behavior</label>
-          <textarea
-            value={testNote}
-            onChange={e => onNotesChange(e.target.value)}
-            onBlur={onNotesBlur}
-            placeholder="Describe the actual behavior observed..."
-            rows={4}
-          />
-        </div>
+        <ExtraTestsSection test={test} onExtraTestsChange={onExtraTestsChange} />
       </div>
     </>
   );
 }
 
 // Regression detail panel
-function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict }) {
+function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, onEvidenceChange, onExtraTestsChange }) {
   return (
     <>
       <div className="test-detail-content">
@@ -226,6 +358,19 @@ function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdic
           </div>
         )}
 
+        <div className="test-detail-section" style={{ marginTop: 0 }}>
+          <label>Notes</label>
+          <textarea
+            value={testNote}
+            onChange={e => onNotesChange(e.target.value)}
+            onBlur={onNotesBlur}
+            placeholder="Add notes about this regression test..."
+            rows={4}
+          />
+        </div>
+
+        <EvidenceFields test={test} onEvidenceChange={onEvidenceChange} />
+
         <div className="verdict-buttons">
           <button
             className={`btn btn-regression-found ${test.status === 'regression-found' ? 'active' : ''}`}
@@ -247,23 +392,14 @@ function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdic
           </button>
         </div>
 
-        <div className="test-detail-section" style={{ marginTop: 24 }}>
-          <label>Notes</label>
-          <textarea
-            value={testNote}
-            onChange={e => onNotesChange(e.target.value)}
-            onBlur={onNotesBlur}
-            placeholder="Add notes about this regression test..."
-            rows={4}
-          />
-        </div>
+        <ExtraTestsSection test={test} onExtraTestsChange={onExtraTestsChange} />
       </div>
     </>
   );
 }
 
 // E2E / Feature detail panel
-function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, type, appConfigName }) {
+function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, type, appConfigName, onEvidenceChange, onExtraTestsChange }) {
   return (
     <>
       <div className="test-detail-content">
@@ -309,6 +445,19 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
           <p>{test.expected || test.defaultExpected || '—'}</p>
         </div>
 
+        <div className="test-detail-section" style={{ marginTop: 0 }}>
+          <label>Notes</label>
+          <textarea
+            value={testNote}
+            onChange={e => onNotesChange(e.target.value)}
+            onBlur={onNotesBlur}
+            placeholder="Add notes about this test result..."
+            rows={4}
+          />
+        </div>
+
+        <EvidenceFields test={test} onEvidenceChange={onEvidenceChange} />
+
         <div className="verdict-buttons">
           <button
             className={`btn btn-pass ${test.status === 'pass' ? 'active' : ''}`}
@@ -336,16 +485,7 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
           </button>
         </div>
 
-        <div className="test-detail-section" style={{ marginTop: 24 }}>
-          <label>Notes</label>
-          <textarea
-            value={testNote}
-            onChange={e => onNotesChange(e.target.value)}
-            onBlur={onNotesBlur}
-            placeholder="Add notes about this test result..."
-            rows={4}
-          />
-        </div>
+        <ExtraTestsSection test={test} onExtraTestsChange={onExtraTestsChange} />
       </div>
     </>
   );
@@ -396,9 +536,17 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
     await saveTestCases(newTestCases);
   }
 
+  function advanceToNextTest() {
+    const currentIndex = session.testCases.findIndex(t => t.id === selectedTestId);
+    if (currentIndex >= 0 && currentIndex < session.testCases.length - 1) {
+      setSelectedTestId(session.testCases[currentIndex + 1].id);
+    }
+  }
+
   function handleVerdict(status) {
     const testNotes = notes[selectedTestId] ?? selectedTest?.notes ?? '';
     saveTestUpdate(selectedTestId, { status, notes: testNotes });
+    advanceToNextTest();
   }
 
   function handleNotesBlur() {
@@ -407,6 +555,14 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
     if (testNotes !== selectedTest.notes) {
       saveTestUpdate(selectedTestId, { notes: testNotes });
     }
+  }
+
+  function handleEvidenceChange(testId, updates) {
+    saveTestUpdate(testId, updates);
+  }
+
+  function handleExtraTestsChange(testId, extraTests) {
+    saveTestUpdate(testId, { extraTests });
   }
 
   async function handleSaveIssue(issue) {
@@ -617,6 +773,8 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                 onNotesChange={val => setNotes(n => ({ ...n, [selectedTestId]: val }))}
                 onNotesBlur={handleNotesBlur}
                 onVerdict={handleVerdict}
+                onEvidenceChange={updates => handleEvidenceChange(selectedTestId, updates)}
+                onExtraTestsChange={extraTests => handleExtraTestsChange(selectedTestId, extraTests)}
               />
             ) : sessionType === 'regression' ? (
               <RegressionDetail
@@ -625,6 +783,8 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                 onNotesChange={val => setNotes(n => ({ ...n, [selectedTestId]: val }))}
                 onNotesBlur={handleNotesBlur}
                 onVerdict={handleVerdict}
+                onEvidenceChange={updates => handleEvidenceChange(selectedTestId, updates)}
+                onExtraTestsChange={extraTests => handleExtraTestsChange(selectedTestId, extraTests)}
               />
             ) : (
               <StandardDetail
@@ -635,6 +795,8 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                 onVerdict={handleVerdict}
                 type={sessionType}
                 appConfigName={session.appConfigName}
+                onEvidenceChange={updates => handleEvidenceChange(selectedTestId, updates)}
+                onExtraTestsChange={extraTests => handleExtraTestsChange(selectedTestId, extraTests)}
               />
             )
           ) : (

@@ -188,6 +188,25 @@ export default function SessionSummary({ session, onBack }) {
         )}
       </div>
 
+      {/* Pending Evidence */}
+      {(() => {
+        const pendingEvidence = testCases.filter(t => t.evidencePending && !t.evidenceUrl);
+        if (pendingEvidence.length === 0) return null;
+        return (
+          <div className="summary-section evidence-pending-section">
+            <h2>Pending Evidence ({pendingEvidence.length})</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {pendingEvidence.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 14px', fontSize: 13 }}>
+                  {t.testNumber && <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)' }}>[{t.testNumber}]</span>}
+                  <span>{t.title}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Issues */}
       {issues.length > 0 && (
         <div className="summary-section">
@@ -219,6 +238,37 @@ export default function SessionSummary({ session, onBack }) {
           />
         )}
       </div>
+
+      {/* Additional Items Tested */}
+      {(() => {
+        const withExtras = testCases.filter(t => t.extraTests && t.extraTests.some(e => e.description));
+        if (withExtras.length === 0) return null;
+        return (
+          <div className="summary-section">
+            <h2>Additional Items Tested</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {withExtras.map(t => (
+                <div key={t.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px 14px' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
+                    {t.testNumber && <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)', marginRight: 6 }}>[{t.testNumber}]</span>}
+                    {t.title}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {t.extraTests.filter(e => e.description).map((e, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                        <span className={`badge ${e.result === 'pass' ? 'badge-pass' : e.result === 'fail' ? 'badge-fail' : 'badge-pending'}`} style={{ flexShrink: 0 }}>
+                          {e.result === 'pass' ? 'Pass' : e.result === 'fail' ? 'Fail' : 'Pending'}
+                        </span>
+                        <span>{e.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="summary-actions">
         <button className="btn btn-secondary" onClick={onBack}>

@@ -28,6 +28,15 @@ export const CAPABILITY_GROUPS = {
       { id: 'professional-monitoring', label: 'Professional Monitoring' },
       { id: 'self-monitoring', label: 'Self-Monitoring' },
     ]},
+    { label: 'Hub Settings', capabilities: [
+      { id: 'hub-set-entry-delay', label: 'Entry Delay' },
+      { id: 'hub-set-exit-delay', label: 'Exit Delay' },
+      { id: 'hub-set-alarm-duration', label: 'Alarm Duration' },
+      { id: 'hub-set-siren-volume', label: 'Siren Volume' },
+      { id: 'hub-set-dialer-delay', label: 'Dialer Delay' },
+      { id: 'hub-set-ac-loss-notif', label: 'AC Power Loss Notification Delay' },
+      { id: 'hub-set-low-battery', label: 'Low Battery Threshold' },
+    ]},
   ],
   touchpad: [
     { label: 'Connectivity', capabilities: [
@@ -37,6 +46,11 @@ export const CAPABILITY_GROUPS = {
     { label: 'Hardware', capabilities: [
       { id: 'battery-backup', label: 'Battery Backup' },
       { id: 'wifi', label: 'Wi-Fi' },
+    ]},
+    { label: 'Touchpad Settings', capabilities: [
+      { id: 'tp-set-brightness', label: 'Display Brightness' },
+      { id: 'tp-set-volume', label: 'Volume Level' },
+      { id: 'tp-set-button-tone', label: 'Button Tone' },
     ]},
   ],
   camera: [
@@ -109,6 +123,24 @@ export const CAPABILITY_GROUPS = {
       { id: 'wired-chime', label: 'Wired Chime Support' },
       { id: 'optical-zoom', label: 'Optical Zoom' },
     ]},
+    { label: 'Camera Settings', capabilities: [
+      { id: 'cam-set-motion-sensitivity', label: 'Motion Sensitivity Adjustment' },
+      { id: 'cam-set-recording-schedule', label: 'Recording Schedule' },
+      { id: 'cam-set-night-vision', label: 'Night Vision Toggle/Auto' },
+      { id: 'cam-set-flip-rotation', label: 'Image Flip/Rotation' },
+      { id: 'cam-set-wdr', label: 'WDR (Wide Dynamic Range)' },
+      { id: 'cam-set-bitrate', label: 'Bitrate/Quality Setting' },
+      { id: 'cam-set-framerate', label: 'Frame Rate Setting' },
+      { id: 'cam-set-mic-sensitivity', label: 'Microphone Sensitivity' },
+      { id: 'cam-set-speaker-volume', label: 'Speaker Volume' },
+      { id: 'cam-set-notif-cooldown', label: 'Notification Cooldown' },
+      { id: 'cam-set-zone-schedule', label: 'Activity Zone Schedule' },
+      { id: 'cam-set-privacy-schedule', label: 'Privacy Mode Schedule' },
+      { id: 'cam-set-led-toggle', label: 'LED Status Light Toggle' },
+      { id: 'cam-set-autotrack', label: 'Auto-Tracking / Follower' },
+      { id: 'cam-set-spotlight-settings', label: 'Spotlight Settings' },
+      { id: 'cam-set-floodlight-settings', label: 'Floodlight Settings' },
+    ]},
   ],
   sensor: [
     { label: 'Sensor Type', capabilities: [
@@ -140,6 +172,15 @@ export const CAPABILITY_GROUPS = {
       { id: 'pet-immune', label: 'Pet Immune' },
       { id: 'long-range', label: 'Long Range' },
     ]},
+    { label: 'Sensor Settings', capabilities: [
+      { id: 'sen-set-entry-delay', label: 'Entry Delay' },
+      { id: 'sen-set-exit-delay', label: 'Exit Delay' },
+      { id: 'sen-set-chime-type', label: 'Chime Type' },
+      { id: 'sen-set-chime-volume', label: 'Chime Volume' },
+      { id: 'sen-set-motion-sensitivity', label: 'Motion Sensitivity' },
+      { id: 'sen-set-supervision', label: 'Supervision Interval' },
+      { id: 'sen-set-pet-immunity', label: 'Pet Immunity Level' },
+    ]},
   ],
   app: [
     { label: 'Platform', capabilities: [
@@ -169,6 +210,13 @@ export const CAPABILITY_GROUPS = {
     { label: 'Automation', capabilities: [
       { id: 'rules-engine', label: 'Rules Engine' },
       { id: 'smarthome-integrations', label: 'Smart Home Integrations (Alexa/Google/HomeKit)' },
+    ]},
+    { label: 'App Settings', capabilities: [
+      { id: 'app-set-notif-sound', label: 'Notification Sound' },
+      { id: 'app-set-auto-arm', label: 'Auto-Arm Schedule' },
+      { id: 'app-set-disarm-timeout', label: 'Disarm Timeout' },
+      { id: 'app-set-video-quality', label: 'Video Quality Preference' },
+      { id: 'app-set-download-quality', label: 'Download Quality' },
     ]},
   ],
 };

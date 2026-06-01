@@ -1369,6 +1369,79 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .badge { border: 1px solid #ccc !important; }
 }
 
+/* ============================================================
+   EVIDENCE FIELDS
+   ============================================================ */
+.evidence-field {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-bottom: 16px;
+}
+
+/* ============================================================
+   EVIDENCE PENDING SECTION (summary)
+   ============================================================ */
+.evidence-pending-section {
+  border-left: 3px solid #eab308;
+  padding-left: 12px;
+}
+
+/* ============================================================
+   EXTRA TESTS SECTION
+   ============================================================ */
+.extra-tests-section {
+  margin-top: 8px;
+}
+
+.extra-test-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.extra-test-row input {
+  flex: 1;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.extra-yes-no {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.extra-yes-no button {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.extra-yes-no button:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  border-right: none;
+}
+
+.extra-yes-no button:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.extra-yes-no button:hover {
+  background: var(--card-hover);
+  color: var(--text);
+}
+
+.extra-yes-no button.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
 /* Not available in app banner */
 .not-available-banner {
   background: rgba(234,179,8,0.1);
