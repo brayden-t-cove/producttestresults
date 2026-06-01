@@ -232,6 +232,17 @@ export default function App() {
     setView('sessionStart');
   }
 
+  function handleDuplicateProduct(product, nextVersion) {
+    const duped = {
+      ...product,
+      id: undefined,
+      createdAt: undefined,
+      version: nextVersion,
+    };
+    setEditingProduct(duped);
+    setView('newProduct');
+  }
+
   return (
     <div className="app-layout">
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
@@ -261,6 +272,7 @@ export default function App() {
             onEdit={product => { setEditingProduct(product); setView('editProduct'); }}
             onStartTest={handleStartTestFromCatalog}
             onDelete={handleDeleteProduct}
+            onDuplicate={handleDuplicateProduct}
             onBack={() => setView('dashboard')}
           />
         </div>

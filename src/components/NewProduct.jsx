@@ -129,6 +129,7 @@ export default function NewProduct({ product, onSave, onBack }) {
   const [name, setName] = useState(product?.name || '');
   const [manufacturer, setManufacturer] = useState(product?.manufacturer || '');
   const [modelNumber, setModelNumber] = useState(product?.modelNumber || '');
+  const [version, setVersion] = useState(product?.version || '');
   const [category, setCategory] = useState(product?.category || '');
   const [capabilities, setCapabilities] = useState(new Set(product?.capabilities || []));
   const [appConfigs, setAppConfigs] = useState(product?.appConfigs || []);
@@ -198,6 +199,7 @@ export default function NewProduct({ product, onSave, onBack }) {
         name: name.trim(),
         manufacturer: manufacturer.trim(),
         modelNumber: modelNumber.trim(),
+        version: version.trim(),
         category,
         capabilities: Array.from(capabilities),
         appConfigs,
@@ -251,6 +253,16 @@ export default function NewProduct({ product, onSave, onBack }) {
             placeholder="e.g. CVH-300"
             value={modelNumber}
             onChange={e => setModelNumber(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Version <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+          <input
+            type="text"
+            placeholder="e.g. V1, V2, Rev B"
+            value={version}
+            onChange={e => setVersion(e.target.value)}
           />
         </div>
 

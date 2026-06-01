@@ -14,7 +14,14 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onBack }) {
+function incrementVersion(v) {
+  if (!v) return 'V2';
+  const m = v.match(/^(V|v|Rev |Rev)(\d+)(.*)$/);
+  if (m) return `${m[1]}${parseInt(m[2]) + 1}${m[3]}`;
+  return v;
+}
+
+export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   function handleDeleteClick(product) {
@@ -62,7 +69,14 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                   {CATEGORY_ICONS[product.category] || '📦'}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="catalog-card-name">{product.name}</div>
+                  <div className="catalog-card-name">
+                    {product.name}
+                    {product.version && (
+                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'rgba(99,102,241,0.15)', borderRadius: 4, padding: '1px 6px' }}>
+                        {product.version}
+                      </span>
+                    )}
+                  </div>
                   <div className="catalog-card-meta">
                     {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || CATEGORY_LABELS[product.category] || product.category}
                   </div>
@@ -86,6 +100,13 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                   onClick={() => onEdit(product)}
                 >
                   Edit
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  title="Duplicate as new version"
+                  onClick={() => onDuplicate(product, incrementVersion(product.version))}
+                >
+                  ⧉ Duplicate
                 </button>
                 <button
                   className="btn btn-danger btn-sm"
