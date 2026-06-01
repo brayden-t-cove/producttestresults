@@ -284,6 +284,7 @@ export default function App() {
             product={editingProduct}
             onSave={handleSaveProduct}
             onBack={() => setView('catalog')}
+            catalog={catalog}
           />
         </div>
       )}

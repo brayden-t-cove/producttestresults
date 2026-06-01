@@ -29,11 +29,24 @@ function platformLabel(platform) {
   return 'iOS/Android';
 }
 
-function AppConfigForm({ capabilities, initialData, onSave, onCancel }) {
+function AppConfigForm({ capabilities, initialData, onSave, onCancel, catalogApps }) {
   const [appName, setAppName] = useState(initialData?.appName || '');
   const [platform, setPlatform] = useState(initialData?.platform || 'both');
   const [unavailable, setUnavailable] = useState(new Set(initialData?.unavailableCapabilities || []));
 
+  function handleSelectCatalogApp(app) {
+    if (!app) return;
+    setAppName(app.name);
+    // prefill platform from app category capabilities
+    const hasiOS = (app.capabilities || []).includes('ios');
+    const hasAndroid = (app.capabilities || []).includes('android');
+    if (hasiOS && hasAndroid) setPlatform('both');
+    else if (hasiOS) setPlatform('ios');
+    else if (hasAndroid) setPlatform('android');
+    else setPlatform('both');
+    // start with nothing unavailable — user unchecks what's hidden
+    setUnavailable(new Set());
+  }
   function toggleUnavailable(capId) {
     setUnavailable(prev => {
       const next = new Set(prev);
@@ -57,6 +70,17 @@ function AppConfigForm({ capabilities, initialData, onSave, onCancel }) {
 
   return (
     <div className="app-config-form">
+      {catalogApps && catalogApps.length > 0 && (
+        <div className="form-group" style={{ marginBottom: 12 }}>
+          <label>Pick from catalog <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(prefills name & platform)</span></label>
+          <select onChange={e => handleSelectCatalogApp(catalogApps.find(a => a.id === e.target.value))} defaultValue="">
+            <option value="">— Select an app —</option>
+            {catalogApps.map(a => (
+              <option key={a.id} value={a.id}>{a.name}{a.version ? ` ${a.version}` : ''}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="form-group" style={{ marginBottom: 12 }}>
         <label>App Name</label>
         <input
@@ -64,7 +88,6 @@ function AppConfigForm({ capabilities, initialData, onSave, onCancel }) {
           placeholder="e.g. InstaVision, Alula, Wyze App"
           value={appName}
           onChange={e => setAppName(e.target.value)}
-          autoFocus
         />
       </div>
 
@@ -124,7 +147,7 @@ function AppConfigForm({ capabilities, initialData, onSave, onCancel }) {
   );
 }
 
-export default function NewProduct({ product, onSave, onBack }) {
+export default function NewProduct({ product, onSave, onBack, catalog }) {
   const isEdit = !!product;
   const [name, setName] = useState(product?.name || '');
   const [manufacturer, setManufacturer] = useState(product?.manufacturer || '');
@@ -344,6 +367,7 @@ export default function NewProduct({ product, onSave, onBack }) {
                         initialData={ac}
                         onSave={handleEditAppConfig}
                         onCancel={() => setEditingConfigId(null)}
+                        catalogApps={catalog?.filter(p => p.category === 'app') || []}
                       />
                     ) : (
                       <div className="app-config-item">
@@ -393,6 +417,7 @@ export default function NewProduct({ product, onSave, onBack }) {
                 initialData={null}
                 onSave={handleAddAppConfig}
                 onCancel={() => setShowAddAppForm(false)}
+                catalogApps={catalog?.filter(p => p.category === 'app') || []}
               />
             ) : (
               <button

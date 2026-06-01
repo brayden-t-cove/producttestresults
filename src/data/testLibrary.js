@@ -943,6 +943,34 @@ export const TEST_LIBRARY = {
       expected: 'Detection event is triggered for movement within the threshold distance.',
     },
   ],
+  'package-detection-edge': [
+    { id: 'cam-pkg-edge-tp', title: 'Package detected on-device (edge)', description: 'Place a package in frame. Verify detection occurs without cloud processing delay.', expected: 'Package event fires within 3 seconds on-device, labeled "Package" in history.' },
+    { id: 'cam-pkg-edge-latency', title: 'Edge package detection latency', description: 'Time from package placement to event notification.', expected: 'Notification received within 5 seconds of package placement.' },
+  ],
+  'vehicle-detection-edge': [
+    { id: 'cam-veh-edge-tp', title: 'Vehicle detected on-device (edge)', description: 'Drive or push a vehicle through the FOV. Verify on-device detection.', expected: 'Vehicle event triggered and labeled "Vehicle" within 5 seconds without cloud dependency.' },
+    { id: 'cam-veh-edge-tn', title: 'Edge vehicle — person does not false trigger', description: 'Walk through the FOV. Verify person does not register as vehicle.', expected: 'Person event fires, not a vehicle event.' },
+  ],
+  'animal-detection-edge': [
+    { id: 'cam-ani-edge-tp', title: 'Animal detected on-device (edge)', description: 'Have a pet walk through the FOV. Verify on-device animal detection.', expected: 'Animal event fires on-device within 5 seconds.' },
+    { id: 'cam-ani-edge-vs-person', title: 'Edge animal vs person differentiation', description: 'Walk through FOV, then have an animal walk through. Verify labels differ.', expected: 'Human labeled "Person", animal labeled "Animal" — both on-device.' },
+  ],
+  'motion-detection-cloud': [
+    { id: 'cam-motion-cloud-trigger', title: 'Cloud motion detection triggers event', description: 'Move in front of camera. Verify cloud-processed motion event is generated.', expected: 'Cloud motion event appears in history, may have slightly higher latency than edge.' },
+    { id: 'cam-motion-cloud-accuracy', title: 'Cloud motion detection accuracy', description: 'Compare cloud detection results with actual motion events over 10 triggers.', expected: 'Cloud detection accuracy matches or exceeds edge detection for same events.' },
+  ],
+  'person-detection-cloud': [
+    { id: 'cam-person-cloud-tp', title: 'Cloud person detection true positive', description: 'Walk in front of camera. Verify cloud-side person detection event.', expected: 'Person event labeled and processed via cloud within 10 seconds.' },
+    { id: 'cam-person-cloud-accuracy', title: 'Cloud person detection accuracy vs edge', description: 'Run 10 person detection events and compare cloud vs edge label accuracy.', expected: 'Cloud person detection provides same or better accuracy; may improve with model updates.' },
+  ],
+  'custom-zones-cloud': [
+    { id: 'cam-zone-cloud-create', title: 'Cloud-processed custom zone creation', description: 'Create a motion zone in app. Verify zone is processed and enforced server-side.', expected: 'Zone saves and cloud only triggers events for motion within defined zone.' },
+    { id: 'cam-zone-cloud-outside', title: 'Cloud zone — motion outside does not trigger', description: 'Move outside the defined zone boundary.', expected: 'No cloud event generated for out-of-zone motion.' },
+  ],
+  'distance-detection-cloud': [
+    { id: 'cam-dist-cloud-threshold', title: 'Cloud distance threshold enforcement', description: 'Set distance threshold. Move beyond it and verify cloud does not trigger.', expected: 'Cloud processing respects distance threshold — no event beyond boundary.' },
+    { id: 'cam-dist-cloud-within', title: 'Cloud distance detection within threshold', description: 'Move within configured distance. Verify cloud event fires.', expected: 'Cloud detection event generated for in-range movement.' },
+  ],
   'local-sd': [
     {
       id: 'cam-sd-detect',
