@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listSessions } from './lib/api.js';
+import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
 import TestRunner from './components/TestRunner.jsx';
 import SessionSummary from './components/SessionSummary.jsx';
@@ -116,6 +117,9 @@ export default function App() {
 
   return (
     <div className="app-layout">
+      <div style={{ position: 'fixed', bottom: 8, right: 12, fontSize: 11, color: 'var(--text-muted)', opacity: 0.5, pointerEvents: 'none', userSelect: 'none', zIndex: 9999 }}>
+        {BUILD_VERSION} · {BUILD_DATE}
+      </div>
       {view === 'dashboard' && (
         <Dashboard
           sessions={sessions}
