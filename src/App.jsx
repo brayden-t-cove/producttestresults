@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, getSettings, saveSettings } from './lib/api.js';
+import { CAPABILITY_GROUPS } from './data/capabilities.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
 import TestRunner from './components/TestRunner.jsx';
@@ -73,6 +74,78 @@ function SettingsModal({ onClose }) {
   );
 }
 
+function getSectionFailures(session) {
+  const testCases = session.testCases || [];
+  if (testCases.length === 0) return [];
+  const groups = CAPABILITY_GROUPS[session.category] || [];
+  const sectionMap = {};
+  for (const test of testCases) {
+    const num = test.testNumber || '';
+    const parts = num.split('.');
+    const sectionNum = parseInt(parts[0], 10);
+    let sectionLabel;
+    if (isNaN(sectionNum) || sectionNum === 0) {
+      sectionLabel = 'General';
+    } else {
+      const grp = groups[sectionNum - 1];
+      sectionLabel = grp ? grp.label : `Section ${sectionNum}`;
+    }
+    const key = isNaN(sectionNum) ? 'general' : String(sectionNum);
+    if (!sectionMap[key]) {
+      sectionMap[key] = { sectionLabel, sectionIndex: isNaN(sectionNum) ? 0 : sectionNum, failCount: 0 };
+    }
+    if (test.status === 'fail') sectionMap[key].failCount++;
+  }
+  return Object.values(sectionMap)
+    .filter(s => s.failCount > 0)
+    .sort((a, b) => a.sectionIndex - b.sectionIndex);
+}
+
+function SessionCard({ s, onOpen }) {
+  const [expanded, setExpanded] = useState(false);
+  const sectionFailures = getSectionFailures(s);
+
+  return (
+    <div className="session-card" onClick={() => onOpen(s.id)}>
+      <div className="session-card-info">
+        <h3>{s.productName}</h3>
+        {s.appConfigName && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{s.appConfigName}</div>
+        )}
+        <div className="session-card-meta">
+          <span>{formatDate(s.date)}</span>
+          {s.issueCount > 0 && (
+            <span className="issue-count">{s.issueCount} issue{s.issueCount !== 1 ? 's' : ''}</span>
+          )}
+        </div>
+        {sectionFailures.length > 0 && (
+          <div style={{ marginTop: 6 }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 11, padding: '2px 8px', color: 'var(--text-muted)' }}
+              onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
+            >
+              {expanded ? '▾' : '▸'} {sectionFailures.length} section{sectionFailures.length !== 1 ? 's' : ''} with failures
+            </button>
+            {expanded && (
+              <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {sectionFailures.map(sec => (
+                  <span key={sec.sectionLabel} style={{ fontSize: 11, background: 'var(--fail-bg, rgba(239,68,68,0.1))', color: 'var(--fail)', borderRadius: 4, padding: '2px 8px' }}>
+                    {sec.sectionLabel}: {sec.failCount} fail
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="session-card-right">
+        <span className={`badge badge-${s.status}`}>{s.status}</span>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, loading }) {
   return (
     <div className="dashboard">
@@ -116,23 +189,7 @@ function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, on
       ) : (
         <div className="sessions-list">
           {sessions.map(s => (
-            <div key={s.id} className="session-card" onClick={() => onOpen(s.id)}>
-              <div className="session-card-info">
-                <h3>{s.productName}</h3>
-                {s.appConfigName && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{s.appConfigName}</div>
-                )}
-                <div className="session-card-meta">
-                  <span>{formatDate(s.date)}</span>
-                  {s.issueCount > 0 && (
-                    <span className="issue-count">{s.issueCount} issue{s.issueCount !== 1 ? 's' : ''}</span>
-                  )}
-                </div>
-              </div>
-              <div className="session-card-right">
-                <span className={`badge badge-${s.status}`}>{s.status}</span>
-              </div>
-            </div>
+            <SessionCard key={s.id} s={s} onOpen={onOpen} />
           ))}
         </div>
       )}

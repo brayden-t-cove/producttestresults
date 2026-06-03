@@ -1772,6 +1772,104 @@ export const TEST_LIBRARY = {
       expected: 'Clip is downloaded to device storage successfully.',
     },
   ],
+  'app-camera-onboard': [
+    {
+      id: 'app-cam-onboard-add',
+      title: 'Camera successfully onboards to the app',
+      description: 'Follow the in-app camera setup flow to add a new camera to the account.',
+      expected: 'Camera completes setup and appears in the device list as online.',
+    },
+    {
+      id: 'app-cam-onboard-rename',
+      title: 'Camera can be renamed after onboarding',
+      description: 'After onboarding, rename the camera from the settings or device detail screen.',
+      expected: 'Camera name updates immediately and persists after app restart.',
+    },
+    {
+      id: 'app-cam-onboard-remove',
+      title: 'Camera can be removed from account',
+      description: 'Remove the onboarded camera from the app account settings.',
+      expected: 'Camera is removed from the device list and no longer accessible under the account.',
+    },
+  ],
+  'app-camera-live-controls': [
+    {
+      id: 'app-cam-live-load',
+      title: 'Live feed loads within 5 seconds',
+      description: 'Tap live view for a paired camera. Measure time to first frame.',
+      expected: 'Live feed begins within 5 seconds of tapping.',
+    },
+    {
+      id: 'app-cam-live-stable',
+      title: 'Live feed stable for 60 seconds',
+      description: 'Keep live view open for 60 seconds. Monitor for freeze or reconnect.',
+      expected: 'Live feed remains stable for 60 seconds without freezing or dropping.',
+    },
+    {
+      id: 'app-cam-live-controls-ui',
+      title: 'All live feed control buttons function as intended',
+      description: 'Test each button visible during live feed: mute/unmute, two-way audio, snapshot, fullscreen, night mode toggle (if present), and any other on-screen controls.',
+      expected: 'Each control responds correctly and produces the expected behavior without errors.',
+    },
+    {
+      id: 'app-cam-live-orientation',
+      title: 'Live feed displays correctly in portrait and landscape',
+      description: 'Rotate the device while in live view.',
+      expected: 'Live feed adjusts correctly for both portrait and landscape orientations.',
+    },
+  ],
+  'app-camera-settings': [
+    {
+      id: 'app-cam-settings-display',
+      title: 'All camera settings display correctly',
+      description: 'Navigate to the camera settings screen. Verify all expected settings options are visible and properly labeled.',
+      expected: 'All settings for the camera are present and correctly labeled with no missing or broken UI elements.',
+    },
+    {
+      id: 'app-cam-settings-motion-sensitivity',
+      title: 'Motion sensitivity setting saves and applies',
+      description: 'Change the motion sensitivity setting to a different value and save.',
+      expected: 'Setting saves successfully and the new value persists after navigating away and returning.',
+    },
+    {
+      id: 'app-cam-settings-notif',
+      title: 'Camera notification preferences save correctly',
+      description: 'Toggle or change camera-specific notification settings (e.g., motion alerts, person alerts).',
+      expected: 'Notification settings save and the camera behaves according to the updated preferences.',
+    },
+    {
+      id: 'app-cam-settings-resolution',
+      title: 'Video resolution / quality setting applies',
+      description: 'If available, change the video quality or resolution setting for the camera.',
+      expected: 'Quality setting saves and is reflected in subsequent live view or clip quality.',
+    },
+  ],
+  'app-camera-event-playback': [
+    {
+      id: 'app-cam-ep-open',
+      title: 'Event clips are accessible from the app',
+      description: 'Navigate to the event history or clip library for a camera that has recorded events.',
+      expected: 'Event clips display in the list with thumbnails, timestamps, and event type labels.',
+    },
+    {
+      id: 'app-cam-ep-play',
+      title: 'Event clip plays without buffering',
+      description: 'Select and play an event clip from history.',
+      expected: 'Clip plays smoothly from start to finish without buffering pauses.',
+    },
+    {
+      id: 'app-cam-ep-notification',
+      title: 'Tapping push notification opens event clip',
+      description: 'Receive a camera event push notification. Tap it.',
+      expected: 'App opens and navigates directly to the corresponding event clip.',
+    },
+    {
+      id: 'app-cam-ep-download',
+      title: 'Event clip can be downloaded or shared',
+      description: 'Select an event clip and use the download or share option.',
+      expected: 'Clip is saved to device storage or share sheet opens successfully.',
+    },
+  ],
   'app-arm-disarm': [
     {
       id: 'app-arm-away',

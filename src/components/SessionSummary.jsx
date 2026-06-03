@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { aiSummarize } from '../lib/api.js';
+import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -66,6 +67,29 @@ function renderMarkdown(text) {
   if (inUl) html += '</ul>';
   if (inOl) html += '</ol>';
   return html;
+}
+
+function groupTestsBySection(tests, category) {
+  const groups = CAPABILITY_GROUPS[category] || [];
+  const sectionMap = {};
+  for (const test of tests) {
+    const num = test.testNumber || '';
+    const parts = num.split('.');
+    const sectionNum = parseInt(parts[0], 10);
+    let sectionLabel;
+    if (isNaN(sectionNum) || sectionNum === 0) {
+      sectionLabel = 'General';
+    } else {
+      const grp = groups[sectionNum - 1];
+      sectionLabel = grp ? grp.label : `Section ${sectionNum}`;
+    }
+    const key = isNaN(sectionNum) ? 'general' : String(sectionNum);
+    if (!sectionMap[key]) {
+      sectionMap[key] = { sectionLabel, sectionIndex: isNaN(sectionNum) ? 0 : sectionNum, tests: [] };
+    }
+    sectionMap[key].tests.push(test);
+  }
+  return Object.values(sectionMap).sort((a, b) => a.sectionIndex - b.sectionIndex);
 }
 
 export default function SessionSummary({ session, onBack }) {
@@ -222,6 +246,62 @@ export default function SessionSummary({ session, onBack }) {
           </div>
         </div>
       )}
+
+      {/* Test Results by Section */}
+      {(() => {
+        const sections = groupTestsBySection(testCases, session.category);
+        if (sections.length === 0) return null;
+        return (
+          <div className="summary-section">
+            <h2>Test Results by Section</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {sections.map(sec => {
+                const sPass = sec.tests.filter(t => t.status === 'pass').length;
+                const sFail = sec.tests.filter(t => t.status === 'fail').length;
+                const sSkip = sec.tests.filter(t => t.status === 'skip').length;
+                const sNa = sec.tests.filter(t => t.status === 'na').length;
+                const allPass = sFail === 0 && sSkip === 0;
+                const failSkipTests = sec.tests.filter(t => t.status === 'fail' || t.status === 'skip');
+                return (
+                  <div key={sec.sectionLabel} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{sec.sectionLabel}</span>
+                      {allPass ? (
+                        <span style={{ color: 'var(--pass)', fontSize: 13, fontWeight: 500 }}>✓ All passed ({sPass})</span>
+                      ) : (
+                        <span style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                          {sPass > 0 && <span style={{ color: 'var(--pass)' }}>{sPass} pass</span>}
+                          {sFail > 0 && <span style={{ color: 'var(--fail)' }}>{sFail} fail</span>}
+                          {sSkip > 0 && <span style={{ color: 'var(--text-muted)' }}>{sSkip} skip</span>}
+                          {sNa > 0 && <span style={{ color: 'var(--text-muted)' }}>{sNa} n/a</span>}
+                        </span>
+                      )}
+                    </div>
+                    {failSkipTests.length > 0 && (
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {failSkipTests.map(t => (
+                          <div key={t.id} style={{ paddingLeft: 10, borderLeft: '2px solid var(--border)', fontSize: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span className={`badge ${t.status === 'fail' ? 'badge-fail' : 'badge-skip'}`} style={{ flexShrink: 0 }}>
+                                {t.status === 'fail' ? 'Fail' : 'Skip'}
+                              </span>
+                              {t.testNumber && <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)' }}>[{t.testNumber}]</span>}
+                              <span style={{ fontWeight: 500 }}>{t.title}</span>
+                            </div>
+                            {t.notes && (
+                              <div style={{ marginTop: 3, color: 'var(--text-muted)', paddingLeft: 4 }}>{t.notes}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* AI Summary */}
       <div className="summary-section">

@@ -200,14 +200,18 @@ export const CAPABILITY_GROUPS = {
       { id: 'auth-2fa', label: '2FA' },
     ]},
     { label: 'Core Features', capabilities: [
-      { id: 'app-live-view', label: 'Live View' },
-      { id: 'app-clip-playback', label: 'Clip Playback' },
       { id: 'app-arm-disarm', label: 'Arm/Disarm' },
       { id: 'app-push-notifications', label: 'Push Notifications' },
       { id: 'app-sms-notifications', label: 'SMS Notifications' },
       { id: 'app-geofencing', label: 'Geofencing' },
       { id: 'app-event-log', label: 'Event Log' },
       { id: 'app-system-test', label: 'System Test Mode' },
+    ]},
+    { label: 'Camera Integration', capabilities: [
+      { id: 'app-camera-onboard', label: 'Camera Onboarding' },
+      { id: 'app-camera-live-controls', label: 'Live Feed & Controls' },
+      { id: 'app-camera-settings', label: 'Camera Settings' },
+      { id: 'app-camera-event-playback', label: 'Event Playback' },
     ]},
     { label: 'User Management', capabilities: [
       { id: 'secondary-users', label: 'Secondary Users' },
