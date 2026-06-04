@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CAPABILITY_GROUPS, CATEGORY_LABELS, CATEGORIES } from '../data/capabilities.js';
 import { getDebugInfo } from '../lib/api.js';
+import { SPEC_SCHEMA } from '../data/productSpecs.js';
+import SpecsForm from './SpecsForm.jsx';
 
 const CATEGORY_ICONS = {
   hub: '🏠',
@@ -157,6 +159,7 @@ export default function NewProduct({ product, onSave, onBack, catalog }) {
   const [category, setCategory] = useState(product?.category || '');
   const [capabilities, setCapabilities] = useState(new Set(product?.capabilities || []));
   const [appConfigs, setAppConfigs] = useState(product?.appConfigs || []);
+  const [specs, setSpecs] = useState(product?.specs || {});
   const [showAddAppForm, setShowAddAppForm] = useState(false);
   const [editingConfigId, setEditingConfigId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -228,6 +231,7 @@ export default function NewProduct({ product, onSave, onBack, catalog }) {
         category,
         capabilities: Array.from(capabilities),
         appConfigs,
+        specs,
       });
     } catch (err) {
       setError(err.message || 'Failed to save product.');
@@ -238,6 +242,8 @@ export default function NewProduct({ product, onSave, onBack, catalog }) {
 
   const groups = category ? (CAPABILITY_GROUPS[category] || []) : [];
   const showAppConfigs = SHOW_APP_CONFIGS_FOR.includes(category) && capabilities.size > 0;
+  const specSchema = category ? (SPEC_SCHEMA[category] || null) : null;
+  const [specsOpen, setSpecsOpen] = useState(false);
 
   return (
     <div className="new-product-page">
@@ -379,6 +385,35 @@ export default function NewProduct({ product, onSave, onBack, catalog }) {
             <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>
               <span className="capability-count-badge">{capabilities.size} capabilities selected</span>
             </div>
+          </div>
+        )}
+
+        {/* Technical Specifications Section */}
+        {specSchema && (
+          <div className="app-config-section" style={{ marginBottom: 16 }}>
+            <button
+              type="button"
+              className="spec-group-header"
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--border)' }}
+              onClick={() => setSpecsOpen(o => !o)}
+              aria-expanded={specsOpen}
+            >
+              <span style={{ fontWeight: 700, fontSize: 15 }}>
+                {specsOpen ? '▾' : '▸'} Technical Specifications
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>
+                Optional — for internal records and QA reference.
+              </span>
+            </button>
+            {specsOpen && (
+              <div style={{ marginTop: 12 }}>
+                <SpecsForm
+                  schema={specSchema}
+                  values={specs}
+                  onChange={(id, val) => setSpecs(prev => ({ ...prev, [id]: val }))}
+                />
+              </div>
+            )}
           </div>
         )}
 
