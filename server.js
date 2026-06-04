@@ -18,6 +18,8 @@ const SESSIONS_DIR = join(__dirname, 'data', 'sessions');
 const DEVICES_FILE = join(__dirname, 'data', 'devices.json');
 const FIRMWARES_FILE = join(__dirname, 'data', 'firmwares.json');
 const CATALOG_FILE = join(__dirname, 'data', 'catalog.json');
+const SPEC_SCHEMA_FILE = join(__dirname, 'data', 'specSchema.json');
+const SPEC_SCHEMA_FILE = join(__dirname, 'data', 'specSchema.json');
 
 app.use(cors());
 app.use(express.json());
@@ -35,6 +37,14 @@ if (!existsSync(FIRMWARES_FILE)) {
 }
 if (!existsSync(CATALOG_FILE)) {
   await writeFile(CATALOG_FILE, JSON.stringify([], null, 2));
+}
+if (!existsSync(SPEC_SCHEMA_FILE)) {
+  const { SPEC_SCHEMA } = await import('./src/data/productSpecs.js');
+  await writeFile(SPEC_SCHEMA_FILE, JSON.stringify(SPEC_SCHEMA, null, 2));
+}
+if (!existsSync(SPEC_SCHEMA_FILE)) {
+  const { SPEC_SCHEMA } = await import('./src/data/productSpecs.js');
+  await writeFile(SPEC_SCHEMA_FILE, JSON.stringify(SPEC_SCHEMA, null, 2));
 }
 
 // GET /api/firmwares?catalogId=xxx (or ?deviceName=xxx for backward compat)
@@ -93,6 +103,46 @@ app.get('/api/debug', async (req, res) => {
   checks.env = { anthropicKeySet: !!process.env.ANTHROPIC_API_KEY };
   const allOk = Object.values(checks).every(c => c.ok);
   res.status(allOk ? 200 : 500).json({ status: allOk ? 'ok' : 'degraded', checks });
+});
+
+// GET /api/spec-schema
+app.get('/api/spec-schema', async (req, res) => {
+  try {
+    const data = await readFile(SPEC_SCHEMA_FILE, 'utf8');
+    res.json(JSON.parse(data));
+  } catch {
+    res.status(404).json({ error: 'Schema not found' });
+  }
+});
+
+// PUT /api/spec-schema
+app.put('/api/spec-schema', async (req, res) => {
+  try {
+    await writeFile(SPEC_SCHEMA_FILE, JSON.stringify(req.body, null, 2));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save schema', detail: e.message });
+  }
+});
+
+// GET /api/spec-schema
+app.get('/api/spec-schema', async (req, res) => {
+  try {
+    const data = await readFile(SPEC_SCHEMA_FILE, 'utf8');
+    res.json(JSON.parse(data));
+  } catch {
+    res.status(404).json({ error: 'Schema not found' });
+  }
+});
+
+// PUT /api/spec-schema
+app.put('/api/spec-schema', async (req, res) => {
+  try {
+    await writeFile(SPEC_SCHEMA_FILE, JSON.stringify(req.body, null, 2));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save schema', detail: e.message });
+  }
 });
 
 // ── Catalog endpoints ─────────────────────────────────────────────────────────
