@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CATEGORY_LABELS } from '../data/capabilities.js';
+import { SPEC_SCHEMA } from '../data/productSpecs.js';
 
 const CATEGORY_ICONS = {
   hub: '🏠',
@@ -21,8 +22,64 @@ function incrementVersion(v) {
   return v;
 }
 
+function boolDisplay(val) {
+  if (val === 'yes') return { symbol: '✓', color: 'var(--pass)' };
+  if (val === 'no') return { symbol: '✗', color: 'var(--fail)' };
+  return null;
+}
+
+function SpecSheet({ product }) {
+  const schema = SPEC_SCHEMA[product.category];
+  const specs = product.specs || {};
+  if (!schema) return <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No spec schema for this category.</p>;
+
+  const filledGroups = schema
+    .map(group => ({
+      ...group,
+      filledFields: group.fields.filter(f => {
+        const v = specs[f.id];
+        return v !== undefined && v !== '' && v !== null;
+      }),
+    }))
+    .filter(g => g.filledFields.length > 0);
+
+  if (filledGroups.length === 0) {
+    return <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No specifications recorded yet.</p>;
+  }
+
+  return (
+    <div className="spec-sheet">
+      {filledGroups.map(group => (
+        <div key={group.label} className="spec-sheet-group">
+          <div className="spec-sheet-group-label">{group.label.toUpperCase()}</div>
+          <div className="spec-sheet-fields">
+            {group.filledFields.map(field => {
+              const val = specs[field.id];
+              const isBool = field.type === 'boolean';
+              const boolInfo = isBool ? boolDisplay(val) : null;
+              return (
+                <div key={field.id} className="spec-sheet-row">
+                  <span className="spec-sheet-key">{field.label}</span>
+                  <span className="spec-sheet-val">
+                    {isBool && boolInfo ? (
+                      <span style={{ color: boolInfo.color, fontWeight: 700 }}>{boolInfo.symbol}</span>
+                    ) : (
+                      String(val)
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [openSpecsId, setOpenSpecsId] = useState(null);
 
   function handleDeleteClick(product) {
     setConfirmDelete(product);
@@ -109,12 +166,25 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                   ⧉ Duplicate
                 </button>
                 <button
+                  className="btn btn-ghost btn-sm"
+                  title="View technical specifications"
+                  onClick={() => setOpenSpecsId(openSpecsId === product.id ? null : product.id)}
+                  style={{ fontWeight: openSpecsId === product.id ? 700 : 400 }}
+                >
+                  {openSpecsId === product.id ? '▾ Specs' : '▸ Specs'}
+                </button>
+                <button
                   className="btn btn-danger btn-sm"
                   onClick={() => handleDeleteClick(product)}
                 >
                   Delete
                 </button>
               </div>
+              {openSpecsId === product.id && (
+                <div className="spec-sheet-panel">
+                  <SpecSheet product={product} />
+                </div>
+              )}
             </div>
           ))}
         </div>
