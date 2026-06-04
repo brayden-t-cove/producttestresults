@@ -214,6 +214,22 @@ export async function deleteCatalogEntry(id) {
   return res.json();
 }
 
+export async function getSpecSchema() {
+  const res = await fetch(`${BASE}/spec-schema`);
+  if (!res.ok) throw new Error('Failed to load spec schema');
+  return res.json();
+}
+
+export async function saveSpecSchema(schema) {
+  const res = await fetch(`${BASE}/spec-schema`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(schema),
+  });
+  if (!res.ok) throw new Error('Failed to save spec schema');
+  return res.json();
+}
+
 export async function getSettings() {
   const res = await fetch(`${BASE}/settings`);
   if (!res.ok) throw new Error('Failed to get settings');
@@ -227,5 +243,21 @@ export async function saveSettings(apiKey) {
     body: JSON.stringify({ apiKey }),
   });
   if (!res.ok) throw new Error('Failed to save settings');
+  return res.json();
+}
+
+export async function getSpecSchema() {
+  const res = await fetch(`${BASE}/spec-schema`);
+  if (!res.ok) throw new Error('Failed to load spec schema');
+  return res.json();
+}
+
+export async function saveSpecSchema(schema) {
+  const res = await fetch(`${BASE}/spec-schema`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(schema),
+  });
+  if (!res.ok) throw new Error('Failed to save spec schema');
   return res.json();
 }

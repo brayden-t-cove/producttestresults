@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, getSettings, saveSettings } from './lib/api.js';
+import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, getSettings, saveSettings, getSpecSchema, saveSpecSchema } from './lib/api.js';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
@@ -9,6 +9,7 @@ import ProductCatalog from './components/ProductCatalog.jsx';
 import NewProduct from './components/NewProduct.jsx';
 import AnalyticsPage from './components/AnalyticsPage.jsx';
 import IssuesPage from './components/IssuesPage.jsx';
+import SchemaEditor from './components/SchemaEditor.jsx';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -146,7 +147,7 @@ function SessionCard({ s, onOpen }) {
   );
 }
 
-function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, loading }) {
+function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onSchemaEditor, loading }) {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -158,6 +159,7 @@ function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, on
           <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
           <button className="btn btn-ghost" onClick={onAnalytics}>📊 Analytics</button>
           <button className="btn btn-ghost" onClick={onIssues}>🐛 Issues</button>
+          <button className="btn btn-ghost" onClick={onSchemaEditor}>🗂 Spec Fields</button>
           <button className="btn btn-secondary" onClick={onCatalog}>
             📦 Product Catalog
           </button>
@@ -205,6 +207,7 @@ export default function App() {
   const [catalog, setCatalog] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [specSchema, setSpecSchema] = useState(null);
 
   async function refreshSessions() {
     try {
@@ -230,6 +233,7 @@ export default function App() {
   useEffect(() => {
     refreshSessions();
     refreshCatalog();
+    getSpecSchema().then(setSpecSchema).catch(() => {});
   }, []);
 
   async function handleOpenSession(id) {
@@ -318,6 +322,7 @@ export default function App() {
           onSettings={() => setShowSettings(true)}
           onAnalytics={() => setView('analytics')}
           onIssues={() => setView('issues')}
+          onSchemaEditor={() => setView('schemaEditor')}
         />
       )}
 
@@ -342,6 +347,7 @@ export default function App() {
             onSave={handleSaveProduct}
             onBack={() => setView('catalog')}
             catalog={catalog}
+            specSchema={specSchema}
           />
         </div>
       )}
@@ -385,6 +391,20 @@ export default function App() {
         <IssuesPage
           onBack={() => setView('dashboard')}
         />
+      )}
+
+      {view === 'schemaEditor' && (
+        <div className="dashboard">
+          <SchemaEditor
+            schema={specSchema || {}}
+            onSave={async (newSchema) => {
+              await saveSpecSchema(newSchema);
+              setSpecSchema(newSchema);
+              setView('dashboard');
+            }}
+            onBack={() => setView('dashboard')}
+          />
+        </div>
       )}
     </div>
   );

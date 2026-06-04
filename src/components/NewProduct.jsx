@@ -150,7 +150,7 @@ function AppConfigForm({ capabilities, initialData, onSave, onCancel, catalogApp
   );
 }
 
-export default function NewProduct({ product, onSave, onBack, catalog }) {
+export default function NewProduct({ product, onSave, onBack, catalog, specSchema: specSchemaProp }) {
   const isEdit = !!product;
   const [name, setName] = useState(product?.name || '');
   const [manufacturer, setManufacturer] = useState(product?.manufacturer || '');
@@ -242,7 +242,8 @@ export default function NewProduct({ product, onSave, onBack, catalog }) {
 
   const groups = category ? (CAPABILITY_GROUPS[category] || []) : [];
   const showAppConfigs = SHOW_APP_CONFIGS_FOR.includes(category) && capabilities.size > 0;
-  const specSchema = category ? (SPEC_SCHEMA[category] || null) : null;
+  const effectiveSchema = specSchemaProp || SPEC_SCHEMA;
+  const specSchema = category ? (effectiveSchema[category] || null) : null;
   const [specsOpen, setSpecsOpen] = useState(false);
 
   return (
