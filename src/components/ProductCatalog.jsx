@@ -82,6 +82,10 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [openSpecsId, setOpenSpecsId] = useState(null);
   const [showExport, setShowExport] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
+
+  const categories = ['all', ...Object.keys(CATEGORY_LABELS).filter(cat => products.some(p => p.category === cat))];
+  const filtered = activeFilter === 'all' ? products : products.filter(p => p.category === activeFilter);
 
   function handleDeleteClick(product) {
     setConfirmDelete(product);
@@ -116,6 +120,20 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
         </div>
       </div>
 
+      {categories.length > 2 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              className={`btn btn-sm ${activeFilter === cat ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setActiveFilter(cat)}
+            >
+              {cat === 'all' ? `All (${products.length})` : `${CATEGORY_ICONS[cat] || ''} ${CATEGORY_LABELS[cat]} (${products.filter(p => p.category === cat).length})`}
+            </button>
+          ))}
+        </div>
+      )}
+
       {products.length === 0 ? (
         <div className="empty-state">
           <h3>No products yet</h3>
@@ -124,9 +142,13 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
             + Add Product
           </button>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state">
+          <p>No {CATEGORY_LABELS[activeFilter]} products in your catalog.</p>
+        </div>
       ) : (
         <div className="catalog-grid">
-          {products.map(product => (
+          {filtered.map(product => (
             <div key={product.id} className="catalog-card">
               <div
                 className="catalog-card-top"
