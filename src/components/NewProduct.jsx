@@ -156,6 +156,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
   const [manufacturer, setManufacturer] = useState(product?.manufacturer || '');
   const [modelNumber, setModelNumber] = useState(product?.modelNumber || '');
   const [version, setVersion] = useState(product?.version || '');
+  const [status, setStatus] = useState(product?.status || 'active');
   const [category, setCategory] = useState(product?.category || '');
   const [capabilities, setCapabilities] = useState(new Set(product?.capabilities || []));
   const [appConfigs, setAppConfigs] = useState(product?.appConfigs || []);
@@ -254,6 +255,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         manufacturer: manufacturer.trim(),
         modelNumber: modelNumber.trim(),
         version: version.trim(),
+        status,
         category,
         capabilities: Array.from(capabilities),
         appConfigs,
@@ -389,6 +391,18 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
             value={version}
             onChange={e => setVersion(e.target.value)}
           />
+        </div>
+
+        <div className="form-group">
+          <label>Status</label>
+          <select value={status} onChange={e => setStatus(e.target.value)}>
+            <option value="active">Active</option>
+            <option value="in-development">In Development</option>
+            <option value="in-testing">In Testing</option>
+            <option value="eol">EOL</option>
+            <option value="discontinued">Discontinued</option>
+            <option value="on-hold">On Hold</option>
+          </select>
         </div>
 
         <div className="form-group">

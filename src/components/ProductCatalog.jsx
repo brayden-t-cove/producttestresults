@@ -78,6 +78,27 @@ function SpecSheet({ product }) {
   );
 }
 
+const STATUS_LABELS = {
+  'active': 'Active',
+  'in-development': 'In Development',
+  'in-testing': 'In Testing',
+  'eol': 'EOL',
+  'discontinued': 'Discontinued',
+  'on-hold': 'On Hold',
+};
+
+const STATUS_COLORS = {
+  'active': 'var(--pass)',
+  'in-development': '#f59e0b',
+  'in-testing': 'var(--primary)',
+  'eol': 'var(--text-muted)',
+  'discontinued': 'var(--fail)',
+  'on-hold': '#94a3b8',
+};
+
+const PRIMARY_STATUSES = ['active', 'in-development', 'in-testing'];
+const SECONDARY_STATUSES = ['eol', 'discontinued', 'on-hold'];
+
 export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [openSpecsId, setOpenSpecsId] = useState(null);
@@ -86,6 +107,27 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
 
   const categories = ['all', ...Object.keys(CATEGORY_LABELS).filter(cat => products.some(p => p.category === cat))];
   const filtered = activeFilter === 'all' ? products : products.filter(p => p.category === activeFilter);
+
+  function groupByStatus(list) {
+    const groups = [];
+    for (const s of PRIMARY_STATUSES) {
+      const items = list.filter(p => (p.status || 'active') === s);
+      if (items.length > 0) groups.push({ status: s, items });
+    }
+    const secondaryItems = list.filter(p => SECONDARY_STATUSES.includes(p.status || ''));
+    if (secondaryItems.length > 0) {
+      const byStatus = {};
+      for (const p of secondaryItems) {
+        const s = p.status || 'eol';
+        if (!byStatus[s]) byStatus[s] = [];
+        byStatus[s].push(p);
+      }
+      for (const s of SECONDARY_STATUSES) {
+        if (byStatus[s]?.length > 0) groups.push({ status: s, items: byStatus[s] });
+      }
+    }
+    return groups;
+  }
 
   function handleDeleteClick(product) {
     setConfirmDelete(product);
@@ -147,8 +189,17 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
           <p>No {CATEGORY_LABELS[activeFilter]} products in your catalog.</p>
         </div>
       ) : (
-        <div className="catalog-grid">
-          {filtered.map(product => (
+        <div>
+          {groupByStatus(filtered).map(({ status, items }) => (
+            <div key={status} style={{ marginBottom: 28 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[status], display: 'inline-block', flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  {STATUS_LABELS[status]} ({items.length})
+                </span>
+              </div>
+              <div className="catalog-grid">
+          {items.map(product => (
             <div key={product.id} className="catalog-card">
               <div
                 className="catalog-card-top"
@@ -175,9 +226,15 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                     {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || CATEGORY_LABELS[product.category] || product.category}
                   </div>
                 </div>
-                <span className="capability-count-badge">
-                  {(product.capabilities || []).length} capabilities
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                  <span className="capability-count-badge">
+                    {(product.capabilities || []).length} capabilities
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLORS[product.status || 'active'], display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[product.status || 'active'], display: 'inline-block' }} />
+                    {STATUS_LABELS[product.status || 'active']}
+                  </span>
+                </div>
               </div>
               <div
                 className="catalog-card-date"
@@ -226,6 +283,9 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                   <SpecSheet product={product} />
                 </div>
               )}
+            </div>
+          ))}
+              </div>
             </div>
           ))}
         </div>
