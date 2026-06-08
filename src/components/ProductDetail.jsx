@@ -83,24 +83,73 @@ function TechSpecsTab({ product }) {
   );
 }
 
+function normalizeCert(entry) {
+  if (typeof entry === 'string') return { name: entry, subcerts: [] };
+  return { name: entry.name || entry, subcerts: entry.subcerts || [] };
+}
+
 function CertificationsTab({ product, onCertUpdate, certSchema }) {
   const [selectedCountry, setSelectedCountry] = useState(null);
   const certData = product.certifications || {};
   const schema = certSchema || {};
 
-  function getCertEntry(country, cert) {
-    return (certData[country] && certData[country][cert]) || { status: 'not-tested', certNumber: '', notes: '' };
+  function getEntry(country, key) {
+    return (certData[country] && certData[country][key]) || { status: 'not-tested', certNumber: '', notes: '' };
   }
 
-  function handleChange(country, cert, field, value) {
+  function handleChange(country, key, field, value) {
     const updated = JSON.parse(JSON.stringify(certData));
     if (!updated[country]) updated[country] = {};
-    if (!updated[country][cert]) updated[country][cert] = { status: 'not-tested', certNumber: '', notes: '' };
-    updated[country][cert][field] = value;
+    if (!updated[country][key]) updated[country][key] = { status: 'not-tested', certNumber: '', notes: '' };
+    updated[country][key][field] = value;
     onCertUpdate(product.id, updated);
   }
 
   const countries = Object.keys(schema);
+
+  function renderCertRow(country, key, label, indented) {
+    const entry = getEntry(country, key);
+    const statusColor = CERT_STATUS_COLORS[entry.status] || CERT_STATUS_COLORS['not-tested'];
+    return (
+      <tr key={key}>
+        <td style={{ fontWeight: 600, paddingLeft: indented ? 28 : undefined }}>
+          <span className="cert-status-dot" style={{ background: statusColor }} />
+          {label}
+        </td>
+        <td>
+          <select
+            value={entry.status}
+            onChange={e => handleChange(country, key, 'status', e.target.value)}
+            style={{ fontSize: 13 }}
+          >
+            {Object.entries(CERT_STATUS_LABELS).map(([val, lbl]) => (
+              <option key={val} value={val}>{lbl}</option>
+            ))}
+          </select>
+        </td>
+        <td>
+          <input
+            type="text"
+            value={entry.certNumber}
+            placeholder="—"
+            onChange={e => handleChange(country, key, 'certNumber', e.target.value)}
+            onBlur={e => handleChange(country, key, 'certNumber', e.target.value)}
+            style={{ fontSize: 13, width: '100%' }}
+          />
+        </td>
+        <td>
+          <input
+            type="text"
+            value={entry.notes}
+            placeholder="—"
+            onChange={e => handleChange(country, key, 'notes', e.target.value)}
+            onBlur={e => handleChange(country, key, 'notes', e.target.value)}
+            style={{ fontSize: 13, width: '100%' }}
+          />
+        </td>
+      </tr>
+    );
+  }
 
   return (
     <div className="cert-layout">
@@ -134,48 +183,21 @@ function CertificationsTab({ product, onCertUpdate, certSchema }) {
                 </tr>
               </thead>
               <tbody>
-                {(schema[selectedCountry] || []).map(cert => {
-                  const entry = getCertEntry(selectedCountry, cert);
-                  const statusColor = CERT_STATUS_COLORS[entry.status] || CERT_STATUS_COLORS['not-tested'];
-                  return (
-                    <tr key={cert}>
-                      <td style={{ fontWeight: 600 }}>
-                        <span className="cert-status-dot" style={{ background: statusColor }} />
-                        {cert}
+                {(schema[selectedCountry] || []).map(rawCert => {
+                  const cert = normalizeCert(rawCert);
+                  if (!cert.subcerts || cert.subcerts.length === 0) {
+                    return renderCertRow(selectedCountry, cert.name, cert.name, false);
+                  }
+                  return [
+                    <tr key={`header-${cert.name}`}>
+                      <td colSpan={4} style={{ fontWeight: 700, background: 'var(--surface-alt, rgba(0,0,0,0.04))', fontSize: 13, paddingTop: 10, paddingBottom: 10 }}>
+                        {cert.name}
                       </td>
-                      <td>
-                        <select
-                          value={entry.status}
-                          onChange={e => handleChange(selectedCountry, cert, 'status', e.target.value)}
-                          style={{ fontSize: 13 }}
-                        >
-                          {Object.entries(CERT_STATUS_LABELS).map(([val, label]) => (
-                            <option key={val} value={val}>{label}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          value={entry.certNumber}
-                          placeholder="—"
-                          onChange={e => handleChange(selectedCountry, cert, 'certNumber', e.target.value)}
-                          onBlur={e => handleChange(selectedCountry, cert, 'certNumber', e.target.value)}
-                          style={{ fontSize: 13, width: '100%' }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          value={entry.notes}
-                          placeholder="—"
-                          onChange={e => handleChange(selectedCountry, cert, 'notes', e.target.value)}
-                          onBlur={e => handleChange(selectedCountry, cert, 'notes', e.target.value)}
-                          style={{ fontSize: 13, width: '100%' }}
-                        />
-                      </td>
-                    </tr>
-                  );
+                    </tr>,
+                    ...cert.subcerts.map(sub =>
+                      renderCertRow(selectedCountry, `${cert.name} > ${sub}`, sub, true)
+                    ),
+                  ];
                 })}
               </tbody>
             </table>

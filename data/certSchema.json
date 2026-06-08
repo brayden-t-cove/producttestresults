@@ -1,11 +1,40 @@
 {
-  "USA": ["FCC", "UL", "ETL", "TSCA"],
-  "Canada": ["IC", "cUL", "cETL"],
-  "European Union": ["CE", "REACH", "RoHS", "WEEE"],
-  "United Kingdom": ["UKCA"],
-  "Australia / New Zealand": ["RCM"],
-  "Japan": ["PSE", "TELEC"],
-  "China": ["CCC", "SRRC"],
-  "South Korea": ["KC"],
-  "Brazil": ["ANATEL", "INMETRO"]
+  "USA": [
+    { "name": "FCC", "subcerts": ["FCC Part 15B (Unintentional Radiator)", "FCC Part 15C (Intentional Radiator)", "FCC ID"] },
+    { "name": "UL", "subcerts": ["UL 2849", "UL 60950-1"] },
+    { "name": "ETL", "subcerts": [] },
+    { "name": "TSCA", "subcerts": [] }
+  ],
+  "Canada": [
+    { "name": "IC", "subcerts": ["IC RSS-247", "IC ID"] },
+    { "name": "cUL", "subcerts": [] },
+    { "name": "cETL", "subcerts": [] }
+  ],
+  "European Union": [
+    { "name": "CE", "subcerts": ["CE EMC (EN 55032)", "CE Radio (RED Directive)", "CE Safety (EN 62368-1)"] },
+    { "name": "REACH", "subcerts": [] },
+    { "name": "RoHS", "subcerts": [] },
+    { "name": "WEEE", "subcerts": [] }
+  ],
+  "United Kingdom": [
+    { "name": "UKCA", "subcerts": [] }
+  ],
+  "Australia / New Zealand": [
+    { "name": "RCM", "subcerts": [] }
+  ],
+  "Japan": [
+    { "name": "PSE", "subcerts": [] },
+    { "name": "TELEC", "subcerts": [] }
+  ],
+  "China": [
+    { "name": "CCC", "subcerts": [] },
+    { "name": "SRRC", "subcerts": [] }
+  ],
+  "South Korea": [
+    { "name": "KC", "subcerts": [] }
+  ],
+  "Brazil": [
+    { "name": "ANATEL", "subcerts": [] },
+    { "name": "INMETRO", "subcerts": [] }
+  ]
 }

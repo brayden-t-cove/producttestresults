@@ -1,16 +1,21 @@
 import { useState } from 'react';
 
+function normalizeCert(entry) {
+  if (typeof entry === 'string') return { name: entry, subcerts: [] };
+  return { name: entry.name || '', subcerts: entry.subcerts || [] };
+}
+
 function toArray(schema) {
   return Object.entries(schema || {}).map(([country, certs]) => ({
     country,
-    certs: [...certs],
+    certs: certs.map(normalizeCert),
   }));
 }
 
 function toObject(arr) {
   const obj = {};
   for (const { country, certs } of arr) {
-    obj[country] = [...certs];
+    obj[country] = certs.map(c => ({ name: c.name, subcerts: [...c.subcerts] }));
   }
   return obj;
 }
@@ -19,6 +24,7 @@ export default function CertEditor({ schema, onSave, onBack }) {
   const [items, setItems] = useState(() => toArray(schema));
   const [saved, setSaved] = useState(false);
   const [newCountry, setNewCountry] = useState('');
+  const [expandedCerts, setExpandedCerts] = useState({});
 
   function updateItem(idx, patch) {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, ...patch } : item));
@@ -43,12 +49,11 @@ export default function CertEditor({ schema, onSave, onBack }) {
   }
 
   function addCert(idx) {
-    updateItem(idx, { certs: [...items[idx].certs, ''] });
+    updateItem(idx, { certs: [...items[idx].certs, { name: '', subcerts: [] }] });
   }
 
-  function updateCert(idx, certIdx, value) {
-    const certs = [...items[idx].certs];
-    certs[certIdx] = value;
+  function updateCertName(idx, certIdx, value) {
+    const certs = items[idx].certs.map((c, i) => i === certIdx ? { ...c, name: value } : c);
     updateItem(idx, { certs });
   }
 
@@ -62,6 +67,49 @@ export default function CertEditor({ schema, onSave, onBack }) {
 
   function deleteCert(idx, certIdx) {
     const certs = items[idx].certs.filter((_, i) => i !== certIdx);
+    updateItem(idx, { certs });
+  }
+
+  function toggleSubcerts(idx, certIdx) {
+    const key = `${idx}-${certIdx}`;
+    setExpandedCerts(prev => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function addSubcert(idx, certIdx) {
+    const certs = items[idx].certs.map((c, i) =>
+      i === certIdx ? { ...c, subcerts: [...c.subcerts, ''] } : c
+    );
+    updateItem(idx, { certs });
+    // auto-expand
+    setExpandedCerts(prev => ({ ...prev, [`${idx}-${certIdx}`]: true }));
+  }
+
+  function updateSubcert(idx, certIdx, subIdx, value) {
+    const certs = items[idx].certs.map((c, i) => {
+      if (i !== certIdx) return c;
+      const subcerts = c.subcerts.map((s, si) => si === subIdx ? value : s);
+      return { ...c, subcerts };
+    });
+    updateItem(idx, { certs });
+  }
+
+  function moveSubcert(idx, certIdx, subIdx, dir) {
+    const certs = items[idx].certs.map((c, i) => {
+      if (i !== certIdx) return c;
+      const subcerts = [...c.subcerts];
+      const target = subIdx + dir;
+      if (target < 0 || target >= subcerts.length) return c;
+      [subcerts[subIdx], subcerts[target]] = [subcerts[target], subcerts[subIdx]];
+      return { ...c, subcerts };
+    });
+    updateItem(idx, { certs });
+  }
+
+  function deleteSubcert(idx, certIdx, subIdx) {
+    const certs = items[idx].certs.map((c, i) => {
+      if (i !== certIdx) return c;
+      return { ...c, subcerts: c.subcerts.filter((_, si) => si !== subIdx) };
+    });
     updateItem(idx, { certs });
   }
 
@@ -109,19 +157,58 @@ export default function CertEditor({ schema, onSave, onBack }) {
             <button className="btn btn-danger btn-sm" onClick={() => removeCountry(idx)} title="Remove country">🗑</button>
           </div>
 
-          {item.certs.map((cert, certIdx) => (
-            <div key={certIdx} className="cert-item-row">
-              <input
-                type="text"
-                value={cert}
-                onChange={e => updateCert(idx, certIdx, e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <button className="btn btn-ghost btn-sm" onClick={() => moveCert(idx, certIdx, -1)} disabled={certIdx === 0} title="Move up">▲</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => moveCert(idx, certIdx, 1)} disabled={certIdx === item.certs.length - 1} title="Move down">▼</button>
-              <button className="btn btn-danger btn-sm" onClick={() => deleteCert(idx, certIdx)} title="Delete cert">✕</button>
-            </div>
-          ))}
+          {item.certs.map((cert, certIdx) => {
+            const expandKey = `${idx}-${certIdx}`;
+            const isExpanded = !!expandedCerts[expandKey];
+            return (
+              <div key={certIdx}>
+                <div className="cert-item-row">
+                  <input
+                    type="text"
+                    value={cert.name}
+                    onChange={e => updateCertName(idx, certIdx, e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => toggleSubcerts(idx, certIdx)}
+                    title={isExpanded ? 'Collapse subcerts' : 'Expand subcerts'}
+                    style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                  >
+                    {isExpanded ? '▾' : '▸'} Subcerts ({cert.subcerts.length})
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => moveCert(idx, certIdx, -1)} disabled={certIdx === 0} title="Move up">▲</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => moveCert(idx, certIdx, 1)} disabled={certIdx === item.certs.length - 1} title="Move down">▼</button>
+                  <button className="btn btn-danger btn-sm" onClick={() => deleteCert(idx, certIdx)} title="Delete cert">✕</button>
+                </div>
+
+                {isExpanded && (
+                  <div style={{ marginLeft: 24, marginBottom: 4, borderLeft: '2px solid var(--border)', paddingLeft: 12 }}>
+                    {cert.subcerts.map((sub, subIdx) => (
+                      <div key={subIdx} className="cert-item-row" style={{ marginTop: 4 }}>
+                        <input
+                          type="text"
+                          value={sub}
+                          onChange={e => updateSubcert(idx, certIdx, subIdx, e.target.value)}
+                          style={{ flex: 1, fontSize: 13 }}
+                        />
+                        <button className="btn btn-ghost btn-sm" onClick={() => moveSubcert(idx, certIdx, subIdx, -1)} disabled={subIdx === 0} title="Move up">▲</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => moveSubcert(idx, certIdx, subIdx, 1)} disabled={subIdx === cert.subcerts.length - 1} title="Move down">▼</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => deleteSubcert(idx, certIdx, subIdx)} title="Delete subcert">✕</button>
+                      </div>
+                    ))}
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ marginTop: 6, fontSize: 12 }}
+                      onClick={() => addSubcert(idx, certIdx)}
+                    >
+                      + Add Subcert
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addCert(idx)}>
             + Add Cert
