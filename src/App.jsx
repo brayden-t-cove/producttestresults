@@ -10,6 +10,7 @@ import NewProduct from './components/NewProduct.jsx';
 import AnalyticsPage from './components/AnalyticsPage.jsx';
 import IssuesPage from './components/IssuesPage.jsx';
 import SchemaEditor from './components/SchemaEditor.jsx';
+import ProductDetail from './components/ProductDetail.jsx';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -208,6 +209,7 @@ export default function App() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [specSchema, setSpecSchema] = useState(null);
+  const [currentProduct, setCurrentProduct] = useState(null);
 
   async function refreshSessions() {
     try {
@@ -293,6 +295,11 @@ export default function App() {
     setView('sessionStart');
   }
 
+  function handleOpenProduct(product) {
+    setCurrentProduct(product);
+    setView('productDetail');
+  }
+
   function handleDuplicateProduct(product, nextVersion) {
     const duped = {
       ...product,
@@ -336,6 +343,25 @@ export default function App() {
             onDelete={handleDeleteProduct}
             onDuplicate={handleDuplicateProduct}
             onBack={() => setView('dashboard')}
+            onView={handleOpenProduct}
+          />
+        </div>
+      )}
+
+      {view === 'productDetail' && currentProduct && (
+        <div className="dashboard">
+          <ProductDetail
+            product={currentProduct}
+            sessions={sessions.filter(s => s.catalogId === currentProduct.id || s.productName === currentProduct.name)}
+            onBack={() => { setCurrentProduct(null); setView('catalog'); }}
+            onEdit={() => { setEditingProduct(currentProduct); setCurrentProduct(null); setView('editProduct'); }}
+            onDelete={async () => { await handleDeleteProduct(currentProduct.id); setCurrentProduct(null); setView('catalog'); }}
+            onOpenSession={handleOpenSession}
+            onCertUpdate={async (productId, certData) => {
+              const updated = await updateCatalogEntry(productId, { certifications: certData });
+              setCurrentProduct(updated);
+              await refreshCatalog();
+            }}
           />
         </div>
       )}

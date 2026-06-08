@@ -77,7 +77,7 @@ function SpecSheet({ product }) {
   );
 }
 
-export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack }) {
+export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [openSpecsId, setOpenSpecsId] = useState(null);
 
@@ -121,7 +121,11 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
         <div className="catalog-grid">
           {products.map(product => (
             <div key={product.id} className="catalog-card">
-              <div className="catalog-card-top">
+              <div
+                className="catalog-card-top"
+                style={{ cursor: onView ? 'pointer' : undefined }}
+                onClick={onView ? () => onView(product) : undefined}
+              >
                 <div className="catalog-card-icon">
                   {CATEGORY_ICONS[product.category] || '📦'}
                 </div>
@@ -142,7 +146,11 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                   {(product.capabilities || []).length} capabilities
                 </span>
               </div>
-              <div className="catalog-card-date">
+              <div
+                className="catalog-card-date"
+                style={{ cursor: onView ? 'pointer' : undefined }}
+                onClick={onView ? () => onView(product) : undefined}
+              >
                 Added {formatDate(product.createdAt)}
               </div>
               <div className="card-actions">

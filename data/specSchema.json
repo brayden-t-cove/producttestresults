@@ -290,6 +290,7 @@
             "Proprietary",
             "PoE",
             "Solar",
+            "E26/E27 Light Socket",
             "N/A"
           ]
         },
@@ -709,36 +710,6 @@
           "id": "humidityRating",
           "label": "Humidity Rating",
           "type": "text"
-        }
-      ]
-    },
-    {
-      "label": "Certifications",
-      "fields": [
-        {
-          "id": "certFcc",
-          "label": "FCC",
-          "type": "boolean"
-        },
-        {
-          "id": "certIc",
-          "label": "IC",
-          "type": "boolean"
-        },
-        {
-          "id": "certUl",
-          "label": "UL",
-          "type": "boolean"
-        },
-        {
-          "id": "certTsca",
-          "label": "TSCA",
-          "type": "boolean"
-        },
-        {
-          "id": "certOther",
-          "label": "Other Certifications",
-          "type": "textarea"
         }
       ]
     },

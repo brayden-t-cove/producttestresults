@@ -103,7 +103,7 @@ export const SPEC_SCHEMA = {
           id: 'powerPortType',
           label: 'Power Port Type',
           type: 'select',
-          options: ['Micro-USB', 'USB-C', 'DC Barrel', 'Proprietary', 'PoE', 'Solar', 'N/A'],
+          options: ['Micro-USB', 'USB-C', 'DC Barrel', 'Proprietary', 'PoE', 'Solar', 'E26/E27 Light Socket', 'N/A'],
         },
         { id: 'batteryCapacity', label: 'Battery Capacity', type: 'text' },
         { id: 'batteryLifeEstimate', label: 'Average Battery Life Estimate', type: 'text' },
@@ -238,16 +238,6 @@ export const SPEC_SCHEMA = {
           options: ['Not Rated', 'IP44', 'IP54', 'IP55', 'IP65', 'IP66', 'IP67', 'IP68'],
         },
         { id: 'humidityRating', label: 'Humidity Rating', type: 'text' },
-      ],
-    },
-    {
-      label: 'Certifications',
-      fields: [
-        { id: 'certFcc', label: 'FCC', type: 'boolean' },
-        { id: 'certIc', label: 'IC', type: 'boolean' },
-        { id: 'certUl', label: 'UL', type: 'boolean' },
-        { id: 'certTsca', label: 'TSCA', type: 'boolean' },
-        { id: 'certOther', label: 'Other Certifications', type: 'textarea' },
       ],
     },
     {
