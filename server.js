@@ -211,23 +211,37 @@ const upload = multer({
 });
 
 // POST /api/catalog/:id/image
-app.post('/api/catalog/:id/image', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
-    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
-    const idx = data.findIndex(e => e.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Not found' });
-    // Delete old image if present
-    if (data[idx].imageUrl) {
-      const oldPath = join(IMAGES_DIR, data[idx].imageUrl.split('/').pop());
-      unlink(oldPath).catch(() => {});
+app.post('/api/catalog/:id/image', (req, res, next) => {
+  upload.single('image')(req, res, async (err) => {
+    if (err) {
+      // Clean up any partial file multer may have written
+      if (req.file) unlink(req.file.path).catch(() => {});
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'Image too large — maximum size is 5 MB' });
+      }
+      return res.status(400).json({ error: err.message || 'Upload failed' });
     }
-    data[idx].imageUrl = `/api/images/${req.file.filename}`;
-    await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
-    res.json({ imageUrl: data[idx].imageUrl });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to upload image', detail: e.message });
-  }
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+      const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+      const idx = data.findIndex(e => e.id === req.params.id);
+      if (idx === -1) {
+        unlink(req.file.path).catch(() => {});
+        return res.status(404).json({ error: 'Not found' });
+      }
+      // Delete old image if present
+      if (data[idx].imageUrl) {
+        const oldPath = join(IMAGES_DIR, data[idx].imageUrl.split('/').pop());
+        unlink(oldPath).catch(() => {});
+      }
+      data[idx].imageUrl = `/api/images/${req.file.filename}`;
+      await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+      res.json({ imageUrl: data[idx].imageUrl });
+    } catch (e) {
+      if (req.file) unlink(req.file.path).catch(() => {});
+      res.status(500).json({ error: 'Failed to upload image', detail: e.message });
+    }
+  });
 });
 
 // DELETE /api/catalog/:id/image
@@ -263,7 +277,7 @@ app.get('/api/catalog/:id', async (req, res) => {
 // POST /api/catalog
 app.post('/api/catalog', async (req, res) => {
   try {
-    const { name, manufacturer, modelNumber, version, status, category, capabilities, appConfigs, specs, certifications } = req.body;
+    const { name, manufacturer, modelNumber, version, status, category, capabilities, appConfigs, specs, certifications, compatibleWith } = req.body;
     if (!name || !category) return res.status(400).json({ error: 'name and category required', code: 'CAT_001_MISSING_FIELDS' });
     let data;
     try {
@@ -280,6 +294,7 @@ app.post('/api/catalog', async (req, res) => {
       status: status || 'active',
       category,
       capabilities: capabilities || [],
+      compatibleWith: compatibleWith || [],
       appConfigs: appConfigs || [],
       specs: specs || {},
       certifications: certifications || {},

@@ -161,6 +161,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
   const [capabilities, setCapabilities] = useState(new Set(product?.capabilities || []));
   const [appConfigs, setAppConfigs] = useState(product?.appConfigs || []);
   const [specs, setSpecs] = useState(product?.specs || {});
+  const [compatibleWith, setCompatibleWith] = useState(product?.compatibleWith || []);
   const [showAddAppForm, setShowAddAppForm] = useState(false);
   const [editingConfigId, setEditingConfigId] = useState(null);
   const [imageUrl, setImageUrl] = useState(product?.imageUrl || null);
@@ -260,6 +261,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         capabilities: Array.from(capabilities),
         appConfigs,
         specs,
+        compatibleWith,
       });
     } catch (err) {
       setError(err.message || 'Failed to save product.');
@@ -462,6 +464,41 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
             </div>
           </div>
         )}
+
+        {/* Compatible With Section */}
+        {category && (() => {
+          const compatCats = {
+            sensor: ['hub'],
+            touchpad: ['hub'],
+            camera: ['app'],
+            hub: ['app'],
+            app: ['hub', 'camera'],
+          }[category] || [];
+          const compatOptions = (catalog || []).filter(p => compatCats.includes(p.category) && p.id !== product?.id);
+          if (compatOptions.length === 0) return null;
+          function toggleCompat(id) {
+            setCompatibleWith(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+          }
+          return (
+            <div className="form-group">
+              <label>Compatible with</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {compatOptions.map(p => (
+                  <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={compatibleWith.includes(p.id)}
+                      onChange={() => toggleCompat(p.id)}
+                      style={{ width: 'auto' }}
+                    />
+                    <span>{p.name}{p.version ? ` ${p.version}` : ''}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.category}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Technical Specifications Section */}
         {specSchema && (

@@ -236,6 +236,20 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                   </span>
                 </div>
               </div>
+              {(product.compatibleWith || []).length > 0 && (
+                <div style={{ padding: '6px 16px', display: 'flex', flexWrap: 'wrap', gap: 6, borderTop: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, alignSelf: 'center' }}>Compatible:</span>
+                  {product.compatibleWith.map(id => {
+                    const p = products.find(x => x.id === id);
+                    if (!p) return null;
+                    return (
+                      <span key={id} style={{ fontSize: 11, background: 'var(--surface-alt, rgba(0,0,0,0.05))', borderRadius: 4, padding: '2px 7px', color: 'var(--text-muted)' }}>
+                        {p.name}{p.version ? ` ${p.version}` : ''}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
               <div
                 className="catalog-card-date"
                 style={{ cursor: onView ? 'pointer' : undefined }}

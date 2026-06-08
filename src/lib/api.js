@@ -271,7 +271,10 @@ export async function uploadProductImage(productId, file) {
     method: 'POST',
     body: formData,
   });
-  if (!res.ok) throw new Error('Failed to upload image');
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || 'Failed to upload image');
+  }
   return res.json();
 }
 
