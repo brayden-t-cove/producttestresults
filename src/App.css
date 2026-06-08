@@ -1020,16 +1020,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 }
 
 .catalog-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-@media (max-width: 900px) {
-  .catalog-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 600px) {
-  .catalog-grid { grid-template-columns: 1fr; }
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .catalog-card {
