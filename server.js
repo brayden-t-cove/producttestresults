@@ -19,6 +19,7 @@ const DEVICES_FILE = join(__dirname, 'data', 'devices.json');
 const FIRMWARES_FILE = join(__dirname, 'data', 'firmwares.json');
 const CATALOG_FILE = join(__dirname, 'data', 'catalog.json');
 const SPEC_SCHEMA_FILE = join(__dirname, 'data', 'specSchema.json');
+const CERT_SCHEMA_FILE = join(__dirname, 'data', 'certSchema.json');
 
 app.use(cors());
 app.use(express.json());
@@ -40,6 +41,10 @@ if (!existsSync(CATALOG_FILE)) {
 if (!existsSync(SPEC_SCHEMA_FILE)) {
   const { SPEC_SCHEMA } = await import('./src/data/productSpecs.js');
   await writeFile(SPEC_SCHEMA_FILE, JSON.stringify(SPEC_SCHEMA, null, 2));
+}
+if (!existsSync(CERT_SCHEMA_FILE)) {
+  const { CERT_SCHEMA } = await import('./src/data/certSchema.js');
+  await writeFile(CERT_SCHEMA_FILE, JSON.stringify(CERT_SCHEMA, null, 2));
 }
 
 // GET /api/firmwares?catalogId=xxx (or ?deviceName=xxx for backward compat)
@@ -117,6 +122,26 @@ app.put('/api/spec-schema', async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Failed to save schema', detail: e.message });
+  }
+});
+
+// GET /api/cert-schema
+app.get('/api/cert-schema', async (req, res) => {
+  try {
+    const data = await readFile(CERT_SCHEMA_FILE, 'utf8');
+    res.json(JSON.parse(data));
+  } catch {
+    res.status(404).json({ error: 'Cert schema not found' });
+  }
+});
+
+// PUT /api/cert-schema
+app.put('/api/cert-schema', async (req, res) => {
+  try {
+    await writeFile(CERT_SCHEMA_FILE, JSON.stringify(req.body, null, 2));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save cert schema', detail: e.message });
   }
 });
 

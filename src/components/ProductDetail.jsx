@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
-import { CERT_SCHEMA, CERT_STATUS_LABELS, CERT_STATUS_COLORS } from '../data/certSchema.js';
+import { CERT_STATUS_LABELS, CERT_STATUS_COLORS } from '../data/certSchema.js';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -83,9 +83,10 @@ function TechSpecsTab({ product }) {
   );
 }
 
-function CertificationsTab({ product, onCertUpdate }) {
+function CertificationsTab({ product, onCertUpdate, certSchema }) {
   const [selectedCountry, setSelectedCountry] = useState(null);
   const certData = product.certifications || {};
+  const schema = certSchema || {};
 
   function getCertEntry(country, cert) {
     return (certData[country] && certData[country][cert]) || { status: 'not-tested', certNumber: '', notes: '' };
@@ -99,7 +100,7 @@ function CertificationsTab({ product, onCertUpdate }) {
     onCertUpdate(product.id, updated);
   }
 
-  const countries = Object.keys(CERT_SCHEMA);
+  const countries = Object.keys(schema);
 
   return (
     <div className="cert-layout">
@@ -133,7 +134,7 @@ function CertificationsTab({ product, onCertUpdate }) {
                 </tr>
               </thead>
               <tbody>
-                {CERT_SCHEMA[selectedCountry].map(cert => {
+                {(schema[selectedCountry] || []).map(cert => {
                   const entry = getCertEntry(selectedCountry, cert);
                   const statusColor = CERT_STATUS_COLORS[entry.status] || CERT_STATUS_COLORS['not-tested'];
                   return (
@@ -250,7 +251,7 @@ function ImagesTab() {
 
 const TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Images & Renders'];
 
-export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onCertUpdate }) {
+export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onCertUpdate, certSchema }) {
   const [activeTab, setActiveTab] = useState('Tech Specs');
 
   return (
@@ -291,7 +292,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       </div>
 
       {activeTab === 'Tech Specs' && <TechSpecsTab product={product} />}
-      {activeTab === 'Certifications' && <CertificationsTab product={product} onCertUpdate={onCertUpdate} />}
+      {activeTab === 'Certifications' && <CertificationsTab product={product} onCertUpdate={onCertUpdate} certSchema={certSchema} />}
       {activeTab === 'Testing Results' && <TestingResultsTab sessions={sessions} onOpenSession={onOpenSession} />}
       {activeTab === 'Images & Renders' && <ImagesTab />}
     </div>

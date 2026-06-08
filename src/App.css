@@ -1600,3 +1600,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .cert-status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
 .cert-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; color: var(--text-muted); border: 2px dashed var(--border); border-radius: var(--radius); }
 @media (max-width: 600px) { .cert-layout { grid-template-columns: 1fr; } .product-tabs { overflow-x: auto; } }
+.cert-editor { max-width: 800px; margin: 0 auto; padding: 24px 0; }
+.cert-editor-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
+.cert-country-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+.cert-country-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.cert-item-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.settings-schema-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.settings-schema-buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, getSettings, saveSettings, getSpecSchema, saveSpecSchema } from './lib/api.js';
+import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, getSettings, saveSettings, getSpecSchema, saveSpecSchema, getCertSchema, saveCertSchema } from './lib/api.js';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
@@ -10,6 +10,7 @@ import NewProduct from './components/NewProduct.jsx';
 import AnalyticsPage from './components/AnalyticsPage.jsx';
 import IssuesPage from './components/IssuesPage.jsx';
 import SchemaEditor from './components/SchemaEditor.jsx';
+import CertEditor from './components/CertEditor.jsx';
 import ProductDetail from './components/ProductDetail.jsx';
 
 function formatDate(iso) {
@@ -19,7 +20,7 @@ function formatDate(iso) {
   });
 }
 
-function SettingsModal({ onClose }) {
+function SettingsModal({ onClose, onOpenSchemaEditor, onOpenCertEditor }) {
   const [apiKey, setApiKey] = useState('');
   const [preview, setPreview] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -67,6 +68,13 @@ function SettingsModal({ onClose }) {
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
             Used for AI features: test population, issue suggestions, repro steps, session summaries. Saved to your local .env file.
           </p>
+        </div>
+        <div className="settings-schema-section">
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Schema &amp; Fields</div>
+          <div className="settings-schema-buttons">
+            <button className="btn btn-ghost" onClick={onOpenSchemaEditor}>🗂 Edit Spec Fields</button>
+            <button className="btn btn-ghost" onClick={onOpenCertEditor}>🏷 Edit Cert Fields</button>
+          </div>
         </div>
         <div style={{ marginTop: 16, textAlign: 'right' }}>
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
@@ -148,7 +156,7 @@ function SessionCard({ s, onOpen }) {
   );
 }
 
-function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onSchemaEditor, loading }) {
+function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, loading }) {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -160,7 +168,6 @@ function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, on
           <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
           <button className="btn btn-ghost" onClick={onAnalytics}>📊 Analytics</button>
           <button className="btn btn-ghost" onClick={onIssues}>🐛 Issues</button>
-          <button className="btn btn-ghost" onClick={onSchemaEditor}>🗂 Spec Fields</button>
           <button className="btn btn-secondary" onClick={onCatalog}>
             📦 Product Catalog
           </button>
@@ -209,6 +216,7 @@ export default function App() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [specSchema, setSpecSchema] = useState(null);
+  const [certSchema, setCertSchema] = useState(null);
   const [currentProduct, setCurrentProduct] = useState(null);
 
   async function refreshSessions() {
@@ -236,6 +244,7 @@ export default function App() {
     refreshSessions();
     refreshCatalog();
     getSpecSchema().then(setSpecSchema).catch(() => {});
+    getCertSchema().then(setCertSchema).catch(() => {});
   }, []);
 
   async function handleOpenSession(id) {
@@ -313,7 +322,13 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          onOpenSchemaEditor={() => { setShowSettings(false); setView('schemaEditor'); }}
+          onOpenCertEditor={() => { setShowSettings(false); setView('certEditor'); }}
+        />
+      )}
       <div style={{ position: 'fixed', bottom: 8, right: 12, fontSize: 11, color: 'var(--text-muted)', opacity: 0.5, pointerEvents: 'none', userSelect: 'none', zIndex: 9999 }}>
         {BUILD_VERSION} · {BUILD_DATE}
       </div>
@@ -329,7 +344,6 @@ export default function App() {
           onSettings={() => setShowSettings(true)}
           onAnalytics={() => setView('analytics')}
           onIssues={() => setView('issues')}
-          onSchemaEditor={() => setView('schemaEditor')}
         />
       )}
 
@@ -357,6 +371,7 @@ export default function App() {
             onEdit={() => { setEditingProduct(currentProduct); setCurrentProduct(null); setView('editProduct'); }}
             onDelete={async () => { await handleDeleteProduct(currentProduct.id); setCurrentProduct(null); setView('catalog'); }}
             onOpenSession={handleOpenSession}
+            certSchema={certSchema}
             onCertUpdate={async (productId, certData) => {
               const updated = await updateCatalogEntry(productId, { certifications: certData });
               setCurrentProduct(updated);
@@ -426,6 +441,20 @@ export default function App() {
             onSave={async (newSchema) => {
               await saveSpecSchema(newSchema);
               setSpecSchema(newSchema);
+              setView('dashboard');
+            }}
+            onBack={() => setView('dashboard')}
+          />
+        </div>
+      )}
+
+      {view === 'certEditor' && (
+        <div className="dashboard">
+          <CertEditor
+            schema={certSchema || {}}
+            onSave={async (newSchema) => {
+              await saveCertSchema(newSchema);
+              setCertSchema(newSchema);
               setView('dashboard');
             }}
             onBack={() => setView('dashboard')}

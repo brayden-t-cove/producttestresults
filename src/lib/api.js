@@ -230,6 +230,22 @@ export async function saveSpecSchema(schema) {
   return res.json();
 }
 
+export async function getCertSchema() {
+  const res = await fetch(`${BASE}/cert-schema`);
+  if (!res.ok) throw new Error('Failed to load cert schema');
+  return res.json();
+}
+
+export async function saveCertSchema(schema) {
+  const res = await fetch(`${BASE}/cert-schema`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(schema),
+  });
+  if (!res.ok) throw new Error('Failed to save cert schema');
+  return res.json();
+}
+
 export async function getSettings() {
   const res = await fetch(`${BASE}/settings`);
   if (!res.ok) throw new Error('Failed to get settings');
