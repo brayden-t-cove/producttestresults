@@ -273,11 +273,56 @@ function ImagesTab() {
 
 const TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Images & Renders'];
 
+function PdfExportModal({ product, onClose }) {
+  const [hideOem, setHideOem] = useState(false);
+
+  function handlePrint() {
+    if (hideOem) document.body.classList.add('pdf-hide-oem');
+    else document.body.classList.remove('pdf-hide-oem');
+    onClose();
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove('pdf-hide-oem');
+    }, 100);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 380 }}>
+        <h2 style={{ marginBottom: 8 }}>Export Product Sheet</h2>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+          Choose what to include in the PDF before printing.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, cursor: 'pointer', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: hideOem ? 'var(--primary-dim)' : 'var(--card)' }}>
+          <input
+            type="checkbox"
+            checked={hideOem}
+            onChange={e => setHideOem(e.target.checked)}
+            style={{ width: 'auto' }}
+          />
+          <div>
+            <div style={{ fontWeight: 600 }}>Hide Manufacturer / OEM</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              Removes manufacturer name and model number — useful when sharing with external partners.
+            </div>
+          </div>
+        </label>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handlePrint}>🖨 Print / Save PDF</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onCertUpdate, certSchema }) {
   const [activeTab, setActiveTab] = useState('Tech Specs');
+  const [showPdfModal, setShowPdfModal] = useState(false);
 
   return (
     <div className="product-detail">
+      {showPdfModal && <PdfExportModal product={product} onClose={() => setShowPdfModal(false)} />}
       <div className="product-detail-header">
         <div>
           <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 8 }}>
@@ -300,14 +345,14 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
                   </span>
                 )}
               </div>
-              <div className="product-detail-sub">
+              <div className="product-detail-sub product-detail-oem">
                 {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || product.category}
               </div>
             </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', paddingTop: 8, flexShrink: 0 }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowPdfModal(true)}>
             🖨 Export PDF
           </button>
           <button className="btn btn-ghost btn-sm" onClick={onEdit}>Edit Product</button>
