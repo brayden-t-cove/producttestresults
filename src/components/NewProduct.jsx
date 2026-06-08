@@ -262,6 +262,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         appConfigs,
         specs,
         compatibleWith,
+        imageUrl,
       });
     } catch (err) {
       setError(err.message || 'Failed to save product.');
