@@ -162,6 +162,8 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
   const [appConfigs, setAppConfigs] = useState(product?.appConfigs || []);
   const [specs, setSpecs] = useState(product?.specs || {});
   const [compatibleWith, setCompatibleWith] = useState(product?.compatibleWith || []);
+  const [entity, setEntity] = useState(product?.entity || []);
+  const [productType, setProductType] = useState(product?.type || 'production');
   const [showAddAppForm, setShowAddAppForm] = useState(false);
   const [editingConfigId, setEditingConfigId] = useState(null);
   const [imageUrl, setImageUrl] = useState(product?.imageUrl || null);
@@ -263,6 +265,8 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         specs,
         compatibleWith,
         imageUrl,
+        entity,
+        type: productType,
       });
     } catch (err) {
       setError(err.message || 'Failed to save product.');
@@ -405,7 +409,49 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
             <option value="eol">EOL</option>
             <option value="discontinued">Discontinued</option>
             <option value="on-hold">On Hold</option>
+            <option value="under-evaluation">Under Evaluation</option>
+            <option value="rejected">Rejected</option>
           </select>
+        </div>
+
+        <div className="form-group">
+          <label>Entity <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(select all that apply)</span></label>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            {['Cove', 'Luna', 'Alder'].map(e => (
+              <label key={e} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={entity.includes(e)}
+                  onChange={() => setEntity(prev => prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e])}
+                  style={{ width: 'auto' }}
+                />
+                {e}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Type</label>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            {[
+              { value: 'production', label: 'Production' },
+              { value: 'sample', label: 'Sample' },
+              { value: 'prototype', label: 'Prototype' },
+            ].map(opt => (
+              <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="productType"
+                  value={opt.value}
+                  checked={productType === opt.value}
+                  onChange={() => setProductType(opt.value)}
+                  style={{ width: 'auto' }}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
         </div>
 
         <div className="form-group">

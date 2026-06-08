@@ -277,7 +277,7 @@ app.get('/api/catalog/:id', async (req, res) => {
 // POST /api/catalog
 app.post('/api/catalog', async (req, res) => {
   try {
-    const { name, manufacturer, modelNumber, version, status, category, capabilities, appConfigs, specs, certifications, compatibleWith } = req.body;
+    const { name, manufacturer, modelNumber, version, status, category, capabilities, appConfigs, specs, certifications, compatibleWith, entity, type } = req.body;
     if (!name || !category) return res.status(400).json({ error: 'name and category required', code: 'CAT_001_MISSING_FIELDS' });
     let data;
     try {
@@ -298,6 +298,8 @@ app.post('/api/catalog', async (req, res) => {
       appConfigs: appConfigs || [],
       specs: specs || {},
       certifications: certifications || {},
+      entity: entity || [],
+      type: type || 'production',
       createdAt: new Date().toISOString(),
     };
     data.push(entry);

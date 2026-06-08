@@ -85,6 +85,8 @@ const STATUS_LABELS = {
   'eol': 'EOL',
   'discontinued': 'Discontinued',
   'on-hold': 'On Hold',
+  'under-evaluation': 'Under Evaluation',
+  'rejected': 'Rejected',
 };
 
 const STATUS_COLORS = {
@@ -94,19 +96,26 @@ const STATUS_COLORS = {
   'eol': 'var(--text-muted)',
   'discontinued': 'var(--fail)',
   'on-hold': '#94a3b8',
+  'under-evaluation': '#a78bfa',
+  'rejected': '#f43f5e',
 };
 
 const PRIMARY_STATUSES = ['active', 'in-development', 'in-testing'];
-const SECONDARY_STATUSES = ['eol', 'discontinued', 'on-hold'];
+const SECONDARY_STATUSES = ['eol', 'discontinued', 'on-hold', 'under-evaluation', 'rejected'];
+
+const ENTITIES = ['Cove', 'Luna', 'Alder'];
 
 export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [openSpecsId, setOpenSpecsId] = useState(null);
   const [showExport, setShowExport] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [activeEntity, setActiveEntity] = useState('all');
 
   const categories = ['all', ...Object.keys(CATEGORY_LABELS).filter(cat => products.some(p => p.category === cat))];
   const filtered = activeFilter === 'all' ? products : products.filter(p => p.category === activeFilter);
+  const entityTabs = ['all', ...ENTITIES.filter(e => products.some(p => (p.entity || []).includes(e)))];
+  const entityFiltered = activeEntity === 'all' ? filtered : filtered.filter(p => (p.entity || []).includes(activeEntity));
 
   function groupByStatus(list) {
     const groups = [];
@@ -127,6 +136,13 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
       }
     }
     return groups;
+  }
+
+  function partitionByType(list) {
+    return {
+      production: list.filter(p => !p.type || p.type === 'production'),
+      nonProduction: list.filter(p => p.type === 'sample' || p.type === 'prototype'),
+    };
   }
 
   function handleDeleteClick(product) {
@@ -163,7 +179,7 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
       </div>
 
       {categories.length > 2 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
           {categories.map(cat => (
             <button
               key={cat}
@@ -171,6 +187,22 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
               onClick={() => setActiveFilter(cat)}
             >
               {cat === 'all' ? `All (${products.length})` : `${CATEGORY_ICONS[cat] || ''} ${CATEGORY_LABELS[cat]} (${products.filter(p => p.category === cat).length})`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {entityTabs.length > 2 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          {entityTabs.map(e => (
+            <button
+              key={e}
+              className={`btn btn-sm ${activeEntity === e ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setActiveEntity(e)}
+            >
+              {e === 'all'
+                ? `All Entities (${filtered.length})`
+                : `${e} (${filtered.filter(p => (p.entity || []).includes(e)).length})`}
             </button>
           ))}
         </div>
@@ -184,124 +216,160 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
             + Add Product
           </button>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : entityFiltered.length === 0 ? (
         <div className="empty-state">
-          <p>No {CATEGORY_LABELS[activeFilter]} products in your catalog.</p>
+          <p>No products match the current filters.</p>
         </div>
       ) : (
         <div>
-          {groupByStatus(filtered).map(({ status, items }) => (
-            <div key={status} style={{ marginBottom: 28 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[status], display: 'inline-block', flexShrink: 0 }} />
-                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  {STATUS_LABELS[status]} ({items.length})
-                </span>
-              </div>
-              <div className="catalog-grid">
-          {items.map(product => (
-            <div key={product.id} className="catalog-card">
-              <div
-                className="catalog-card-top"
-                style={{ cursor: onView ? 'pointer' : undefined }}
-                onClick={onView ? () => onView(product) : undefined}
-              >
-                <div className="catalog-card-icon">
-                  {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
-                  ) : (
-                    <span style={{ fontSize: 32 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="catalog-card-name">
-                    {product.name}
-                    {product.version && (
-                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'rgba(99,102,241,0.15)', borderRadius: 4, padding: '1px 6px' }}>
-                        {product.version}
+          {(() => {
+            const { production, nonProduction } = partitionByType(entityFiltered);
+
+            function renderCard(product) {
+              const typeBadge = product.type === 'sample' || product.type === 'prototype' ? product.type : null;
+              return (
+                <div key={product.id} className="catalog-card">
+                  <div
+                    className="catalog-card-top"
+                    style={{ cursor: onView ? 'pointer' : undefined, position: 'relative' }}
+                    onClick={onView ? () => onView(product) : undefined}
+                  >
+                    {typeBadge && (
+                      <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', padding: '2px 7px', borderRadius: 4, background: typeBadge === 'sample' ? '#fef3c7' : '#ede9fe', color: typeBadge === 'sample' ? '#b45309' : '#6d28d9', textTransform: 'uppercase' }}>
+                        {typeBadge}
                       </span>
                     )}
-                  </div>
-                  <div className="catalog-card-meta">
-                    {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || CATEGORY_LABELS[product.category] || product.category}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                  <span className="capability-count-badge">
-                    {(product.capabilities || []).length} capabilities
-                  </span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLORS[product.status || 'active'], display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[product.status || 'active'], display: 'inline-block' }} />
-                    {STATUS_LABELS[product.status || 'active']}
-                  </span>
-                </div>
-              </div>
-              {(product.compatibleWith || []).length > 0 && (
-                <div style={{ padding: '6px 16px', display: 'flex', flexWrap: 'wrap', gap: 6, borderTop: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, alignSelf: 'center' }}>Compatible:</span>
-                  {product.compatibleWith.map(id => {
-                    const p = products.find(x => x.id === id);
-                    if (!p) return null;
-                    return (
-                      <span key={id} style={{ fontSize: 11, background: 'var(--surface-alt, rgba(0,0,0,0.05))', borderRadius: 4, padding: '2px 7px', color: 'var(--text-muted)' }}>
-                        {p.name}{p.version ? ` ${p.version}` : ''}
+                    <div className="catalog-card-icon">
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.name} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
+                      ) : (
+                        <span style={{ fontSize: 32 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="catalog-card-name">
+                        {product.name}
+                        {product.version && (
+                          <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'rgba(99,102,241,0.15)', borderRadius: 4, padding: '1px 6px' }}>
+                            {product.version}
+                          </span>
+                        )}
+                      </div>
+                      <div className="catalog-card-meta">
+                        {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || CATEGORY_LABELS[product.category] || product.category}
+                      </div>
+                      {(product.entity || []).length > 0 && (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                          {product.entity.map(e => (
+                            <span key={e} style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', letterSpacing: '0.05em' }}>
+                              {e}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                      <span className="capability-count-badge">
+                        {(product.capabilities || []).length} capabilities
                       </span>
-                    );
-                  })}
+                      <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLORS[product.status || 'active'], display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[product.status || 'active'], display: 'inline-block' }} />
+                        {STATUS_LABELS[product.status || 'active']}
+                      </span>
+                    </div>
+                  </div>
+                  {(product.compatibleWith || []).length > 0 && (
+                    <div style={{ padding: '6px 16px', display: 'flex', flexWrap: 'wrap', gap: 6, borderTop: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, alignSelf: 'center' }}>Compatible:</span>
+                      {product.compatibleWith.map(id => {
+                        const p = products.find(x => x.id === id);
+                        if (!p) return null;
+                        return (
+                          <span key={id} style={{ fontSize: 11, background: 'var(--surface-alt, rgba(0,0,0,0.05))', borderRadius: 4, padding: '2px 7px', color: 'var(--text-muted)' }}>
+                            {p.name}{p.version ? ` ${p.version}` : ''}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div
+                    className="catalog-card-date"
+                    style={{ cursor: onView ? 'pointer' : undefined }}
+                    onClick={onView ? () => onView(product) : undefined}
+                  >
+                    Added {formatDate(product.createdAt)}
+                  </div>
+                  <div className="card-actions">
+                    <button className="btn btn-primary btn-sm" onClick={() => onStartTest(product)}>▶ Start Test</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => onEdit(product)}>Edit</button>
+                    <button className="btn btn-secondary btn-sm" title="Duplicate as new version" onClick={() => onDuplicate(product, incrementVersion(product.version))}>⧉ Duplicate</button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      title="View technical specifications"
+                      onClick={() => setOpenSpecsId(openSpecsId === product.id ? null : product.id)}
+                      style={{ fontWeight: openSpecsId === product.id ? 700 : 400 }}
+                    >
+                      {openSpecsId === product.id ? '▾ Specs' : '▸ Specs'}
+                    </button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteClick(product)}>Delete</button>
+                  </div>
+                  {openSpecsId === product.id && (
+                    <div className="spec-sheet-panel">
+                      <SpecSheet product={product} />
+                    </div>
+                  )}
                 </div>
-              )}
-              <div
-                className="catalog-card-date"
-                style={{ cursor: onView ? 'pointer' : undefined }}
-                onClick={onView ? () => onView(product) : undefined}
-              >
-                Added {formatDate(product.createdAt)}
-              </div>
-              <div className="card-actions">
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => onStartTest(product)}
-                >
-                  ▶ Start Test
-                </button>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => onEdit(product)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  title="Duplicate as new version"
-                  onClick={() => onDuplicate(product, incrementVersion(product.version))}
-                >
-                  ⧉ Duplicate
-                </button>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  title="View technical specifications"
-                  onClick={() => setOpenSpecsId(openSpecsId === product.id ? null : product.id)}
-                  style={{ fontWeight: openSpecsId === product.id ? 700 : 400 }}
-                >
-                  {openSpecsId === product.id ? '▾ Specs' : '▸ Specs'}
-                </button>
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => handleDeleteClick(product)}
-                >
-                  Delete
-                </button>
-              </div>
-              {openSpecsId === product.id && (
-                <div className="spec-sheet-panel">
-                  <SpecSheet product={product} />
+              );
+            }
+
+            function renderStatusGroups(list) {
+              return groupByStatus(list).map(({ status, items }) => (
+                <div key={status} style={{ marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[status] || '#94a3b8', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                      {STATUS_LABELS[status] || status} ({items.length})
+                    </span>
+                  </div>
+                  <div className="catalog-grid">
+                    {items.map(p => renderCard(p))}
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
-              </div>
-            </div>
-          ))}
+              ));
+            }
+
+            return (
+              <>
+                {production.length > 0 && (
+                  <div style={{ marginBottom: 36 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                      Production &amp; Development ({production.length})
+                    </div>
+                    {renderStatusGroups(production)}
+                  </div>
+                )}
+                {nonProduction.length > 0 && (
+                  <div style={{ marginBottom: 36 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                      Samples &amp; Prototypes ({nonProduction.length})
+                    </div>
+                    {['sample', 'prototype'].map(t => {
+                      const typeItems = nonProduction.filter(p => p.type === t);
+                      if (typeItems.length === 0) return null;
+                      return (
+                        <div key={t} style={{ marginBottom: 24 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: t === 'sample' ? '#b45309' : '#6d28d9', textTransform: 'uppercase', marginBottom: 10 }}>
+                            {t === 'sample' ? 'Samples' : 'Prototypes'} ({typeItems.length})
+                          </div>
+                          {renderStatusGroups(typeItems)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
