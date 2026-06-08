@@ -94,13 +94,13 @@ function CertificationsTab({ product, onCertUpdate, certSchema }) {
   const schema = certSchema || {};
 
   function getEntry(country, key) {
-    return (certData[country] && certData[country][key]) || { status: 'not-tested', certNumber: '', notes: '' };
+    return (certData[country] && certData[country][key]) || { status: 'not-tested', certNumber: '', notes: '', url: '' };
   }
 
   function handleChange(country, key, field, value) {
     const updated = JSON.parse(JSON.stringify(certData));
     if (!updated[country]) updated[country] = {};
-    if (!updated[country][key]) updated[country][key] = { status: 'not-tested', certNumber: '', notes: '' };
+    if (!updated[country][key]) updated[country][key] = { status: 'not-tested', certNumber: '', notes: '', url: '' };
     updated[country][key][field] = value;
     onCertUpdate(product.id, updated);
   }
@@ -147,6 +147,23 @@ function CertificationsTab({ product, onCertUpdate, certSchema }) {
             style={{ fontSize: 13, width: '100%' }}
           />
         </td>
+        <td>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="url"
+              value={entry.url || ''}
+              placeholder="https://..."
+              onChange={e => handleChange(country, key, 'url', e.target.value)}
+              onBlur={e => handleChange(country, key, 'url', e.target.value)}
+              style={{ fontSize: 13, width: '100%' }}
+            />
+            {entry.url && (
+              <a href={entry.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                ↗
+              </a>
+            )}
+          </div>
+        </td>
       </tr>
     );
   }
@@ -180,6 +197,7 @@ function CertificationsTab({ product, onCertUpdate, certSchema }) {
                   <th>Status</th>
                   <th>Cert #</th>
                   <th>Notes</th>
+                  <th>Document / Link</th>
                 </tr>
               </thead>
               <tbody>
@@ -190,7 +208,7 @@ function CertificationsTab({ product, onCertUpdate, certSchema }) {
                   }
                   return [
                     <tr key={`header-${cert.name}`}>
-                      <td colSpan={4} style={{ fontWeight: 700, background: 'var(--surface-alt, rgba(0,0,0,0.04))', fontSize: 13, paddingTop: 10, paddingBottom: 10 }}>
+                      <td colSpan={5} style={{ fontWeight: 700, background: 'var(--surface-alt, rgba(0,0,0,0.04))', fontSize: 13, paddingTop: 10, paddingBottom: 10 }}>
                         {cert.name}
                       </td>
                     </tr>,
