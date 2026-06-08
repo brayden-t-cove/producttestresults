@@ -264,6 +264,23 @@ export async function saveCertSchema(schema) {
   return res.json();
 }
 
+export async function uploadProductImage(productId, file) {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`${BASE}/catalog/${productId}/image`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) throw new Error('Failed to upload image');
+  return res.json();
+}
+
+export async function deleteProductImage(productId) {
+  const res = await fetch(`${BASE}/catalog/${productId}/image`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete image');
+  return res.json();
+}
+
 export async function getSettings() {
   const res = await fetch(`${BASE}/settings`);
   if (!res.ok) throw new Error('Failed to get settings');

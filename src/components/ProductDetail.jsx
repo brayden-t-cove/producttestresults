@@ -283,16 +283,27 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
           <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 8 }}>
             ← Back
           </button>
-          <div className="product-detail-title">
-            {product.name}
-            {product.version && (
-              <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 600, color: 'var(--primary)', background: 'rgba(99,102,241,0.15)', borderRadius: 4, padding: '2px 8px' }}>
-                {product.version}
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {product.imageUrl && (
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 12, border: '1px solid var(--border)', flexShrink: 0 }}
+              />
             )}
-          </div>
-          <div className="product-detail-sub">
-            {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || product.category}
+            <div>
+              <div className="product-detail-title">
+                {product.name}
+                {product.version && (
+                  <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 600, color: 'var(--primary)', background: 'rgba(99,102,241,0.15)', borderRadius: 4, padding: '2px 8px' }}>
+                    {product.version}
+                  </span>
+                )}
+              </div>
+              <div className="product-detail-sub">
+                {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || product.category}
+              </div>
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', paddingTop: 8, flexShrink: 0 }}>

@@ -134,7 +134,11 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                 onClick={onView ? () => onView(product) : undefined}
               >
                 <div className="catalog-card-icon">
-                  {CATEGORY_ICONS[product.category] || '📦'}
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.name} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
+                  ) : (
+                    <span style={{ fontSize: 32 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
+                  )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="catalog-card-name">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CAPABILITY_GROUPS, CATEGORY_LABELS, CATEGORIES } from '../data/capabilities.js';
-import { getDebugInfo } from '../lib/api.js';
+import { getDebugInfo, uploadProductImage, deleteProductImage } from '../lib/api.js';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import SpecsForm from './SpecsForm.jsx';
 
@@ -162,6 +162,8 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
   const [specs, setSpecs] = useState(product?.specs || {});
   const [showAddAppForm, setShowAddAppForm] = useState(false);
   const [editingConfigId, setEditingConfigId] = useState(null);
+  const [imageUrl, setImageUrl] = useState(product?.imageUrl || null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [debugInfo, setDebugInfo] = useState(null);
@@ -207,6 +209,30 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
 
   function handleRemoveAppConfig(id) {
     setAppConfigs(prev => prev.filter(ac => ac.id !== id));
+  }
+
+  async function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file || !product?.id) return;
+    setUploadingImage(true);
+    try {
+      const result = await uploadProductImage(product.id, file);
+      setImageUrl(result.imageUrl);
+    } catch (err) {
+      setError('Failed to upload image: ' + err.message);
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  async function handleImageRemove() {
+    if (!product?.id) return;
+    try {
+      await deleteProductImage(product.id);
+      setImageUrl(null);
+    } catch (err) {
+      setError('Failed to remove image: ' + err.message);
+    }
   }
 
   async function handleSave(e) {
@@ -299,6 +325,40 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
             onChange={e => setName(e.target.value)}
             required
           />
+        </div>
+
+        <div className="form-group">
+          <label>Product Image</label>
+          {isEdit ? (
+            <div className="product-image-upload">
+              {imageUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <img src={imageUrl} alt="Product" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
+                      Change Image
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+                    </label>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={handleImageRemove} disabled={uploadingImage}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <label className="image-upload-dropzone" style={{ cursor: 'pointer' }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>Upload product image</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>PNG, JPG, WEBP up to 5MB</div>
+                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+                  {uploadingImage && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--primary)' }}>Uploading...</div>}
+                </label>
+              )}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '8px 0' }}>
+              Save the product first, then edit it to add an image.
+            </div>
+          )}
         </div>
 
         <div className="form-group">

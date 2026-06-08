@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import { readdir, readFile, writeFile, mkdir } from 'fs/promises';
+import { unlink } from 'fs/promises';
 import { existsSync } from 'fs';
+import multer from 'multer';
 import { join, dirname } from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -20,14 +22,19 @@ const FIRMWARES_FILE = join(__dirname, 'data', 'firmwares.json');
 const CATALOG_FILE = join(__dirname, 'data', 'catalog.json');
 const SPEC_SCHEMA_FILE = join(__dirname, 'data', 'specSchema.json');
 const CERT_SCHEMA_FILE = join(__dirname, 'data', 'certSchema.json');
+const IMAGES_DIR = join(__dirname, 'data', 'images');
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/api/images', express.static(IMAGES_DIR));
 
 // Ensure sessions dir exists
 if (!existsSync(SESSIONS_DIR)) {
   await mkdir(SESSIONS_DIR, { recursive: true });
+}
+if (!existsSync(IMAGES_DIR)) {
+  await mkdir(IMAGES_DIR, { recursive: true });
 }
 if (!existsSync(DEVICES_FILE)) {
   await writeFile(DEVICES_FILE, JSON.stringify([], null, 2));
@@ -184,6 +191,60 @@ app.get('/api/catalog/export/json', async (req, res) => {
     res.send(JSON.stringify(data, null, 2));
   } catch (e) {
     res.status(500).json({ error: 'Failed to export JSON' });
+  }
+});
+
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, IMAGES_DIR),
+  filename: (req, file, cb) => {
+    const ext = file.originalname.split('.').pop().toLowerCase();
+    cb(null, `${req.params.id}-${Date.now()}.${ext}`);
+  },
+});
+const upload = multer({
+  storage: imageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files allowed'));
+  },
+});
+
+// POST /api/catalog/:id/image
+app.post('/api/catalog/:id/image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    const idx = data.findIndex(e => e.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    // Delete old image if present
+    if (data[idx].imageUrl) {
+      const oldPath = join(IMAGES_DIR, data[idx].imageUrl.split('/').pop());
+      unlink(oldPath).catch(() => {});
+    }
+    data[idx].imageUrl = `/api/images/${req.file.filename}`;
+    await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    res.json({ imageUrl: data[idx].imageUrl });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to upload image', detail: e.message });
+  }
+});
+
+// DELETE /api/catalog/:id/image
+app.delete('/api/catalog/:id/image', async (req, res) => {
+  try {
+    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    const idx = data.findIndex(e => e.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    if (data[idx].imageUrl) {
+      const oldPath = join(IMAGES_DIR, data[idx].imageUrl.split('/').pop());
+      unlink(oldPath).catch(() => {});
+      data[idx].imageUrl = null;
+      await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete image' });
   }
 });
 

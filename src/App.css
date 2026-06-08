@@ -1614,3 +1614,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .product-detail { max-width: 100% !important; padding: 0 !important; }
   .spec-sheet-panel { break-inside: avoid; }
 }
+
+/* ============================================================
+   PRODUCT IMAGE UPLOAD
+   ============================================================ */
+.image-upload-dropzone { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed var(--border); border-radius: var(--radius); padding: 24px; text-align: center; transition: border-color 0.15s; }
+.image-upload-dropzone:hover { border-color: var(--primary); }
+.product-image-upload { margin-top: 4px; }
