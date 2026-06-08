@@ -1607,3 +1607,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .cert-item-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .settings-schema-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 .settings-schema-buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+@media print {
+  .dashboard-header, .product-tabs, .product-detail-header .btn,
+  nav, .sidebar, button:not(.print-keep) { display: none !important; }
+  .product-detail { max-width: 100% !important; padding: 0 !important; }
+  .spec-sheet-panel { break-inside: avoid; }
+}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CATEGORY_LABELS } from '../data/capabilities.js';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
+import { exportCatalogCsv, exportCatalogJson } from '../lib/api.js';
 
 const CATEGORY_ICONS = {
   hub: '🏠',
@@ -80,6 +81,7 @@ function SpecSheet({ product }) {
 export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [openSpecsId, setOpenSpecsId] = useState(null);
+  const [showExport, setShowExport] = useState(false);
 
   function handleDeleteClick(product) {
     setConfirmDelete(product);
@@ -104,9 +106,14 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
             Manage your products and their capabilities
           </p>
         </div>
-        <button className="btn btn-primary btn-lg" onClick={onAdd}>
-          + Add Product
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowExport(true)}>
+            ↓ Export
+          </button>
+          <button className="btn btn-primary btn-lg" onClick={onAdd}>
+            + Add Product
+          </button>
+        </div>
       </div>
 
       {products.length === 0 ? (
@@ -195,6 +202,37 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {showExport && (
+        <div className="modal-overlay" onClick={() => setShowExport(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <h2 style={{ marginBottom: 8 }}>Export Catalog</h2>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+              Choose a format to export your {products.length} product{products.length !== 1 ? 's' : ''}.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="btn btn-secondary" style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px' }}
+                onClick={() => { exportCatalogCsv(); setShowExport(false); }}>
+                <div style={{ fontWeight: 600 }}>Download CSV</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Basic fields only — compatible with Excel, Google Sheets, and SQL import</div>
+              </button>
+              <button className="btn btn-secondary" style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px' }}
+                onClick={() => { exportCatalogJson(); setShowExport(false); }}>
+                <div style={{ fontWeight: 600 }}>Download JSON</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Full export including specs, certifications, and capabilities — for platform migration</div>
+              </button>
+              <button className="btn btn-secondary" style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', opacity: 0.5, cursor: 'not-allowed' }}
+                disabled>
+                <div style={{ fontWeight: 600 }}>Export Product Sheet PDF</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Open a product and use the "Export PDF" button on its detail page</div>
+              </button>
+            </div>
+            <div style={{ marginTop: 16, textAlign: 'right' }}>
+              <button className="btn btn-ghost" onClick={() => setShowExport(false)}>Close</button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -157,6 +157,36 @@ app.get('/api/catalog', async (req, res) => {
   }
 });
 
+// GET /api/catalog/export/csv
+app.get('/api/catalog/export/csv', async (req, res) => {
+  try {
+    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    const headers = ['id','name','manufacturer','modelNumber','version','category','createdAt'];
+    const rows = data.map(p => headers.map(h => {
+      const v = p[h] ?? '';
+      return `"${String(v).replace(/"/g, '""')}"`;
+    }).join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="catalog-export.csv"');
+    res.send(csv);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to export CSV' });
+  }
+});
+
+// GET /api/catalog/export/json
+app.get('/api/catalog/export/json', async (req, res) => {
+  try {
+    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="catalog-export.json"');
+    res.send(JSON.stringify(data, null, 2));
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to export JSON' });
+  }
+});
+
 // GET /api/catalog/:id
 app.get('/api/catalog/:id', async (req, res) => {
   try {

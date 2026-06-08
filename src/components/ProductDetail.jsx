@@ -296,6 +296,9 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', paddingTop: 8, flexShrink: 0 }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+            🖨 Export PDF
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={onEdit}>Edit Product</button>
           <button className="btn btn-danger btn-sm" onClick={onDelete}>Delete</button>
         </div>

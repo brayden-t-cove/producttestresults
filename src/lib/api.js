@@ -147,6 +147,24 @@ export async function importCsv(csvText, type) {
 
 // ── Catalog ──────────────────────────────────────────────────────────────────
 
+export function exportCatalogCsv() {
+  const a = document.createElement('a');
+  a.href = `${BASE}/catalog/export/csv`;
+  a.download = 'catalog-export.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+export function exportCatalogJson() {
+  const a = document.createElement('a');
+  a.href = `${BASE}/catalog/export/json`;
+  a.download = 'catalog-export.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 export async function getCatalog() {
   const res = await fetch(`${BASE}/catalog`);
   if (!res.ok) throw new Error('Failed to fetch catalog');
