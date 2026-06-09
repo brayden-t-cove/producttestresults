@@ -363,7 +363,7 @@ export default function App() {
       )}
 
       {view === 'productDetail' && currentProduct && (
-        <div className="dashboard">
+        <div className="dashboard product-detail-wrapper">
           <ProductDetail
             product={currentProduct}
             sessions={sessions.filter(s => s.catalogId === currentProduct.id || s.productName === currentProduct.name)}

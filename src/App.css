@@ -1354,7 +1354,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
    ============================================================ */
 @media print {
   body { background: white !important; color: black !important; }
-  .app-layout > *:not(.session-summary-wrapper) { display: none !important; }
+  .app-layout > *:not(.session-summary-wrapper):not(.product-detail-wrapper) { display: none !important; }
   .summary-actions { display: none !important; }
   .build-version { display: none !important; }
   .session-summary { box-shadow: none !important; background: white !important; color: black !important; max-width: 100% !important; }
@@ -1602,10 +1602,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .settings-schema-buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
 @media print {
-  .dashboard-header, .product-tabs, .product-detail-header .btn,
-  nav, .sidebar, button:not(.print-keep) { display: none !important; }
-  .product-detail { max-width: 100% !important; padding: 0 !important; }
-  .spec-sheet-panel { break-inside: avoid; }
+  .product-detail-wrapper .btn,
+  .product-tabs,
+  nav, .sidebar { display: none !important; }
+  .product-detail { max-width: 100% !important; padding: 0 !important; box-shadow: none !important; }
+  .product-detail-header { padding-bottom: 12px; border-bottom: 1px solid #ccc; margin-bottom: 16px; }
+  .spec-sheet { break-inside: avoid; }
+  .spec-sheet-group { break-inside: avoid; }
+  .cert-table { break-inside: avoid; }
 }
 
 .pdf-hide-oem .product-detail-oem { display: none !important; }
