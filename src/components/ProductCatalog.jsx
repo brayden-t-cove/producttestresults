@@ -100,10 +100,22 @@ const STATUS_COLORS = {
   'rejected': '#f43f5e',
 };
 
-const PRIMARY_STATUSES = ['active', 'in-development', 'in-testing'];
+// Production: type=production AND status not in-development
+// Samples & Prototypes: everything else (samples, prototypes, anything in-development)
+const PRODUCTION_STATUSES = ['active', 'in-testing', 'eol', 'discontinued', 'on-hold'];
+const PRIMARY_STATUSES = ['active', 'in-testing'];
 const SECONDARY_STATUSES = ['eol', 'discontinued', 'on-hold', 'under-evaluation', 'rejected'];
+const SP_PRIMARY_STATUSES = ['in-development', 'under-evaluation'];
+const SP_SECONDARY_STATUSES = ['on-hold', 'rejected'];
 
 const ENTITIES = ['Cove', 'Luna', 'Alder'];
+
+function isProduction(p) {
+  return (!p.type || p.type === 'production') && PRODUCTION_STATUSES.includes(p.status || 'active');
+}
+function isSP(p) {
+  return !isProduction(p);
+}
 
 export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -111,38 +123,38 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
   const [showExport, setShowExport] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [activeEntity, setActiveEntity] = useState('all');
+  const [activePage, setActivePage] = useState('production');
 
   const categories = ['all', ...Object.keys(CATEGORY_LABELS).filter(cat => products.some(p => p.category === cat))];
   const filtered = activeFilter === 'all' ? products : products.filter(p => p.category === activeFilter);
   const entityTabs = ['all', ...ENTITIES.filter(e => products.some(p => (p.entity || []).includes(e)))];
   const entityFiltered = activeEntity === 'all' ? filtered : filtered.filter(p => (p.entity || []).includes(activeEntity));
+  const pageFiltered = activePage === 'production' ? entityFiltered.filter(isProduction) : entityFiltered.filter(isSP);
 
-  function groupByStatus(list) {
+  function groupByStatus(list, primaryStatuses, secondaryStatuses) {
+    const allStatuses = [...primaryStatuses, ...secondaryStatuses];
     const groups = [];
-    for (const s of PRIMARY_STATUSES) {
+    for (const s of primaryStatuses) {
       const items = list.filter(p => (p.status || 'active') === s);
       if (items.length > 0) groups.push({ status: s, items });
     }
-    const secondaryItems = list.filter(p => SECONDARY_STATUSES.includes(p.status || ''));
-    if (secondaryItems.length > 0) {
+    const secItems = list.filter(p => secondaryStatuses.includes(p.status || ''));
+    if (secItems.length > 0) {
       const byStatus = {};
-      for (const p of secondaryItems) {
-        const s = p.status || 'eol';
+      for (const p of secItems) {
+        const s = p.status || secondaryStatuses[0];
         if (!byStatus[s]) byStatus[s] = [];
         byStatus[s].push(p);
       }
-      for (const s of SECONDARY_STATUSES) {
+      for (const s of secondaryStatuses) {
         if (byStatus[s]?.length > 0) groups.push({ status: s, items: byStatus[s] });
       }
     }
+    // Catch-all for any statuses not in either list
+    const known = new Set(allStatuses);
+    const other = list.filter(p => !known.has(p.status || 'active'));
+    if (other.length > 0) groups.push({ status: 'other', items: other });
     return groups;
-  }
-
-  function partitionByType(list) {
-    return {
-      production: list.filter(p => !p.type || p.type === 'production'),
-      nonProduction: list.filter(p => p.type === 'sample' || p.type === 'prototype'),
-    };
   }
 
   function handleDeleteClick(product) {
@@ -176,6 +188,21 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
             + Add Product
           </button>
         </div>
+      </div>
+
+      <div className="product-tabs" style={{ marginBottom: 16 }}>
+        <button
+          className={`product-tab${activePage === 'production' ? ' active' : ''}`}
+          onClick={() => setActivePage('production')}
+        >
+          Production ({products.filter(isProduction).length})
+        </button>
+        <button
+          className={`product-tab${activePage === 'sp' ? ' active' : ''}`}
+          onClick={() => setActivePage('sp')}
+        >
+          Samples &amp; Prototypes ({products.filter(isSP).length})
+        </button>
       </div>
 
       {categories.length > 2 && (
@@ -216,15 +243,13 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
             + Add Product
           </button>
         </div>
-      ) : entityFiltered.length === 0 ? (
+      ) : pageFiltered.length === 0 ? (
         <div className="empty-state">
-          <p>No products match the current filters.</p>
+          <p>No products here yet.</p>
         </div>
       ) : (
         <div>
           {(() => {
-            const { production, nonProduction } = partitionByType(entityFiltered);
-
             function renderCard(product) {
               const typeBadge = product.type === 'sample' || product.type === 'prototype' ? product.type : null;
               return (
@@ -322,8 +347,8 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
               );
             }
 
-            function renderStatusGroups(list) {
-              return groupByStatus(list).map(({ status, items }) => (
+            function renderStatusGroups(list, primaryStatuses, secondaryStatuses) {
+              return groupByStatus(list, primaryStatuses, secondaryStatuses).map(({ status, items }) => (
                 <div key={status} style={{ marginBottom: 24 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[status] || '#94a3b8', display: 'inline-block', flexShrink: 0 }} />
@@ -338,35 +363,34 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
               ));
             }
 
+            if (activePage === 'production') {
+              return renderStatusGroups(pageFiltered, PRIMARY_STATUSES, SECONDARY_STATUSES);
+            }
+
+            // Samples & Prototypes page — group by type then status
             return (
               <>
-                {production.length > 0 && (
-                  <div style={{ marginBottom: 36 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-                      Production &amp; Development ({production.length})
+                {['in-development', 'sample', 'prototype'].map(bucket => {
+                  let bucketItems, bucketLabel, bucketColor;
+                  if (bucket === 'in-development') {
+                    bucketItems = pageFiltered.filter(p => (p.status || '') === 'in-development');
+                    bucketLabel = 'In Development';
+                    bucketColor = '#f59e0b';
+                  } else {
+                    bucketItems = pageFiltered.filter(p => p.type === bucket);
+                    bucketLabel = bucket === 'sample' ? 'Samples' : 'Prototypes';
+                    bucketColor = bucket === 'sample' ? '#b45309' : '#6d28d9';
+                  }
+                  if (bucketItems.length === 0) return null;
+                  return (
+                    <div key={bucket} style={{ marginBottom: 32 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: bucketColor, textTransform: 'uppercase', marginBottom: 10 }}>
+                        {bucketLabel} ({bucketItems.length})
+                      </div>
+                      {renderStatusGroups(bucketItems, SP_PRIMARY_STATUSES, SP_SECONDARY_STATUSES)}
                     </div>
-                    {renderStatusGroups(production)}
-                  </div>
-                )}
-                {nonProduction.length > 0 && (
-                  <div style={{ marginBottom: 36 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-                      Samples &amp; Prototypes ({nonProduction.length})
-                    </div>
-                    {['sample', 'prototype'].map(t => {
-                      const typeItems = nonProduction.filter(p => p.type === t);
-                      if (typeItems.length === 0) return null;
-                      return (
-                        <div key={t} style={{ marginBottom: 24 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: t === 'sample' ? '#b45309' : '#6d28d9', textTransform: 'uppercase', marginBottom: 10 }}>
-                            {t === 'sample' ? 'Samples' : 'Prototypes'} ({typeItems.length})
-                          </div>
-                          {renderStatusGroups(typeItems)}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                  );
+                })}
               </>
             );
           })()}
