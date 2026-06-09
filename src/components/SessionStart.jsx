@@ -1,7 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { CATEGORY_LABELS, CAPABILITY_GROUPS } from '../data/capabilities.js';
 import { BASELINE_TESTS, TEST_LIBRARY } from '../data/testLibrary.js';
+import { generateVendorEvalTestCases, VENDOR_EVAL_SESSION_TYPES } from '../data/vendorEvalLibrary.js';
 import { createSession, updateSession, downloadCsvTemplate, importCsv, getFirmwares, addFirmware } from '../lib/api.js';
+
+const TEST_PLANS = [
+  { id: 'production', label: 'Production', icon: '🏭', description: 'Test against our platform requirements and release criteria' },
+  { id: 'vendor-eval', label: 'Vendor Evaluation', icon: '🔍', description: 'Evaluate a third-party sample or prototype for potential adoption' },
+];
 
 const CATEGORY_ICONS = {
   hub: '🏠',
@@ -114,6 +120,7 @@ function platformLabel(platform) {
 export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedAppConfig, setSelectedAppConfig] = useState(null);
+  const [testPlan, setTestPlan] = useState('production');
   const [sessionType, setSessionType] = useState('e2e');
   const [firmware, setFirmware] = useState('');
   const [addingFirmware, setAddingFirmware] = useState(false);
@@ -136,6 +143,9 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     setSelectedAppConfig(null);
     if (selectedProduct) {
       getFirmwares(null, selectedProduct.id).then(setSavedFirmwares).catch(() => {});
+      const isSample = selectedProduct.type === 'sample' || selectedProduct.type === 'prototype';
+      setTestPlan(isSample ? 'vendor-eval' : 'production');
+      setSessionType('e2e');
     }
   }, [selectedProduct]);
 
@@ -195,6 +205,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         firmware,
         notes,
         type: sessionType,
+        testPlan,
         appConfigId: selectedAppConfig?.id || null,
         appConfigName: selectedAppConfig?.appName || null,
       });
@@ -207,10 +218,14 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           testCases = csvPreview.data;
         } else {
           issues = csvPreview.data;
-          testCases = generateTestCases(selectedProduct, selectedAppConfig);
+          testCases = testPlan === 'vendor-eval'
+            ? generateVendorEvalTestCases(selectedProduct)
+            : generateTestCases(selectedProduct, selectedAppConfig);
         }
       } else {
-        testCases = generateTestCases(selectedProduct, selectedAppConfig);
+        testCases = testPlan === 'vendor-eval'
+          ? generateVendorEvalTestCases(selectedProduct)
+          : generateTestCases(selectedProduct, selectedAppConfig);
       }
 
       const updated = await updateSession(session.id, { testCases, issues });
@@ -331,11 +346,36 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           </div>
         )}
 
+        {/* Test Plan Selector */}
+        {selectedProduct && (
+          <div className="form-group">
+            <label>Test Plan</label>
+            <div className="session-type-cards">
+              {TEST_PLANS.map(tp => (
+                <div
+                  key={tp.id}
+                  className={`session-type-card ${testPlan === tp.id ? 'selected' : ''}`}
+                  onClick={() => { setTestPlan(tp.id); setSessionType('e2e'); }}
+                >
+                  <span className="session-type-icon">{tp.icon}</span>
+                  <span className="session-type-label">{tp.label}</span>
+                  <span className="session-type-desc">{tp.description}</span>
+                </div>
+              ))}
+            </div>
+            {testPlan === 'vendor-eval' && (
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)', padding: '8px 12px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                🔍 Vendor Eval uses a standardized checklist ({generateVendorEvalTestCases(selectedProduct).length} test cases) covering packaging, build quality, setup, core function, connectivity, and interoperability.
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Session Type Selector */}
         <div className="form-group">
           <label>Session Type</label>
           <div className="session-type-cards">
-            {SESSION_TYPES.map(st => (
+            {(testPlan === 'vendor-eval' ? VENDOR_EVAL_SESSION_TYPES : SESSION_TYPES).map(st => (
               <div
                 key={st.id}
                 className={`session-type-card ${sessionType === st.id ? 'selected' : ''}`}

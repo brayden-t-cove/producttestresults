@@ -149,8 +149,13 @@ function SessionCard({ s, onOpen }) {
           </div>
         )}
       </div>
-      <div className="session-card-right">
+      <div className="session-card-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
         <span className={`badge badge-${s.status}`}>{s.status}</span>
+        {s.testPlan === 'vendor-eval' && (
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: '#ede9fe', color: '#6d28d9', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            Vendor Eval
+          </span>
+        )}
       </div>
     </div>
   );

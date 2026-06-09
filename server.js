@@ -427,7 +427,7 @@ app.get('/api/sessions/:id', async (req, res) => {
 // POST /api/sessions - create new session
 app.post('/api/sessions', async (req, res) => {
   try {
-    const { productId, productName, category, subcategory, firmware, notes, type } = req.body;
+    const { productId, productName, category, subcategory, firmware, notes, type, testPlan } = req.body;
     const id = uuidv4();
     const session = {
       id,
@@ -438,6 +438,7 @@ app.post('/api/sessions', async (req, res) => {
       firmware: firmware || '',
       sessionNotes: notes || '',
       type: type || 'e2e',
+      testPlan: testPlan || 'production',
       createdAt: new Date().toISOString(),
       completedAt: null,
       status: 'active',
