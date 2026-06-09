@@ -1,2 +1,2 @@
-export const BUILD_VERSION = 'v2.23.1';
+export const BUILD_VERSION = 'v2.23.2';
 export const BUILD_DATE = '2026-06-08';

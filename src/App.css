@@ -1605,7 +1605,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .product-detail-wrapper .btn,
   .product-tabs,
   nav, .sidebar { display: none !important; }
-  .product-detail { max-width: 100% !important; padding: 0 !important; box-shadow: none !important; }
+  .app-layout { height: auto !important; overflow: visible !important; }
+  .dashboard { overflow: visible !important; max-width: 100% !important; padding: 16px !important; }
+  .product-detail { max-width: 100% !important; padding: 0 !important; box-shadow: none !important; overflow: visible !important; }
   .product-detail-header { padding-bottom: 12px; border-bottom: 1px solid #ccc; margin-bottom: 16px; }
   .spec-sheet { break-inside: avoid; }
   .spec-sheet-group { break-inside: avoid; }
