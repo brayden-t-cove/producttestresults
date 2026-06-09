@@ -197,7 +197,25 @@ function HomePage({ onCatalog, onTesting, onSettings }) {
   );
 }
 
+function classifySession(s, catalog) {
+  if (s.testPlan === 'vendor-eval') return 'evaluation';
+  const product = catalog.find(p => p.id === s.catalogId || p.name === s.productName);
+  if (product && (product.type === 'sample' || product.type === 'prototype')) return 'evaluation';
+  if (product && product.status === 'in-development') return 'development';
+  return 'production';
+}
+
 function ProductTestingPage({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
+  const [activeTab, setActiveTab] = useState('production');
+
+  const productionSessions = sessions.filter(s => classifySession(s, catalog) === 'production');
+  const developmentSessions = sessions.filter(s => classifySession(s, catalog) === 'development');
+  const evaluationSessions = sessions.filter(s => classifySession(s, catalog) === 'evaluation');
+
+  const tabSessions = activeTab === 'production' ? productionSessions
+    : activeTab === 'development' ? developmentSessions
+    : evaluationSessions;
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -213,6 +231,27 @@ function ProductTestingPage({ sessions, catalog, onNew, onOpen, onCatalog, onSet
             + New Session
           </button>
         </div>
+      </div>
+
+      <div className="product-tabs" style={{ marginBottom: 16 }}>
+        <button
+          className={`product-tab${activeTab === 'production' ? ' active' : ''}`}
+          onClick={() => setActiveTab('production')}
+        >
+          Production ({productionSessions.length})
+        </button>
+        <button
+          className={`product-tab${activeTab === 'development' ? ' active' : ''}`}
+          onClick={() => setActiveTab('development')}
+        >
+          Development ({developmentSessions.length})
+        </button>
+        <button
+          className={`product-tab${activeTab === 'evaluation' ? ' active' : ''}`}
+          onClick={() => setActiveTab('evaluation')}
+        >
+          Evaluation ({evaluationSessions.length})
+        </button>
       </div>
 
       {loading ? (
@@ -234,9 +273,13 @@ function ProductTestingPage({ sessions, catalog, onNew, onOpen, onCatalog, onSet
             </p>
           )}
         </div>
+      ) : tabSessions.length === 0 ? (
+        <div className="empty-state">
+          <p>No sessions here yet.</p>
+        </div>
       ) : (
         <div className="sessions-list">
-          {sessions.map(s => (
+          {tabSessions.map(s => (
             <SessionCard key={s.id} s={s} onOpen={onOpen} />
           ))}
         </div>

@@ -100,21 +100,27 @@ const STATUS_COLORS = {
   'rejected': '#f43f5e',
 };
 
-// Production: type=production AND status not in-development
-// Samples & Prototypes: everything else (samples, prototypes, anything in-development)
+// Production: type=production, status is live/shipped
+// Development: type=production, status=in-development
+// Evaluation: type=sample or prototype
 const PRODUCTION_STATUSES = ['active', 'in-testing', 'eol', 'discontinued', 'on-hold'];
 const PRIMARY_STATUSES = ['active', 'in-testing'];
 const SECONDARY_STATUSES = ['eol', 'discontinued', 'on-hold', 'under-evaluation', 'rejected'];
-const SP_PRIMARY_STATUSES = ['in-development', 'under-evaluation'];
-const SP_SECONDARY_STATUSES = ['on-hold', 'rejected'];
+const DEV_PRIMARY_STATUSES = ['in-development'];
+const DEV_SECONDARY_STATUSES = ['on-hold', 'rejected'];
+const EVAL_PRIMARY_STATUSES = ['under-evaluation', 'in-development'];
+const EVAL_SECONDARY_STATUSES = ['on-hold', 'rejected'];
 
 const ENTITIES = ['Cove', 'Luna', 'Alder'];
 
 function isProduction(p) {
   return (!p.type || p.type === 'production') && PRODUCTION_STATUSES.includes(p.status || 'active');
 }
-function isSP(p) {
-  return !isProduction(p);
+function isDevelopment(p) {
+  return (!p.type || p.type === 'production') && (p.status === 'in-development');
+}
+function isEvaluation(p) {
+  return p.type === 'sample' || p.type === 'prototype';
 }
 
 export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView }) {
@@ -129,7 +135,11 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
   const filtered = activeFilter === 'all' ? products : products.filter(p => p.category === activeFilter);
   const entityTabs = ['all', ...ENTITIES.filter(e => products.some(p => (p.entity || []).includes(e)))];
   const entityFiltered = activeEntity === 'all' ? filtered : filtered.filter(p => (p.entity || []).includes(activeEntity));
-  const pageFiltered = activePage === 'production' ? entityFiltered.filter(isProduction) : entityFiltered.filter(isSP);
+  const pageFiltered = activePage === 'production'
+    ? entityFiltered.filter(isProduction)
+    : activePage === 'development'
+      ? entityFiltered.filter(isDevelopment)
+      : entityFiltered.filter(isEvaluation);
 
   function groupByStatus(list, primaryStatuses, secondaryStatuses) {
     const allStatuses = [...primaryStatuses, ...secondaryStatuses];
@@ -198,10 +208,16 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
           Production ({products.filter(isProduction).length})
         </button>
         <button
-          className={`product-tab${activePage === 'sp' ? ' active' : ''}`}
-          onClick={() => setActivePage('sp')}
+          className={`product-tab${activePage === 'development' ? ' active' : ''}`}
+          onClick={() => setActivePage('development')}
         >
-          Samples &amp; Prototypes ({products.filter(isSP).length})
+          Development ({products.filter(isDevelopment).length})
+        </button>
+        <button
+          className={`product-tab${activePage === 'evaluation' ? ' active' : ''}`}
+          onClick={() => setActivePage('evaluation')}
+        >
+          Evaluation ({products.filter(isEvaluation).length})
         </button>
       </div>
 
@@ -367,27 +383,24 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
               return renderStatusGroups(pageFiltered, PRIMARY_STATUSES, SECONDARY_STATUSES);
             }
 
-            // Samples & Prototypes page — group by type then status
+            if (activePage === 'development') {
+              return renderStatusGroups(pageFiltered, DEV_PRIMARY_STATUSES, DEV_SECONDARY_STATUSES);
+            }
+
+            // Evaluation page — group by type (sample/prototype) then status
             return (
               <>
-                {['in-development', 'sample', 'prototype'].map(bucket => {
-                  let bucketItems, bucketLabel, bucketColor;
-                  if (bucket === 'in-development') {
-                    bucketItems = pageFiltered.filter(p => (p.status || '') === 'in-development');
-                    bucketLabel = 'In Development';
-                    bucketColor = '#f59e0b';
-                  } else {
-                    bucketItems = pageFiltered.filter(p => p.type === bucket);
-                    bucketLabel = bucket === 'sample' ? 'Samples' : 'Prototypes';
-                    bucketColor = bucket === 'sample' ? '#b45309' : '#6d28d9';
-                  }
+                {['sample', 'prototype'].map(bucket => {
+                  const bucketItems = pageFiltered.filter(p => p.type === bucket);
                   if (bucketItems.length === 0) return null;
+                  const bucketLabel = bucket === 'sample' ? 'Samples' : 'Prototypes';
+                  const bucketColor = bucket === 'sample' ? '#b45309' : '#6d28d9';
                   return (
                     <div key={bucket} style={{ marginBottom: 32 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: bucketColor, textTransform: 'uppercase', marginBottom: 10 }}>
                         {bucketLabel} ({bucketItems.length})
                       </div>
-                      {renderStatusGroups(bucketItems, SP_PRIMARY_STATUSES, SP_SECONDARY_STATUSES)}
+                      {renderStatusGroups(bucketItems, EVAL_PRIMARY_STATUSES, EVAL_SECONDARY_STATUSES)}
                     </div>
                   );
                 })}
