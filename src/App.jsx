@@ -156,21 +156,54 @@ function SessionCard({ s, onOpen }) {
   );
 }
 
-function Dashboard({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, loading }) {
+function HomePage({ onCatalog, onTesting, onSettings }) {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
         <div>
           <h1>QA Testing Platform</h1>
-          <p>Security hardware testing sessions</p>
+          <p>Security hardware testing</p>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 20, marginTop: 24, flexWrap: 'wrap' }}>
+        <div
+          className="session-type-card"
+          onClick={onCatalog}
+          style={{ flex: '1 1 220px', cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: 32, marginBottom: 10 }}>📦</div>
+          <h3 style={{ marginBottom: 6 }}>Product Catalog</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Manage your product inventory</p>
+        </div>
+        <div
+          className="session-type-card"
+          onClick={onTesting}
+          style={{ flex: '1 1 220px', cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: 32, marginBottom: 10 }}>🧪</div>
+          <h3 style={{ marginBottom: 6 }}>Product Testing</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Run test sessions and view results</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductTestingPage({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
+  return (
+    <div className="dashboard">
+      <div className="dashboard-header">
+        <div>
+          <h1>Product Testing</h1>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button className="btn btn-ghost" onClick={onBack}>← Back</button>
           <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
           <button className="btn btn-ghost" onClick={onAnalytics}>📊 Analytics</button>
           <button className="btn btn-ghost" onClick={onIssues}>🐛 Issues</button>
-          <button className="btn btn-secondary" onClick={onCatalog}>
-            📦 Product Catalog
-          </button>
           <button className="btn btn-primary btn-lg" onClick={onNew}>
             + New Session
           </button>
@@ -279,7 +312,7 @@ export default function App() {
   }
 
   function handleBackToDashboard() {
-    setView('dashboard');
+    setView('testing');
     setCurrentSession(null);
     refreshSessions();
   }
@@ -334,7 +367,15 @@ export default function App() {
       </div>
 
       {view === 'dashboard' && (
-        <Dashboard
+        <HomePage
+          onCatalog={() => setView('catalog')}
+          onTesting={() => setView('testing')}
+          onSettings={() => setShowSettings(true)}
+        />
+      )}
+
+      {view === 'testing' && (
+        <ProductTestingPage
           sessions={sessions}
           catalog={catalog}
           loading={loadingSessions}
@@ -344,6 +385,7 @@ export default function App() {
           onSettings={() => setShowSettings(true)}
           onAnalytics={() => setView('analytics')}
           onIssues={() => setView('issues')}
+          onBack={() => setView('dashboard')}
         />
       )}
 
@@ -396,7 +438,7 @@ export default function App() {
       {view === 'sessionStart' && (
         <SessionStart
           catalog={catalog}
-          onBack={() => setView('dashboard')}
+          onBack={() => setView('testing')}
           onCreated={handleSessionCreated}
           onGoToCatalog={() => setView('catalog')}
         />
@@ -407,7 +449,7 @@ export default function App() {
           session={currentSession}
           onUpdate={handleSessionUpdated}
           onEnd={handleEndSession}
-          onExit={() => { setView('dashboard'); setCurrentSession(null); refreshSessions(); }}
+          onExit={() => { setView('testing'); setCurrentSession(null); refreshSessions(); }}
           allSessions={sessions}
         />
       )}
@@ -421,7 +463,7 @@ export default function App() {
 
       {view === 'analytics' && (
         <AnalyticsPage
-          onBack={() => setView('dashboard')}
+          onBack={() => setView('testing')}
           onGoToIssues={(product) => {
             setView('issues');
           }}
@@ -430,7 +472,7 @@ export default function App() {
 
       {view === 'issues' && (
         <IssuesPage
-          onBack={() => setView('dashboard')}
+          onBack={() => setView('testing')}
         />
       )}
 
