@@ -5,6 +5,9 @@ import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
 import TestRunner from './components/TestRunner.jsx';
 import SessionSummary from './components/SessionSummary.jsx';
+import ComparativeStart from './components/ComparativeStart.jsx';
+import ComparativeRunner from './components/ComparativeRunner.jsx';
+import ComparativeSummary from './components/ComparativeSummary.jsx';
 import ProductCatalog from './components/ProductCatalog.jsx';
 import NewProduct from './components/NewProduct.jsx';
 import AnalyticsPage from './components/AnalyticsPage.jsx';
@@ -156,6 +159,11 @@ function SessionCard({ s, onOpen }) {
             Vendor Eval
           </span>
         )}
+        {s.testPlan === 'comparative' && (
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: 'rgba(234,179,8,0.15)', color: '#ca8a04', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            Comparative
+          </span>
+        )}
       </div>
     </div>
   );
@@ -198,6 +206,7 @@ function HomePage({ onCatalog, onTesting, onSettings }) {
 }
 
 function classifySession(s, catalog) {
+  if (s.testPlan === 'comparative') return 'evaluation';
   if (s.testPlan === 'vendor-eval') return 'evaluation';
   const product = catalog.find(p => p.id === s.catalogId || p.name === s.productName);
   if (product && (product.type === 'sample' || product.type === 'prototype')) return 'evaluation';
@@ -205,7 +214,7 @@ function classifySession(s, catalog) {
   return 'production';
 }
 
-function ProductTestingPage({ sessions, catalog, onNew, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
+function ProductTestingPage({ sessions, catalog, onNew, onNewComparative, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
   const [activeTab, setActiveTab] = useState('production');
 
   const productionSessions = sessions.filter(s => classifySession(s, catalog) === 'production');
@@ -227,6 +236,9 @@ function ProductTestingPage({ sessions, catalog, onNew, onOpen, onCatalog, onSet
           <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
           <button className="btn btn-ghost" onClick={onAnalytics}>📊 Analytics</button>
           <button className="btn btn-ghost" onClick={onIssues}>🐛 Issues</button>
+          <button className="btn btn-secondary" onClick={onNewComparative}>
+            + Compare
+          </button>
           <button className="btn btn-primary btn-lg" onClick={onNew}>
             + New Session
           </button>
@@ -333,7 +345,13 @@ export default function App() {
       const { getSession } = await import('./lib/api.js');
       const session = await getSession(id);
       setCurrentSession(session);
-      if (session.status === 'completed') {
+      if (session.testPlan === 'comparative') {
+        if (session.status === 'completed') {
+          setView('comparativeSummary');
+        } else {
+          setView('comparativeRunner');
+        }
+      } else if (session.status === 'completed') {
         setView('summary');
       } else {
         setView('runner');
@@ -341,6 +359,12 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
+  }
+
+  function handleComparativeCreated(session) {
+    setCurrentSession(session);
+    setView('comparativeRunner');
+    refreshSessions();
   }
 
   function handleSessionCreated(session) {
@@ -428,6 +452,7 @@ export default function App() {
           catalog={catalog}
           loading={loadingSessions}
           onNew={() => setView('sessionStart')}
+          onNewComparative={() => setView('comparativeStart')}
           onOpen={handleOpenSession}
           onCatalog={() => setView('catalog')}
           onSettings={() => setShowSettings(true)}
@@ -550,6 +575,36 @@ export default function App() {
             onBack={() => setView('dashboard')}
           />
         </div>
+      )}
+
+      {view === 'comparativeStart' && (
+        <ComparativeStart
+          catalog={catalog}
+          sessions={sessions}
+          onBack={() => setView('testing')}
+          onCreated={handleComparativeCreated}
+        />
+      )}
+
+      {view === 'comparativeRunner' && currentSession && (
+        <ComparativeRunner
+          session={currentSession}
+          onUpdate={session => setCurrentSession(session)}
+          onComplete={session => {
+            setCurrentSession(session);
+            setView('comparativeSummary');
+            refreshSessions();
+          }}
+          onExit={() => { setView('testing'); setCurrentSession(null); refreshSessions(); }}
+        />
+      )}
+
+      {view === 'comparativeSummary' && currentSession && (
+        <ComparativeSummary
+          session={currentSession}
+          onBack={() => { setView('testing'); setCurrentSession(null); refreshSessions(); }}
+          onEdit={() => setView('comparativeRunner')}
+        />
       )}
     </div>
   );
