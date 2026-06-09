@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import { CERT_STATUS_LABELS, CERT_STATUS_COLORS } from '../data/certSchema.js';
 
@@ -289,7 +289,106 @@ function ImagesTab() {
   );
 }
 
-const TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Images & Renders'];
+const SEVERITY_COLORS = { critical: '#dc2626', high: '#ea580c', medium: '#d97706', low: '#16a34a' };
+const STATUS_COLORS_ISSUE = { open: 'var(--fail)', investigating: '#f59e0b', resolved: 'var(--pass)', wont_fix: 'var(--text-muted)' };
+
+function KnownIssuesTab({ product, onOpenSession }) {
+  const [issues, setIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/issues')
+      .then(r => r.json())
+      .then(data => {
+        const filtered = data.filter(i =>
+          i.catalogId === product.id || i.productName === product.name
+        );
+        setIssues(filtered);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [product.id, product.name]);
+
+  if (loading) return <div className="ai-loading"><div className="spinner" /></div>;
+
+  if (issues.length === 0) {
+    return (
+      <div className="empty-state" style={{ padding: '40px 0' }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+        <p>No known issues logged for this product.</p>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Issues are logged during test sessions and will appear here automatically.</p>
+      </div>
+    );
+  }
+
+  const open = issues.filter(i => i.derivedStatus !== 'resolved' && i.derivedStatus !== 'wont_fix');
+  const closed = issues.filter(i => i.derivedStatus === 'resolved' || i.derivedStatus === 'wont_fix');
+
+  function renderIssue(issue) {
+    const key = `${issue.sessionId}-${issue.id}`;
+    const isOpen = expanded === key;
+    return (
+      <div key={key} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginBottom: 8, overflow: 'hidden' }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: 'var(--card)' }}
+          onClick={() => setExpanded(isOpen ? null : key)}
+        >
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: SEVERITY_COLORS[issue.severity] + '22', color: SEVERITY_COLORS[issue.severity], textTransform: 'uppercase', flexShrink: 0 }}>
+            {issue.severity || '—'}
+          </span>
+          <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{issue.title}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{issue.issueCategory || issue.category || ''}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLORS_ISSUE[issue.derivedStatus] || 'var(--text-muted)', flexShrink: 0, textTransform: 'capitalize' }}>
+            {(issue.derivedStatus || 'open').replace('_', ' ')}
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{isOpen ? '▾' : '▸'}</span>
+        </div>
+        {isOpen && (
+          <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {issue.description && <div><span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Description</span><div style={{ fontSize: 13, marginTop: 2 }}>{issue.description}</div></div>}
+            {issue.reproSteps && <div><span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Repro Steps</span><pre style={{ fontSize: 12, marginTop: 2, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{issue.reproSteps}</pre></div>}
+            {issue.affectedTestCase && <div><span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Affected Test</span><div style={{ fontSize: 13, marginTop: 2 }}>{issue.affectedTestCase}</div></div>}
+            <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+              {issue.firmware && <span>FW: {issue.firmware}</span>}
+              {issue.sessionDate && <span>Session: {formatDate(issue.sessionDate)}</span>}
+              {issue.sourceTicket && <a href={issue.sourceTicket} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>Ticket ↗</a>}
+              {issue.sessionId && onOpenSession && (
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 8px' }} onClick={() => onOpenSession(issue.sessionId)}>
+                  Open session ↗
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 13 }}>
+        <span style={{ color: 'var(--fail)', fontWeight: 600 }}>{open.length} open</span>
+        <span style={{ color: 'var(--text-muted)' }}>{closed.length} resolved</span>
+        <span style={{ color: 'var(--text-muted)' }}>{issues.length} total</span>
+      </div>
+      {open.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Open</div>
+          {open.map(renderIssue)}
+        </div>
+      )}
+      {closed.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Resolved</div>
+          {closed.map(renderIssue)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Images & Renders'];
 
 function PdfExportModal({ product, onClose }) {
   const [hideOem, setHideOem] = useState(false);
@@ -393,6 +492,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Tech Specs' && <TechSpecsTab product={product} />}
       {activeTab === 'Certifications' && <CertificationsTab product={product} onCertUpdate={onCertUpdate} certSchema={certSchema} />}
       {activeTab === 'Testing Results' && <TestingResultsTab sessions={sessions} onOpenSession={onOpenSession} />}
+      {activeTab === 'Known Issues' && <KnownIssuesTab product={product} onOpenSession={onOpenSession} />}
       {activeTab === 'Images & Renders' && <ImagesTab />}
     </div>
   );
