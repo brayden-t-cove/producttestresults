@@ -427,7 +427,8 @@ app.get('/api/sessions/:id', async (req, res) => {
 // POST /api/sessions - create new session
 app.post('/api/sessions', async (req, res) => {
   try {
-    const { productId, productName, category, subcategory, firmware, notes, type, testPlan } = req.body;
+    const { productId, productName, category, subcategory, firmware, notes, type, testPlan,
+            products, metrics, results, autoPulled } = req.body;
     const id = uuidv4();
     const session = {
       id,
@@ -446,6 +447,12 @@ app.post('/api/sessions', async (req, res) => {
       issues: [],
       verifications: [],
     };
+    if (testPlan === 'comparative') {
+      session.products = products || [];
+      session.metrics = metrics || [];
+      session.results = results || {};
+      session.autoPulled = autoPulled || {};
+    }
     await writeFile(join(SESSIONS_DIR, `${id}.json`), JSON.stringify(session, null, 2));
     res.status(201).json(session);
   } catch (err) {
