@@ -123,6 +123,30 @@ function isEvaluation(p) {
   return p.type === 'sample' || p.type === 'prototype';
 }
 
+function CollapsibleStatusGroup({ status, items, defaultOpen, renderCard }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: open ? 10 : 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, width: '100%', textAlign: 'left' }}
+      >
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.6 }}>{open ? '▾' : '▸'}</span>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[status] || '#94a3b8', display: 'inline-block', flexShrink: 0 }} />
+        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+          {STATUS_LABELS[status] || status} ({items.length})
+        </span>
+      </button>
+      {open && (
+        <div className="catalog-grid">
+          {items.map(p => renderCard(p))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [openSpecsId, setOpenSpecsId] = useState(null);
@@ -376,17 +400,13 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
 
             function renderStatusGroups(list, primaryStatuses, secondaryStatuses) {
               return groupByStatus(list, primaryStatuses, secondaryStatuses).map(({ status, items }) => (
-                <div key={status} style={{ marginBottom: 24 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[status] || '#94a3b8', display: 'inline-block', flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                      {STATUS_LABELS[status] || status} ({items.length})
-                    </span>
-                  </div>
-                  <div className="catalog-grid">
-                    {items.map(p => renderCard(p))}
-                  </div>
-                </div>
+                <CollapsibleStatusGroup
+                  key={status}
+                  status={status}
+                  items={items}
+                  defaultOpen={primaryStatuses.includes(status)}
+                  renderCard={renderCard}
+                />
               ));
             }
 

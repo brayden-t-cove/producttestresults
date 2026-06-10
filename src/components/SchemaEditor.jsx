@@ -108,14 +108,16 @@ export default function SchemaEditor({ schema, onSave, onBack }) {
     });
   }
 
-  function updateField(gi, fi, key, val) {
+  function updateField(gi, fi, key, val, finalize = false) {
     updateSchema(s => {
       const field = s[activeCategory][gi].fields[fi];
       if (key === 'label') {
-        // Auto-generate ID only if field ID looks auto-generated or matches old slug
-        const oldSlug = slugify(field.label);
-        if (field.id === oldSlug || field.id.startsWith('new-field-')) {
-          field.id = slugify(val) || field.id;
+        // Only auto-generate ID when the user finishes typing (on blur), not on every keystroke
+        if (finalize) {
+          const oldSlug = slugify(field.label);
+          if (field.id === oldSlug || field.id.startsWith('new-field-')) {
+            field.id = slugify(val) || field.id;
+          }
         }
         field.label = val;
       } else {
@@ -247,12 +249,13 @@ export default function SchemaEditor({ schema, onSave, onBack }) {
 
               {/* Fields */}
               {group.fields.map((field, fi) => (
-                <div key={fi} className="schema-field-row">
+                <div key={field.id} className="schema-field-row">
                   <input
                     type="text"
                     value={field.label}
                     placeholder="Field label"
                     onChange={e => updateField(gi, fi, 'label', e.target.value)}
+                    onBlur={e => updateField(gi, fi, 'label', e.target.value, true)}
                   />
                   <select
                     value={field.type}
