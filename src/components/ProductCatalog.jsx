@@ -319,9 +319,19 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                       </span>
                     </div>
                   </div>
+                  {product.category === 'camera' && product.hubConnectionType && product.hubConnectionType !== 'standalone' && (
+                    <div style={{ padding: '4px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Connection:</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {{ 'hub': 'Hub', 'nvr-dvr': 'NVR / DVR', 'proprietary-base': 'Proprietary Base Station' }[product.hubConnectionType]}
+                      </span>
+                    </div>
+                  )}
                   {(product.compatibleWith || []).length > 0 && (
                     <div style={{ padding: '6px 16px', display: 'flex', flexWrap: 'wrap', gap: 6, borderTop: '1px solid var(--border)' }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, alignSelf: 'center' }}>Compatible:</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, alignSelf: 'center' }}>
+                        {product.category === 'camera' ? 'Compatible Apps:' : 'Compatible:'}
+                      </span>
                       {product.compatibleWith.map(id => {
                         const p = products.find(x => x.id === id);
                         if (!p) return null;

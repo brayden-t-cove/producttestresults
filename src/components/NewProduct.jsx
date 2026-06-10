@@ -162,6 +162,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
   const [appConfigs, setAppConfigs] = useState(product?.appConfigs || []);
   const [specs, setSpecs] = useState(product?.specs || {});
   const [compatibleWith, setCompatibleWith] = useState(product?.compatibleWith || []);
+  const [hubConnectionType, setHubConnectionType] = useState(product?.hubConnectionType || 'standalone');
   const [entity, setEntity] = useState(product?.entity || []);
   const [productType, setProductType] = useState(product?.type || 'production');
   const [showAddAppForm, setShowAddAppForm] = useState(false);
@@ -264,6 +265,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         appConfigs,
         specs,
         compatibleWith,
+        hubConnectionType: category === 'camera' ? hubConnectionType : undefined,
         imageUrl,
         entity,
         type: productType,
@@ -512,7 +514,20 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
           </div>
         )}
 
-        {/* Compatible With Section */}
+        {/* Camera: Hub/NVR/DVR Connection Type */}
+        {category === 'camera' && (
+          <div className="form-group">
+            <label>Hub / NVR / DVR Connection</label>
+            <select value={hubConnectionType} onChange={e => setHubConnectionType(e.target.value)}>
+              <option value="standalone">Standalone (no hub required)</option>
+              <option value="hub">Connects to Hub</option>
+              <option value="nvr-dvr">Connects to NVR / DVR</option>
+              <option value="proprietary-base">Connects to Proprietary Base Station</option>
+            </select>
+          </div>
+        )}
+
+        {/* Compatible Apps / Compatible With Section */}
         {category && (() => {
           const compatCats = {
             sensor: ['hub'],
@@ -523,12 +538,13 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
           }[category] || [];
           const compatOptions = (catalog || []).filter(p => compatCats.includes(p.category) && p.id !== product?.id);
           if (compatOptions.length === 0) return null;
+          const labelText = category === 'camera' ? 'Compatible Apps' : 'Compatible with';
           function toggleCompat(id) {
             setCompatibleWith(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
           }
           return (
             <div className="form-group">
-              <label>Compatible with</label>
+              <label>{labelText}</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {compatOptions.map(p => (
                   <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>

@@ -11,6 +11,30 @@ const CATEGORY_LABELS = {
   universal: 'Universal',
 };
 
+const PRODUCT_CLASSES = [
+  {
+    id: 'home-security',
+    label: 'Home Security Hardware',
+    icon: '🏠',
+    description: 'Hubs, touchpads, and sensors',
+    categories: ['hub', 'touchpad', 'sensor'],
+  },
+  {
+    id: 'camera',
+    label: 'Cameras & Camera Systems',
+    icon: '📷',
+    description: 'Indoor, outdoor, doorbell, and NVR/DVR systems',
+    categories: ['camera'],
+  },
+  {
+    id: 'app',
+    label: 'Apps',
+    icon: '📱',
+    description: 'Mobile and web applications',
+    categories: ['app'],
+  },
+];
+
 // Default metric IDs to pre-select per category
 const DEFAULT_METRIC_IDS = {
   camera: new Set([
@@ -94,6 +118,7 @@ function computeAutoPull(sessions, catalogId) {
 
 export default function ComparativeStart({ catalog, sessions, onBack, onCreated }) {
   const [step, setStep] = useState(1);
+  const [selectedClass, setSelectedClass] = useState(null);
   const [productSlots, setProductSlots] = useState([
     { catalogId: '', firmware: '' },
     { catalogId: '', firmware: '' },
@@ -116,6 +141,13 @@ export default function ComparativeStart({ catalog, sessions, onBack, onCreated 
     if (productSlots.length <= 2) return;
     setProductSlots(prev => prev.filter((_, i) => i !== idx));
   }
+
+  const classCategories = selectedClass
+    ? (PRODUCT_CLASSES.find(c => c.id === selectedClass)?.categories || [])
+    : [];
+  const classCatalog = selectedClass
+    ? catalog.filter(p => classCategories.includes(p.category))
+    : catalog;
 
   const selectedProducts = productSlots
     .filter(s => s.catalogId)
@@ -274,7 +306,7 @@ export default function ComparativeStart({ catalog, sessions, onBack, onCreated 
           <div key={n} className={`step-indicator-item${step === n ? ' active' : step > n ? ' done' : ''}`}>
             <div className="step-indicator-dot">{step > n ? '✓' : n}</div>
             <div className="step-indicator-label">
-              {n === 1 ? 'Add Products' : n === 2 ? 'Select Metrics' : 'Thresholds'}
+              {n === 1 ? 'Class & Products' : n === 2 ? 'Select Metrics' : 'Thresholds'}
             </div>
           </div>
         ))}
@@ -288,49 +320,75 @@ export default function ComparativeStart({ catalog, sessions, onBack, onCreated 
 
       {step === 1 && (
         <div>
-          <h3 style={{ marginBottom: 16 }}>Select Products to Compare</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {productSlots.map((slot, idx) => (
-              <div key={idx} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>Product {idx + 1}</span>
-                  {productSlots.length > 2 && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => removeSlot(idx)} style={{ color: 'var(--fail)' }}>Remove</button>
-                  )}
+          <div className="form-group">
+            <label>Product Class</label>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+              Choose a class to filter the catalog — you can only compare products of the same class.
+            </p>
+            <div className="session-type-cards">
+              {PRODUCT_CLASSES.filter(cls =>
+                catalog.some(p => cls.categories.includes(p.category))
+              ).map(cls => (
+                <div
+                  key={cls.id}
+                  className={`session-type-card ${selectedClass === cls.id ? 'selected' : ''}`}
+                  onClick={() => {
+                    setSelectedClass(cls.id);
+                    setProductSlots([{ catalogId: '', firmware: '' }, { catalogId: '', firmware: '' }]);
+                  }}
+                >
+                  <span className="session-type-icon">{cls.icon}</span>
+                  <span className="session-type-label">{cls.label}</span>
+                  <span className="session-type-desc">{cls.description}</span>
                 </div>
-                <div className="form-group" style={{ marginBottom: 10 }}>
-                  <label>Select Product</label>
-                  <select
-                    value={slot.catalogId}
-                    onChange={e => setSlotField(idx, 'catalogId', e.target.value)}
-                  >
-                    <option value="">— Choose from catalog —</option>
-                    {catalog.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}{p.category ? ` (${p.category})` : ''}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Firmware (optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 1.4.2"
-                    value={slot.firmware}
-                    onChange={e => setSlotField(idx, 'firmware', e.target.value)}
-                  />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-          <button
-            className="btn btn-ghost"
-            style={{ marginTop: 12 }}
-            onClick={addSlot}
-          >
-            + Add Another Product
-          </button>
+
+          {selectedClass && (
+            <>
+              <h3 style={{ marginBottom: 16 }}>Select Products to Compare</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {productSlots.map((slot, idx) => (
+                  <div key={idx} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>Product {idx + 1}</span>
+                      {productSlots.length > 2 && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => removeSlot(idx)} style={{ color: 'var(--fail)' }}>Remove</button>
+                      )}
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 10 }}>
+                      <label>Select Product</label>
+                      <select
+                        value={slot.catalogId}
+                        onChange={e => setSlotField(idx, 'catalogId', e.target.value)}
+                      >
+                        <option value="">— Choose from catalog —</option>
+                        {classCatalog.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}{p.version ? ` ${p.version}` : ''}{p.category ? ` · ${p.category}` : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Firmware (optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 1.4.2"
+                        value={slot.firmware}
+                        onChange={e => setSlotField(idx, 'firmware', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button className="btn btn-ghost" style={{ marginTop: 12 }} onClick={addSlot}>
+                + Add Another Product
+              </button>
+            </>
+          )}
+
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={handleStepOneNext}>
+            <button className="btn btn-primary" onClick={handleStepOneNext} disabled={!selectedClass}>
               Next: Select Metrics →
             </button>
           </div>
