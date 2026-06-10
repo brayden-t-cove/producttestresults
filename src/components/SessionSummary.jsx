@@ -104,7 +104,7 @@ export default function SessionSummary({ session, onBack }) {
   const skipCount = testCases.filter(t => t.status === 'skip').length;
   const naCount = testCases.filter(t => t.status === 'na').length;
   const total = testCases.length;
-  const effectiveTotal = total - naCount;
+  const effectiveTotal = passCount + failCount; // skip and n/a excluded from pass rate
   const passRate = effectiveTotal > 0 ? Math.round((passCount / effectiveTotal) * 100) : 0;
 
   useEffect(() => {

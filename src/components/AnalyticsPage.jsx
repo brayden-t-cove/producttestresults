@@ -119,7 +119,7 @@ function FirmwareComparison({ productStats }) {
     const fw = s.firmware || 'Unknown';
     if (!firmwareMap[fw]) firmwareMap[fw] = { passCount: 0, total: 0 };
     firmwareMap[fw].passCount += s.passCount || 0;
-    firmwareMap[fw].total += (s.passCount || 0) + (s.failCount || 0) + (s.skipCount || 0) + (s.naCount || 0);
+    firmwareMap[fw].total += (s.passCount || 0) + (s.failCount || 0); // skip/na excluded
   }
   const firmwares = Object.entries(firmwareMap).map(([fw, d]) => ({ fw, passRate: d.total > 0 ? d.passCount / d.total : 0 }));
 
@@ -180,8 +180,8 @@ export default function AnalyticsPage({ onBack, onGoToIssues }) {
   const topFailing = data?.topFailingTests || [];
   const openByProduct = data?.openIssuesByProduct || [];
 
-  const passRate = stats.totalTests > 0
-    ? Math.round((stats.passCount / stats.totalTests) * 100)
+  const passRate = (stats.passCount + stats.failCount) > 0
+    ? Math.round((stats.passCount / (stats.passCount + stats.failCount)) * 100)
     : 0;
 
   const donutData = [

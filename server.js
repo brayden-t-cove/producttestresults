@@ -610,7 +610,7 @@ app.post('/api/ai/summarize', async (req, res) => {
     const passCount = session.testCases.filter(t => t.status === 'pass').length;
     const failCount = session.testCases.filter(t => t.status === 'fail').length;
     const skipCount = session.testCases.filter(t => t.status === 'skip').length;
-    const total = session.testCases.length;
+    const total = passCount + failCount; // skip/na excluded from pass rate
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
@@ -837,7 +837,7 @@ app.get('/api/analytics', async (req, res) => {
         }
       }
 
-      const sTotal = sPass + sFail + sSkip + sNa;
+      const sTotal = sPass + sFail; // skip/na excluded from pass rate denominator
       const sPassRate = sTotal > 0 ? sPass / sTotal : 0;
 
       const pName = session.productName || 'Unknown';
@@ -886,7 +886,7 @@ app.get('/api/analytics', async (req, res) => {
 
     // Build productStats
     const productStats = Object.values(productMap).map(pm => {
-      const tot = pm.totalPass + pm.totalFail + pm.totalSkip + pm.totalNa;
+      const tot = pm.totalPass + pm.totalFail; // skip/na excluded
       return {
         productName: pm.productName,
         catalogId: pm.catalogId,
@@ -945,7 +945,7 @@ app.get('/api/analytics', async (req, res) => {
         failCount,
         skipCount,
         naCount,
-        overallPassRate: totalTests > 0 ? passCount / totalTests : 0,
+        overallPassRate: (passCount + failCount) > 0 ? passCount / (passCount + failCount) : 0,
       },
       productStats,
       issueSeverityBreakdown,
