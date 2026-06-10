@@ -419,7 +419,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         <div className="form-group">
           <label>Entity <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(select all that apply)</span></label>
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-            {['Cove', 'Luna', 'Alder'].map(e => (
+            {['Cove', 'Luna', 'Alder', 'Instavision'].map(e => (
               <label key={e} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
                 <input
                   type="checkbox"
@@ -520,7 +520,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
             <label>Hub / NVR / DVR Connection</label>
             <select value={hubConnectionType} onChange={e => setHubConnectionType(e.target.value)}>
               <option value="standalone">Standalone (no hub required)</option>
-              <option value="hub">Connects to Hub</option>
+              <option value="hub">Connects to Hub / Chime</option>
               <option value="nvr-dvr">Connects to NVR / DVR</option>
               <option value="proprietary-base">Connects to Proprietary Base Station</option>
             </select>

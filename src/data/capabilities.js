@@ -62,7 +62,8 @@ export const CAPABILITY_GROUPS = {
       { id: 'window', label: 'Window' },
     ]},
     { label: 'Power', capabilities: [
-      { id: 'wired', label: 'Wired' },
+      { id: 'wired', label: 'Hardwired' },
+      { id: 'power-cable', label: 'Power Cable (Plugin)' },
       { id: 'battery-powered', label: 'Battery' },
       { id: 'solar', label: 'Solar' },
       { id: 'poe', label: 'PoE' },

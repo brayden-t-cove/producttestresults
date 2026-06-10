@@ -323,7 +323,7 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                     <div style={{ padding: '4px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Connection:</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {{ 'hub': 'Hub', 'nvr-dvr': 'NVR / DVR', 'proprietary-base': 'Proprietary Base Station' }[product.hubConnectionType]}
+                        {{ 'hub': 'Hub / Chime', 'nvr-dvr': 'NVR / DVR', 'proprietary-base': 'Proprietary Base Station' }[product.hubConnectionType]}
                       </span>
                     </div>
                   )}
