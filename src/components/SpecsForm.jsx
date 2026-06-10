@@ -12,6 +12,8 @@ function BooleanToggle({ value, onChange }) {
   const opts = [
     { val: 'yes', label: 'Yes' },
     { val: 'no', label: 'No' },
+    { val: 'na', label: 'N/A' },
+    { val: 'unknown', label: 'Unknown' },
     { val: '', label: '—' },
   ];
 
@@ -25,6 +27,10 @@ function BooleanToggle({ value, onChange }) {
             activeStyle = { background: 'rgba(34,197,94,0.18)', color: 'var(--pass)', borderColor: 'var(--pass)' };
           } else if (opt.val === 'no') {
             activeStyle = { background: 'rgba(239,68,68,0.15)', color: 'var(--fail)', borderColor: 'var(--fail)' };
+          } else if (opt.val === 'na') {
+            activeStyle = { background: 'rgba(99,102,241,0.15)', color: '#6366f1', borderColor: '#6366f1' };
+          } else if (opt.val === 'unknown') {
+            activeStyle = { background: 'rgba(245,158,11,0.15)', color: '#d97706', borderColor: '#d97706' };
           } else {
             activeStyle = { background: 'var(--border)', color: 'var(--text-muted)', borderColor: 'var(--border)' };
           }

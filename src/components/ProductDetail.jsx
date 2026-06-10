@@ -20,6 +20,8 @@ function formatDuration(start, end) {
 function boolDisplay(val) {
   if (val === 'yes') return { symbol: '✓', color: 'var(--pass)' };
   if (val === 'no') return { symbol: '✗', color: 'var(--fail)' };
+  if (val === 'na') return { symbol: 'N/A', color: '#6366f1' };
+  if (val === 'unknown') return { symbol: 'Unknown', color: '#d97706' };
   return null;
 }
 
