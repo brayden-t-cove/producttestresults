@@ -278,13 +278,206 @@ function TestingResultsTab({ sessions, onOpenSession }) {
   );
 }
 
-function ImagesTab() {
+const MEDIA_CATEGORIES = [
+  { id: 'renders', label: 'Renders & Product Images', icon: '🖼' },
+  { id: 'packaging', label: 'Packaging', icon: '📦' },
+  { id: 'manual', label: 'User Manual', icon: '📖' },
+  { id: 'other', label: 'Other', icon: '🔗' },
+];
+
+function MediaTab({ product, onProductUpdate }) {
+  const mediaLinks = product.mediaLinks || [];
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+  const [newCategory, setNewCategory] = useState('renders');
+  const [saving, setSaving] = useState(false);
+
+  async function handleAdd() {
+    if (!newUrl.trim()) return;
+    setSaving(true);
+    const entry = { id: crypto.randomUUID(), label: newLabel.trim() || newUrl.trim(), url: newUrl.trim(), category: newCategory };
+    await onProductUpdate({ mediaLinks: [...mediaLinks, entry] });
+    setNewLabel(''); setNewUrl(''); setNewCategory('renders'); setAdding(false); setSaving(false);
+  }
+
+  async function handleRemove(id) {
+    await onProductUpdate({ mediaLinks: mediaLinks.filter(m => m.id !== id) });
+  }
+
+  const grouped = MEDIA_CATEGORIES.map(cat => ({
+    ...cat,
+    items: mediaLinks.filter(m => m.category === cat.id),
+  })).filter(g => g.items.length > 0 || adding);
+
   return (
-    <div className="cert-placeholder">
-      <div style={{ fontSize: 48, marginBottom: 16 }}>📷</div>
-      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Images &amp; Renders</div>
-      <p style={{ marginBottom: 8 }}>Coming soon — upload product images, renders, and reference photos.</p>
-      <p style={{ fontSize: 12 }}>This feature is being planned with the design team.</p>
+    <div style={{ padding: '4px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+          Add links to renders, packaging photos, manuals, and other visual reference material.
+          Direct upload coming in a future release.
+        </p>
+        {!adding && (
+          <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0, marginLeft: 16 }} onClick={() => setAdding(true)}>
+            + Add Link
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 16, marginBottom: 20 }}>
+          <div className="form-group" style={{ marginBottom: 10 }}>
+            <label>Category</label>
+            <select value={newCategory} onChange={e => setNewCategory(e.target.value)}>
+              {MEDIA_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: 10 }}>
+            <label>Label <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 12 }}>(optional)</span></label>
+            <input type="text" placeholder="e.g. Front render, Retail box" value={newLabel} onChange={e => setNewLabel(e.target.value)} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label>URL</label>
+            <input type="url" placeholder="https://..." value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" onClick={handleAdd} disabled={!newUrl.trim() || saving}>
+              {saving ? 'Saving...' : 'Add'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setAdding(false); setNewLabel(''); setNewUrl(''); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {mediaLinks.length === 0 && !adding ? (
+        <div className="empty-state" style={{ padding: '40px 0' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🖼</div>
+          <p>No media links yet.</p>
+          <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add Link</button>
+        </div>
+      ) : (
+        MEDIA_CATEGORIES.map(cat => {
+          const items = mediaLinks.filter(m => m.category === cat.id);
+          if (items.length === 0) return null;
+          return (
+            <div key={cat.id} style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10 }}>
+                {cat.icon} {cat.label}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {items.map(m => (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                    <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, color: 'var(--primary)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {m.label || m.url}
+                    </a>
+                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', padding: '2px 6px' }} onClick={() => handleRemove(m.id)}>×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+const PROJECT_DOC_TYPES = [
+  { id: 'gantt', label: 'Gantt / Project Timeline', icon: '📅' },
+  { id: 'checklist', label: 'Checklist / Task List', icon: '✅' },
+  { id: 'spec', label: 'Specification Document', icon: '📋' },
+  { id: 'roadmap', label: 'Roadmap', icon: '🗺' },
+  { id: 'other', label: 'Other', icon: '📎' },
+];
+
+function ProjectDocsTab({ product, onProductUpdate }) {
+  const projectDocs = product.projectDocs || [];
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+  const [newType, setNewType] = useState('gantt');
+  const [saving, setSaving] = useState(false);
+
+  async function handleAdd() {
+    if (!newUrl.trim()) return;
+    setSaving(true);
+    const entry = { id: crypto.randomUUID(), label: newLabel.trim() || newUrl.trim(), url: newUrl.trim(), type: newType };
+    await onProductUpdate({ projectDocs: [...projectDocs, entry] });
+    setNewLabel(''); setNewUrl(''); setNewType('gantt'); setAdding(false); setSaving(false);
+  }
+
+  async function handleRemove(id) {
+    await onProductUpdate({ projectDocs: projectDocs.filter(d => d.id !== id) });
+  }
+
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+          Link project documents — Gantt charts, checklists, spec docs, and roadmaps.
+          Direct upload and a full PM checklist builder are planned for a future release.
+        </p>
+        {!adding && (
+          <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0, marginLeft: 16 }} onClick={() => setAdding(true)}>
+            + Add Link
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 16, marginBottom: 20 }}>
+          <div className="form-group" style={{ marginBottom: 10 }}>
+            <label>Document Type</label>
+            <select value={newType} onChange={e => setNewType(e.target.value)}>
+              {PROJECT_DOC_TYPES.map(t => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: 10 }}>
+            <label>Label <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 12 }}>(optional)</span></label>
+            <input type="text" placeholder="e.g. Q3 Launch Timeline, Integration Checklist" value={newLabel} onChange={e => setNewLabel(e.target.value)} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label>URL</label>
+            <input type="url" placeholder="https://..." value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" onClick={handleAdd} disabled={!newUrl.trim() || saving}>
+              {saving ? 'Saving...' : 'Add'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setAdding(false); setNewLabel(''); setNewUrl(''); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {projectDocs.length === 0 && !adding ? (
+        <div className="empty-state" style={{ padding: '40px 0' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
+          <p>No project documents linked yet.</p>
+          <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add Link</button>
+        </div>
+      ) : (
+        PROJECT_DOC_TYPES.map(docType => {
+          const items = projectDocs.filter(d => d.type === docType.id);
+          if (items.length === 0) return null;
+          return (
+            <div key={docType.id} style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10 }}>
+                {docType.icon} {docType.label}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {items.map(d => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                    <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, color: 'var(--primary)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {d.label || d.url}
+                    </a>
+                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', padding: '2px 6px' }} onClick={() => handleRemove(d.id)}>×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }
@@ -388,7 +581,7 @@ function KnownIssuesTab({ product, onOpenSession }) {
   );
 }
 
-const TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Images & Renders'];
+const TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Media & Documents', 'Project Docs'];
 
 function PdfExportModal({ product, onClose }) {
   const [hideOem, setHideOem] = useState(false);
@@ -433,7 +626,7 @@ function PdfExportModal({ product, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onCertUpdate, certSchema }) {
+export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onCertUpdate, certSchema, onProductUpdate }) {
   const [activeTab, setActiveTab] = useState('Tech Specs');
   const [showPdfModal, setShowPdfModal] = useState(false);
 
@@ -493,7 +686,8 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Certifications' && <CertificationsTab product={product} onCertUpdate={onCertUpdate} certSchema={certSchema} />}
       {activeTab === 'Testing Results' && <TestingResultsTab sessions={sessions} onOpenSession={onOpenSession} />}
       {activeTab === 'Known Issues' && <KnownIssuesTab product={product} onOpenSession={onOpenSession} />}
-      {activeTab === 'Images & Renders' && <ImagesTab />}
+      {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} />}
+      {activeTab === 'Project Docs' && <ProjectDocsTab product={product} onProductUpdate={onProductUpdate} />}
     </div>
   );
 }

@@ -497,6 +497,11 @@ export default function App() {
               setCurrentProduct(updated);
               await refreshCatalog();
             }}
+            onProductUpdate={async (data) => {
+              const updated = await updateCatalogEntry(currentProduct.id, data);
+              setCurrentProduct(updated);
+              await refreshCatalog();
+            }}
           />
         </div>
       )}
