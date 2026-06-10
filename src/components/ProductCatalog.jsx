@@ -132,7 +132,8 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
   const [activePage, setActivePage] = useState('production');
 
   const categories = ['all', ...Object.keys(CATEGORY_LABELS).filter(cat => products.some(p => p.category === cat))];
-  const filtered = activeFilter === 'all' ? products : products.filter(p => p.category === activeFilter);
+  const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
+  const filtered = activeFilter === 'all' ? sorted : sorted.filter(p => p.category === activeFilter);
   const entityTabs = ['all', ...ENTITIES.filter(e => products.some(p => (p.entity || []).includes(e)))];
   const entityFiltered = activeEntity === 'all' ? filtered : filtered.filter(p => (p.entity || []).includes(activeEntity));
   const pageFiltered = activePage === 'production'
