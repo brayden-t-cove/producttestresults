@@ -164,6 +164,11 @@ function SessionCard({ s, onOpen }) {
             Comparative
           </span>
         )}
+        {s.products && s.products.length > 1 && (
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: 'rgba(99,102,241,0.12)', color: 'var(--primary)', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            {s.products.length} products
+          </span>
+        )}
       </div>
     </div>
   );

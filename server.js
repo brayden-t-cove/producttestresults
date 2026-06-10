@@ -453,6 +453,8 @@ app.post('/api/sessions', async (req, res) => {
       session.metrics = metrics || [];
       session.results = results || {};
       session.autoPulled = autoPulled || {};
+    } else if (products && products.length > 0) {
+      session.products = products;
     }
     await writeFile(join(SESSIONS_DIR, `${id}.json`), JSON.stringify(session, null, 2));
     res.status(201).json(session);

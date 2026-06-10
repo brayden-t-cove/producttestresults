@@ -118,15 +118,25 @@ function platformLabel(platform) {
 }
 
 export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog }) {
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [selectedAppConfig, setSelectedAppConfig] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  // each item: { product, appConfig, firmware }
+
+  // Derived for backward compat with firmware loading logic
+  const selectedProduct = selectedProducts[0]?.product || null;
+
   const [testPlan, setTestPlan] = useState('production');
   const [sessionType, setSessionType] = useState('e2e');
+
+  // Single-product firmware state (kept for the existing firmware dropdown shown when one product selected)
   const [firmware, setFirmware] = useState('');
   const [addingFirmware, setAddingFirmware] = useState(false);
   const [newFirmwareVersion, setNewFirmwareVersion] = useState('');
   const [savedFirmwares, setSavedFirmwares] = useState([]);
   const newFirmwareInputRef = useRef(null);
+
+  // Per-product firmware for multi-product list (keyed by catalogId)
+  const [firmwarePerProduct, setFirmwarePerProduct] = useState({});
+
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
@@ -140,14 +150,13 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     setAddingFirmware(false);
     setNewFirmwareVersion('');
     setSavedFirmwares([]);
-    setSelectedAppConfig(null);
     if (selectedProduct) {
       getFirmwares(null, selectedProduct.id).then(setSavedFirmwares).catch(() => {});
       const isSample = selectedProduct.type === 'sample' || selectedProduct.type === 'prototype';
       setTestPlan(isSample ? 'vendor-eval' : 'production');
       setSessionType('e2e');
     }
-  }, [selectedProduct]);
+  }, [selectedProduct?.id]);
 
   useEffect(() => {
     if (addingFirmware) newFirmwareInputRef.current?.focus();
@@ -165,6 +174,42 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     }
     setAddingFirmware(false);
     setNewFirmwareVersion('');
+  }
+
+  function toggleProduct(product) {
+    setSelectedProducts(prev => {
+      const exists = prev.find(p => p.product.id === product.id);
+      if (exists) {
+        return prev.filter(p => p.product.id !== product.id);
+      } else {
+        return [...prev, { product, appConfig: null }];
+      }
+    });
+  }
+
+  function removeSelectedProduct(catalogId) {
+    setSelectedProducts(prev => prev.filter(p => p.product.id !== catalogId));
+    setFirmwarePerProduct(prev => {
+      const next = { ...prev };
+      delete next[catalogId];
+      return next;
+    });
+  }
+
+  function moveProduct(index, direction) {
+    setSelectedProducts(prev => {
+      const next = [...prev];
+      const swapIndex = index + direction;
+      if (swapIndex < 0 || swapIndex >= next.length) return prev;
+      [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      return next;
+    });
+  }
+
+  function setAppConfigForProduct(catalogId, appConfig) {
+    setSelectedProducts(prev =>
+      prev.map(p => p.product.id === catalogId ? { ...p, appConfig } : p)
+    );
   }
 
   async function handleCsvUpload(e) {
@@ -188,7 +233,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!selectedProduct) {
+    if (selectedProducts.length === 0) {
       setError('Please select a product from your catalog.');
       return;
     }
@@ -197,35 +242,76 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     setLoadingMsg('Creating session...');
 
     try {
+      const isMulti = selectedProducts.length > 1;
+
+      // Build products array
+      const products = selectedProducts.map(({ product, appConfig }, i) => ({
+        catalogId: product.id,
+        name: product.name,
+        category: product.category,
+        firmware: isMulti ? (firmwarePerProduct[product.id] || '') : firmware,
+        appConfigId: appConfig?.id || null,
+        appConfigName: appConfig?.appName || null,
+      }));
+
+      // Build productName
+      let productName;
+      if (!isMulti) {
+        productName = selectedProducts[0].product.name;
+      } else {
+        const p1 = selectedProducts[0].product.name;
+        const p2 = selectedProducts[1].product.name;
+        const more = selectedProducts.length - 2;
+        productName = `${p1} + ${p2}${more > 0 ? ` + ${more} more` : ''}`;
+      }
+
+      const firstProduct = selectedProducts[0].product;
+      const firstAppConfig = selectedProducts[0].appConfig;
+
       const session = await createSession({
-        productId: selectedProduct.id,
-        productName: selectedProduct.name,
-        category: selectedProduct.category,
-        catalogId: selectedProduct.id,
-        firmware,
+        productId: firstProduct.id,
+        productName,
+        category: firstProduct.category,
+        catalogId: firstProduct.id,
+        firmware: isMulti ? (firmwarePerProduct[firstProduct.id] || '') : firmware,
         notes,
         type: sessionType,
         testPlan,
-        appConfigId: selectedAppConfig?.id || null,
-        appConfigName: selectedAppConfig?.appName || null,
+        appConfigId: isMulti ? null : (firstAppConfig?.id || null),
+        appConfigName: isMulti ? null : (firstAppConfig?.appName || null),
+        products: isMulti ? products : null,
       });
 
       let testCases;
       let issues = session.issues || [];
 
-      if (csvPreview) {
+      if (csvPreview && !isMulti) {
         if (csvPreview.type === 'testCases') {
           testCases = csvPreview.data;
         } else {
           issues = csvPreview.data;
           testCases = testPlan === 'vendor-eval'
-            ? generateVendorEvalTestCases(selectedProduct)
-            : generateTestCases(selectedProduct, selectedAppConfig);
+            ? generateVendorEvalTestCases(firstProduct)
+            : generateTestCases(firstProduct, firstAppConfig);
         }
+      } else if (isMulti) {
+        const allTestCases = [];
+        for (let i = 0; i < selectedProducts.length; i++) {
+          const { product, appConfig } = selectedProducts[i];
+          const cases = testPlan === 'vendor-eval'
+            ? generateVendorEvalTestCases(product)
+            : generateTestCases(product, appConfig);
+          cases.forEach(tc => {
+            tc.productCatalogId = product.id;
+            tc.productIndex = i;
+          });
+          allTestCases.push(...cases);
+        }
+        testCases = allTestCases;
       } else {
         testCases = testPlan === 'vendor-eval'
-          ? generateVendorEvalTestCases(selectedProduct)
-          : generateTestCases(selectedProduct, selectedAppConfig);
+          ? generateVendorEvalTestCases(firstProduct)
+          : generateTestCases(firstProduct, firstAppConfig);
       }
 
       const updated = await updateSession(session.id, { testCases, issues });
@@ -257,6 +343,8 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
       : []
     : [];
 
+  const isMultiProduct = selectedProducts.length > 1;
+
   return (
     <div className="session-start">
       <div className="session-start-header">
@@ -264,7 +352,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           ← Back
         </button>
         <h1>New Testing Session</h1>
-        <p>Select a product from your catalog, choose a session type, then start testing.</p>
+        <p>Select one or more products from your catalog, choose a session type, then start testing.</p>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -272,7 +360,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
 
         {/* Product Picker */}
         <div className="form-group">
-          <label>Select Product</label>
+          <label>Select Product{isMultiProduct ? 's' : ''}</label>
           {catalog.length === 0 ? (
             <div className="error-msg" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               No products in catalog.{' '}
@@ -286,37 +374,126 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
             </div>
           ) : (
             <div className="product-picker-grid">
-              {catalog.map(product => (
-                <div
-                  key={product.id}
-                  className={`product-picker-card ${selectedProduct?.id === product.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedProduct(product)}
-                >
-                  <span style={{ fontSize: 22, lineHeight: 1 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{product.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {CATEGORY_LABELS[product.category] || product.category}
-                      {product.manufacturer ? ` · ${product.manufacturer}` : ''}
+              {catalog.map(product => {
+                const isSelected = selectedProducts.some(p => p.product.id === product.id);
+                return (
+                  <div
+                    key={product.id}
+                    className={`product-picker-card ${isSelected ? 'selected' : ''}`}
+                    onClick={() => toggleProduct(product)}
+                  >
+                    <span style={{ fontSize: 22, lineHeight: 1 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{product.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                        {CATEGORY_LABELS[product.category] || product.category}
+                        {product.manufacturer ? ` · ${product.manufacturer}` : ''}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+                        {(product.capabilities || []).length} capabilities → {countTests(product)} test cases
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-                      {(product.capabilities || []).length} capabilities → {countTests(product)} test cases
-                    </div>
+                    {isSelected && (
+                      <span style={{ fontSize: 16, color: 'var(--primary)', flexShrink: 0 }}>✓</span>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* App Configuration Selector */}
-        {selectedProduct && (selectedProduct.appConfigs || []).length > 0 && (
+        {/* Selected Products List (multi-product) */}
+        {selectedProducts.length > 0 && (
+          <div className="form-group">
+            <label>Selected Products ({selectedProducts.length})</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {selectedProducts.map(({ product, appConfig }, index) => (
+                <div key={product.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 18 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
+                    <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>{product.name}</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => moveProduct(index, -1)}
+                        disabled={index === 0}
+                        style={{ padding: '2px 6px', fontSize: 12 }}
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => moveProduct(index, 1)}
+                        disabled={index === selectedProducts.length - 1}
+                        style={{ padding: '2px 6px', fontSize: 12 }}
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => removeSelectedProduct(product.id)}
+                        style={{ padding: '2px 6px', fontSize: 12, color: 'var(--text-muted)' }}
+                        title="Remove"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: (product.appConfigs || []).length > 0 ? 8 : 0 }}>
+                    <input
+                      type="text"
+                      placeholder="Firmware version (optional)"
+                      value={firmwarePerProduct[product.id] || ''}
+                      onChange={e => setFirmwarePerProduct(prev => ({ ...prev, [product.id]: e.target.value }))}
+                      style={{ flex: 1, fontSize: 13 }}
+                    />
+                  </div>
+                  {(product.appConfigs || []).length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>App configuration:</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${appConfig === null ? 'btn-primary' : 'btn-ghost'}`}
+                          onClick={() => setAppConfigForProduct(product.id, null)}
+                          style={{ fontSize: 12 }}
+                        >
+                          Generic
+                        </button>
+                        {(product.appConfigs || []).map(ac => (
+                          <button
+                            type="button"
+                            key={ac.id}
+                            className={`btn btn-sm ${appConfig?.id === ac.id ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={() => setAppConfigForProduct(product.id, ac)}
+                            style={{ fontSize: 12 }}
+                          >
+                            {ac.appName}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* App Configuration Selector — single product only */}
+        {!isMultiProduct && selectedProduct && (selectedProduct.appConfigs || []).length > 0 && (
           <div className="form-group">
             <label>APP CONFIGURATION <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 12, color: 'var(--text-muted)' }}>(optional)</span></label>
             <div className="product-picker-grid">
               <div
-                className={`product-picker-card ${selectedAppConfig === null ? 'selected' : ''}`}
-                onClick={() => setSelectedAppConfig(null)}
+                className={`product-picker-card ${selectedProducts[0]?.appConfig === null ? 'selected' : ''}`}
+                onClick={() => setAppConfigForProduct(selectedProduct.id, null)}
               >
                 <span style={{ fontSize: 22 }}>🌐</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -327,8 +504,8 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
               {(selectedProduct.appConfigs || []).map(ac => (
                 <div
                   key={ac.id}
-                  className={`product-picker-card ${selectedAppConfig?.id === ac.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedAppConfig(ac)}
+                  className={`product-picker-card ${selectedProducts[0]?.appConfig?.id === ac.id ? 'selected' : ''}`}
+                  onClick={() => setAppConfigForProduct(selectedProduct.id, ac)}
                 >
                   <span style={{ fontSize: 22 }}>📱</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -347,7 +524,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         )}
 
         {/* Test Plan Selector */}
-        {selectedProduct && (
+        {selectedProducts.length > 0 && (
           <div className="form-group">
             <label>Test Plan</label>
             <div className="session-type-cards">
@@ -363,7 +540,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
                 </div>
               ))}
             </div>
-            {testPlan === 'vendor-eval' && (
+            {testPlan === 'vendor-eval' && selectedProduct && (
               <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)', padding: '8px 12px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
                 🔍 Vendor Eval uses a standardized checklist ({generateVendorEvalTestCases(selectedProduct).length} test cases) covering packaging, build quality, setup, core function, connectivity, and interoperability.
               </div>
@@ -393,8 +570,8 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           </div>
         </div>
 
-        {/* Firmware */}
-        {selectedProduct && (
+        {/* Firmware — single product only (existing dropdown) */}
+        {!isMultiProduct && selectedProduct && (
           <div className="form-group">
             <label>Firmware Version</label>
             {!addingFirmware ? (
@@ -444,69 +621,71 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           />
         </div>
 
-        {/* CSV Section */}
-        <div className="csv-section">
-          <div className="csv-section-label">CSV Import (optional — overrides auto-generated test cases)</div>
-          <div className="csv-buttons-row">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => downloadCsvTemplate(sessionType)}
-            >
-              ↓ Download Template
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              ↑ Upload CSV
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              style={{ display: 'none' }}
-              onChange={handleCsvUpload}
-            />
-          </div>
-
-          {csvError && (
-            <div className="error-msg" style={{ marginTop: 8 }}>{csvError}</div>
-          )}
-
-          {csvPreview && (
-            <div className="csv-preview">
-              <div className="csv-preview-summary">
-                ✓ {csvPreview.count} {csvPreview.type === 'issues' ? 'issues' : 'test cases'} loaded from CSV
-                {csvPreview.count > 3 && ` (showing first 3)`}
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="csv-preview-table">
-                  <thead>
-                    <tr>
-                      {previewHeaders.slice(0, 4).map(h => <th key={h}>{h}</th>)}
-                      {previewHeaders.length > 4 && <th>...</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {csvPreview.rows.map((row, i) => (
-                      <tr key={i}>
-                        {previewHeaders.slice(0, 4).map(h => (
-                          <td key={h}>{String(row[h] ?? '').slice(0, 50)}{String(row[h] ?? '').length > 50 ? '…' : ''}</td>
-                        ))}
-                        {previewHeaders.length > 4 && <td>…</td>}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {csvPreview.count > 3 && (
-                <div className="csv-preview-more">… and {csvPreview.count - 3} more</div>
-              )}
+        {/* CSV Section — single product only */}
+        {!isMultiProduct && (
+          <div className="csv-section">
+            <div className="csv-section-label">CSV Import (optional — overrides auto-generated test cases)</div>
+            <div className="csv-buttons-row">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => downloadCsvTemplate(sessionType)}
+              >
+                ↓ Download Template
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                ↑ Upload CSV
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                style={{ display: 'none' }}
+                onChange={handleCsvUpload}
+              />
             </div>
-          )}
-        </div>
+
+            {csvError && (
+              <div className="error-msg" style={{ marginTop: 8 }}>{csvError}</div>
+            )}
+
+            {csvPreview && (
+              <div className="csv-preview">
+                <div className="csv-preview-summary">
+                  ✓ {csvPreview.count} {csvPreview.type === 'issues' ? 'issues' : 'test cases'} loaded from CSV
+                  {csvPreview.count > 3 && ` (showing first 3)`}
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="csv-preview-table">
+                    <thead>
+                      <tr>
+                        {previewHeaders.slice(0, 4).map(h => <th key={h}>{h}</th>)}
+                        {previewHeaders.length > 4 && <th>...</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreview.rows.map((row, i) => (
+                        <tr key={i}>
+                          {previewHeaders.slice(0, 4).map(h => (
+                            <td key={h}>{String(row[h] ?? '').slice(0, 50)}{String(row[h] ?? '').length > 50 ? '…' : ''}</td>
+                          ))}
+                          {previewHeaders.length > 4 && <td>…</td>}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {csvPreview.count > 3 && (
+                  <div className="csv-preview-more">… and {csvPreview.count - 3} more</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <button
           type="submit"
@@ -514,7 +693,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           style={{ width: '100%' }}
           disabled={catalog.length === 0}
         >
-          Start {SESSION_TYPE_LABELS[sessionType]}
+          {isMultiProduct ? 'Start Session' : `Start ${SESSION_TYPE_LABELS[sessionType]}`}
         </button>
       </form>
     </div>

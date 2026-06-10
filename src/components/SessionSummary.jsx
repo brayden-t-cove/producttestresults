@@ -186,6 +186,37 @@ export default function SessionSummary({ session, onBack }) {
         )}
       </div>
 
+      {/* Per-product breakdown for multi-product sessions */}
+      {session.products && session.products.length > 1 && (
+        <div style={{ marginBottom: 24, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>
+            Results by Product
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {session.products.map((prod, idx) => {
+              const prodTests = testCases.filter(t => t.productCatalogId === prod.catalogId || t.productIndex === idx);
+              const pPass = prodTests.filter(t => t.status === 'pass').length;
+              const pFail = prodTests.filter(t => t.status === 'fail').length;
+              const pSkip = prodTests.filter(t => t.status === 'skip').length;
+              const pEff = pPass + pFail;
+              const pRate = pEff > 0 ? Math.round((pPass / pEff) * 100) : null;
+              const rateColor = pRate === null ? 'var(--text-muted)' : pRate >= 80 ? 'var(--pass)' : pRate >= 60 ? '#f97316' : 'var(--fail)';
+              return (
+                <div key={prod.catalogId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: idx < session.products.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <span style={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prod.name}</span>
+                  <span style={{ fontSize: 12, color: 'var(--pass)', fontWeight: 600 }}>{pPass} pass</span>
+                  <span style={{ fontSize: 12, color: 'var(--fail)', fontWeight: 600 }}>{pFail} fail</span>
+                  {pSkip > 0 && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pSkip} skip</span>}
+                  <span style={{ fontSize: 13, fontWeight: 700, color: rateColor, minWidth: 44, textAlign: 'right' }}>
+                    {pRate !== null ? `${pRate}%` : '—'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="stats-row">
         <div className="stat-card stat-pass">
@@ -243,6 +274,45 @@ export default function SessionSummary({ session, onBack }) {
                 <span className="issue-cat">{issue.issueCategory}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Per-product breakdown (multi-product sessions) */}
+      {session.products && session.products.length > 1 && (
+        <div className="summary-section">
+          <h2>Results by Product</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {session.products.map(prod => {
+              const prodTests = testCases.filter(t => t.productCatalogId === prod.catalogId);
+              const pPass = prodTests.filter(t => t.status === 'pass').length;
+              const pFail = prodTests.filter(t => t.status === 'fail').length;
+              const pSkip = prodTests.filter(t => t.status === 'skip').length;
+              const pNa = prodTests.filter(t => t.status === 'na').length;
+              const pEffective = pPass + pFail;
+              const pRate = pEffective > 0 ? Math.round((pPass / pEffective) * 100) : null;
+              return (
+                <div key={prod.catalogId} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{prod.name}</span>
+                    <span style={{ display: 'flex', gap: 10, fontSize: 12 }}>
+                      {pPass > 0 && <span style={{ color: 'var(--pass)' }}>{pPass} pass</span>}
+                      {pFail > 0 && <span style={{ color: 'var(--fail)' }}>{pFail} fail</span>}
+                      {pSkip > 0 && <span style={{ color: 'var(--text-muted)' }}>{pSkip} skip</span>}
+                      {pNa > 0 && <span style={{ color: 'var(--text-muted)' }}>{pNa} n/a</span>}
+                      {pRate !== null && (
+                        <span style={{ fontWeight: 600, color: pRate >= 80 ? 'var(--pass)' : pRate >= 50 ? 'var(--warn, #ca8a04)' : 'var(--fail)' }}>
+                          {pRate}%
+                        </span>
+                      )}
+                      {pRate === null && pSkip === prodTests.length && (
+                        <span style={{ color: 'var(--text-muted)' }}>skipped</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
