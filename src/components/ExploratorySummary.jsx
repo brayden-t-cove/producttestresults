@@ -85,11 +85,97 @@ export default function ExploratorySummary({ session, onBack, onOpenSession }) {
   // TODO: replace with pdfkit server-side generation (POST /api/sessions/:id/export/pdf)
   // for a true file download without requiring the print dialog.
   function handleExport() {
-    // Expand all sections so nothing is hidden in the print output
-    setEnvOpen(true);
-    setCollapsedCats({});
-    // Small delay to let state re-render before the print dialog opens
-    setTimeout(() => window.print(), 100);
+    const env = session.testEnvironment || {};
+    const envRows = [
+      ['App Name', env.appName],
+      ['Device', env.phoneType],
+      ['OS Version', env.osVersion],
+      ['App Version', env.appVersion],
+      ['Username', env.username],
+      ['Device ID', env.deviceId],
+    ].filter(([, v]) => v);
+
+    const categoriesHtml = (session.categories || []).map(cat => {
+      const obsRows = OBSERVATION_FIELDS
+        .filter(f => (cat.observations?.[f.key] || '').trim())
+        .map(f => `
+          <div class="obs-block">
+            <div class="obs-label">${f.label}</div>
+            <div class="obs-value">${(cat.observations[f.key] || '').replace(/\n/g, '<br>')}</div>
+          </div>`).join('');
+      const mediaLinks = [
+        cat.screenshotUrl && `<a href="${cat.screenshotUrl}">Screenshot</a>`,
+        cat.videoUrl && `<a href="${cat.videoUrl}">Video</a>`,
+      ].filter(Boolean).join(' · ');
+
+      if (!obsRows && !mediaLinks) return `
+        <div class="cat-card">
+          <h3>${cat.label}</h3>
+          <p class="muted">No observations recorded.</p>
+        </div>`;
+
+      return `
+        <div class="cat-card">
+          <h3>${cat.label}</h3>
+          ${cat.description ? `<p class="desc">${cat.description}</p>` : ''}
+          ${obsRows}
+          ${mediaLinks ? `<div class="media-links">${mediaLinks}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Exploratory Report — ${session.productName}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11pt; color: #111; margin: 0; padding: 24px 32px; }
+    h1 { font-size: 18pt; margin: 0 0 4px; }
+    h3 { font-size: 12pt; margin: 0 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+    .meta { color: #555; font-size: 10pt; margin-bottom: 20px; }
+    .section-title { font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #888; margin: 24px 0 10px; }
+    .env-table { border-collapse: collapse; font-size: 10pt; margin-bottom: 24px; }
+    .env-table td { padding: 4px 16px 4px 0; vertical-align: top; }
+    .env-table td:first-child { color: #666; font-weight: 600; white-space: nowrap; }
+    .summary-box { background: #f5f5f5; border-left: 4px solid #6366f1; padding: 12px 16px; margin-bottom: 24px; font-size: 11pt; white-space: pre-wrap; line-height: 1.6; }
+    .cat-card { border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-bottom: 16px; page-break-inside: avoid; }
+    .obs-block { margin-bottom: 12px; }
+    .obs-label { font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #888; margin-bottom: 3px; }
+    .obs-value { font-size: 11pt; line-height: 1.6; }
+    .desc { font-size: 10pt; color: #666; margin: 0 0 12px; font-style: italic; }
+    .media-links { margin-top: 10px; font-size: 10pt; }
+    .media-links a { color: #6366f1; }
+    .muted { color: #999; font-size: 10pt; }
+    @page { margin: 20mm; }
+  </style>
+</head>
+<body>
+  <h1>${session.productName}</h1>
+  <div class="meta">
+    Exploratory Session · ${PLATFORM_LABELS[session.platform] || session.platform} · ${formatDate(session.createdAt)}
+    ${session.completedAt ? ` · Completed ${formatDate(session.completedAt)}` : ''}
+  </div>
+
+  ${envRows.length ? `
+    <div class="section-title">Test Environment</div>
+    <table class="env-table">
+      ${envRows.map(([l, v]) => `<tr><td>${l}</td><td>${v}</td></tr>`).join('')}
+    </table>` : ''}
+
+  ${(overallSummary || session.aiSummary) ? `
+    <div class="section-title">Overall Summary</div>
+    <div class="summary-box">${(overallSummary || session.aiSummary).replace(/\n/g, '<br>')}</div>` : ''}
+
+  <div class="section-title">Category Observations</div>
+  ${categoriesHtml}
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 300);
   }
 
   const hasEnvData = Object.values(env).some(v => v && v.trim());
