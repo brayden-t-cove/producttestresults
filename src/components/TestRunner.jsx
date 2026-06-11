@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { updateSession } from '../lib/api.js';
 import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 import IssueLogger from './IssueLogger.jsx';
@@ -227,15 +227,40 @@ function ExtraTestsSection({ test, onExtraTestsChange }) {
   );
 }
 
+function TestDetailHeader({ test, onDelete, onRenameTitle }) {
+  const [title, setTitle] = useState(test.title || '');
+  useEffect(() => { setTitle(test.title || ''); }, [test.id]);
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
+      <TestNumberBadge testNumber={test.testNumber} />
+      <input
+        type="text"
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        onBlur={e => {
+          const v = e.target.value.trim();
+          if (v && v !== test.title) onRenameTitle(v);
+        }}
+        style={{ flex: 1, fontWeight: 700, fontSize: 16, border: 'none', borderBottom: '1px solid transparent', background: 'transparent', padding: '0 0 2px', color: 'var(--text)', outline: 'none' }}
+        onFocus={e => { e.target.style.borderBottomColor = 'var(--primary)'; }}
+        onBlurCapture={e => { e.target.style.borderBottomColor = 'transparent'; }}
+      />
+      <button
+        className="btn btn-ghost btn-sm"
+        style={{ color: 'var(--fail)', flexShrink: 0 }}
+        onClick={onDelete}
+        title="Remove test case"
+      >✕</button>
+    </div>
+  );
+}
+
 // Reproduction detail panel
-function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, onEvidenceChange, onExtraTestsChange }) {
+function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, onEvidenceChange, onExtraTestsChange, onDelete, onRenameTitle }) {
   return (
     <>
       <div className="test-detail-content">
-        <div className="test-detail-title">
-          <TestNumberBadge testNumber={test.testNumber} />
-          {test.title}
-        </div>
+        <TestDetailHeader test={test} onDelete={onDelete} onRenameTitle={onRenameTitle} />
         <span className={badgeClass(test.status)} style={{ marginBottom: 20, display: 'inline-flex' }}>
           {statusLabel(test.status)}
         </span>
@@ -312,14 +337,11 @@ function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerd
 }
 
 // Regression detail panel
-function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, onEvidenceChange, onExtraTestsChange }) {
+function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, onEvidenceChange, onExtraTestsChange, onDelete, onRenameTitle }) {
   return (
     <>
       <div className="test-detail-content">
-        <div className="test-detail-title">
-          <TestNumberBadge testNumber={test.testNumber} />
-          {test.title}
-        </div>
+        <TestDetailHeader test={test} onDelete={onDelete} onRenameTitle={onRenameTitle} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
           <span className={badgeClass(test.status)} style={{ display: 'inline-flex' }}>
             {statusLabel(test.status)}
@@ -399,7 +421,7 @@ function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdic
 }
 
 // E2E / Feature detail panel
-function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, type, appConfigName, onEvidenceChange, onExtraTestsChange }) {
+function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, type, appConfigName, onEvidenceChange, onExtraTestsChange, onDelete, onRenameTitle }) {
   return (
     <>
       <div className="test-detail-content">
@@ -408,10 +430,7 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
             ⚠️ Not available in {appConfigName || 'this app'} — mark as N/A or test anyway
           </div>
         )}
-        <div className="test-detail-title">
-          <TestNumberBadge testNumber={test.testNumber} />
-          {test.title}
-        </div>
+        <TestDetailHeader test={test} onDelete={onDelete} onRenameTitle={onRenameTitle} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <span className={badgeClass(test.status)} style={{ display: 'inline-flex' }}>
             {statusLabel(test.status)}
@@ -516,6 +535,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const [showSkipAllModal, setShowSkipAllModal] = useState(false);
   const [skipAllReason, setSkipAllReason] = useState('');
   const [skipSectionState, setSkipSectionState] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const selectedTest = session.testCases.find(t => t.id === selectedTestId);
 
@@ -546,6 +566,14 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
       t.id === testId ? { ...t, ...updates } : t
     );
     await saveTestCases(newTestCases);
+  }
+
+  async function handleDeleteTest(testId) {
+    const remaining = session.testCases.filter(t => t.id !== testId);
+    const nextTest = remaining.find(t => t.status === 'pending') || remaining[0] || null;
+    setSelectedTestId(nextTest?.id || null);
+    setConfirmDeleteId(null);
+    await saveTestCases(remaining);
   }
 
   function advanceToNextTest() {
@@ -858,6 +886,8 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                 onVerdict={handleVerdict}
                 onEvidenceChange={updates => handleEvidenceChange(selectedTestId, updates)}
                 onExtraTestsChange={extraTests => handleExtraTestsChange(selectedTestId, extraTests)}
+                onDelete={() => setConfirmDeleteId(selectedTestId)}
+                onRenameTitle={title => saveTestUpdate(selectedTestId, { title })}
               />
             ) : sessionType === 'regression' ? (
               <RegressionDetail
@@ -868,6 +898,8 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                 onVerdict={handleVerdict}
                 onEvidenceChange={updates => handleEvidenceChange(selectedTestId, updates)}
                 onExtraTestsChange={extraTests => handleExtraTestsChange(selectedTestId, extraTests)}
+                onDelete={() => setConfirmDeleteId(selectedTestId)}
+                onRenameTitle={title => saveTestUpdate(selectedTestId, { title })}
               />
             ) : (
               <StandardDetail
@@ -880,6 +912,8 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                 appConfigName={session.appConfigName}
                 onEvidenceChange={updates => handleEvidenceChange(selectedTestId, updates)}
                 onExtraTestsChange={extraTests => handleExtraTestsChange(selectedTestId, extraTests)}
+                onDelete={() => setConfirmDeleteId(selectedTestId)}
+                onRenameTitle={title => saveTestUpdate(selectedTestId, { title })}
               />
             )
           ) : (
@@ -889,6 +923,22 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
           )}
         </div>
       </div>
+
+      {/* Delete test confirmation */}
+      {confirmDeleteId && (
+        <div className="modal-overlay" onClick={() => setConfirmDeleteId(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <h3 style={{ marginBottom: 8 }}>Remove Test Case?</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+              "{session.testCases.find(t => t.id === confirmDeleteId)?.title}" will be permanently removed from this session. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={() => handleDeleteTest(confirmDeleteId)}>Remove Test</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Action Bar */}
       <div className="test-action-bar action-bar">
