@@ -8,6 +8,9 @@ import SessionSummary from './components/SessionSummary.jsx';
 import ComparativeStart from './components/ComparativeStart.jsx';
 import ComparativeRunner from './components/ComparativeRunner.jsx';
 import ComparativeSummary from './components/ComparativeSummary.jsx';
+import ExploratoryStart from './components/ExploratoryStart.jsx';
+import ExploratoryRunner from './components/ExploratoryRunner.jsx';
+import ExploratorySummary from './components/ExploratorySummary.jsx';
 import ProductCatalog from './components/ProductCatalog.jsx';
 import NewProduct from './components/NewProduct.jsx';
 import AnalyticsPage from './components/AnalyticsPage.jsx';
@@ -164,6 +167,11 @@ function SessionCard({ s, onOpen }) {
             Comparative
           </span>
         )}
+        {s.testPlan === 'exploratory' && (
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: 'rgba(16,185,129,0.12)', color: '#059669', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            Exploratory
+          </span>
+        )}
         {s.products && s.products.length > 1 && (
           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: 'rgba(99,102,241,0.12)', color: 'var(--primary)', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
             {s.products.length} products
@@ -213,13 +221,14 @@ function HomePage({ onCatalog, onTesting, onSettings }) {
 function classifySession(s, catalog) {
   if (s.testPlan === 'comparative') return 'evaluation';
   if (s.testPlan === 'vendor-eval') return 'evaluation';
+  if (s.testPlan === 'exploratory') return 'production';
   const product = catalog.find(p => p.id === s.catalogId || p.name === s.productName);
   if (product && (product.type === 'sample' || product.type === 'prototype')) return 'evaluation';
   if (product && product.status === 'in-development') return 'development';
   return 'production';
 }
 
-function ProductTestingPage({ sessions, catalog, onNew, onNewComparative, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
+function ProductTestingPage({ sessions, catalog, onNew, onNewComparative, onNewExploratory, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
   const [activeTab, setActiveTab] = useState('production');
 
   const productionSessions = sessions.filter(s => classifySession(s, catalog) === 'production');
@@ -241,6 +250,9 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewComparative, onOpen
           <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
           <button className="btn btn-ghost" onClick={onAnalytics}>📊 Analytics</button>
           <button className="btn btn-ghost" onClick={onIssues}>🐛 Issues</button>
+          <button className="btn btn-secondary" onClick={onNewExploratory}>
+            + Exploratory
+          </button>
           <button className="btn btn-secondary" onClick={onNewComparative}>
             + Compare
           </button>
@@ -356,6 +368,12 @@ export default function App() {
         } else {
           setView('comparativeRunner');
         }
+      } else if (session.testPlan === 'exploratory') {
+        if (session.status === 'completed') {
+          setView('exploratorySummary');
+        } else {
+          setView('exploratoryRunner');
+        }
       } else if (session.status === 'completed') {
         setView('summary');
       } else {
@@ -369,6 +387,22 @@ export default function App() {
   function handleComparativeCreated(session) {
     setCurrentSession(session);
     setView('comparativeRunner');
+    refreshSessions();
+  }
+
+  function handleExploratoryCreated(session) {
+    setCurrentSession(session);
+    setView('exploratoryRunner');
+    refreshSessions();
+  }
+
+  async function handleExploratoryUpdate(updatedSession) {
+    setCurrentSession(updatedSession);
+  }
+
+  function handleExploratoryFinish(session) {
+    setCurrentSession(session || currentSession);
+    setView('exploratorySummary');
     refreshSessions();
   }
 
@@ -458,6 +492,7 @@ export default function App() {
           loading={loadingSessions}
           onNew={() => setView('sessionStart')}
           onNewComparative={() => setView('comparativeStart')}
+          onNewExploratory={() => setView('exploratoryStart')}
           onOpen={handleOpenSession}
           onCatalog={() => setView('catalog')}
           onSettings={() => setShowSettings(true)}
@@ -614,6 +649,34 @@ export default function App() {
           session={currentSession}
           onBack={() => { setView('testing'); setCurrentSession(null); refreshSessions(); }}
           onEdit={() => setView('comparativeRunner')}
+        />
+      )}
+
+      {view === 'exploratoryStart' && (
+        <ExploratoryStart
+          catalog={catalog}
+          onBack={() => setView('testing')}
+          onCreated={handleExploratoryCreated}
+        />
+      )}
+
+      {view === 'exploratoryRunner' && currentSession && (
+        <ExploratoryRunner
+          session={currentSession}
+          onUpdate={handleExploratoryUpdate}
+          onFinish={handleExploratoryFinish}
+          onBack={() => { setView('testing'); setCurrentSession(null); refreshSessions(); }}
+        />
+      )}
+
+      {view === 'exploratorySummary' && currentSession && (
+        <ExploratorySummary
+          session={currentSession}
+          onBack={() => { setView('testing'); setCurrentSession(null); refreshSessions(); }}
+          onOpenSession={session => {
+            setCurrentSession(session);
+            setView('exploratoryRunner');
+          }}
         />
       )}
     </div>

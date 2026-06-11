@@ -401,6 +401,11 @@ app.get('/api/sessions', async (req, res) => {
           date: session.createdAt,
           status: session.status,
           issueCount: (session.issues || []).length,
+          testPlan: session.testPlan || 'production',
+          catalogId: session.catalogId || session.productId || null,
+          appConfigName: session.appConfigName || null,
+          products: session.products ? session.products.map(p => ({ catalogId: p.catalogId })) : null,
+          testCases: session.testCases || [],
         };
       })
     );
@@ -429,7 +434,9 @@ app.get('/api/sessions/:id', async (req, res) => {
 app.post('/api/sessions', async (req, res) => {
   try {
     const { productId, productName, category, subcategory, firmware, notes, type, testPlan,
-            products, metrics, results, autoPulled } = req.body;
+            products, metrics, results, autoPulled,
+            platform, testEnvironment, categories, overallSummary,
+            catalogId } = req.body;
     const id = uuidv4();
     const session = {
       id,
@@ -448,13 +455,21 @@ app.post('/api/sessions', async (req, res) => {
       issues: [],
       verifications: [],
     };
+    if (catalogId) session.catalogId = catalogId;
     if (testPlan === 'comparative') {
       session.products = products || [];
       session.metrics = metrics || [];
       session.results = results || {};
       session.autoPulled = autoPulled || {};
-    } else if (products && products.length > 0) {
-      session.products = products;
+    } else if (testPlan === 'exploratory') {
+      session.platform = platform || 'native';
+      session.testEnvironment = testEnvironment || {};
+      session.categories = categories || [];
+      session.overallSummary = overallSummary || '';
+      session.status = 'in-progress';
+    } else {
+      if (products && products.length > 0) session.products = products;
+      if (testEnvironment) session.testEnvironment = testEnvironment;
     }
     await writeFile(join(SESSIONS_DIR, `${id}.json`), JSON.stringify(session, null, 2));
     res.status(201).json(session);
@@ -477,6 +492,47 @@ app.put('/api/sessions/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update session' });
+  }
+});
+
+// POST /api/sessions/:id/ai-summary — generate AI summary for exploratory sessions
+app.post('/api/sessions/:id/ai-summary', async (req, res) => {
+  const client = getAnthropicClient();
+  if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set.' });
+  try {
+    const filePath = join(SESSIONS_DIR, `${req.params.id}.json`);
+    if (!existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
+    const session = JSON.parse(await readFile(filePath, 'utf-8'));
+
+    const catSummaries = (session.categories || []).map(cat => {
+      const obs = cat.observations || {};
+      const lines = [];
+      if (obs.performance) lines.push(`Performance: ${obs.performance}`);
+      if (obs.uiux) lines.push(`UI/UX: ${obs.uiux}`);
+      if (obs.bugIssue) lines.push(`Bug/Issue: ${obs.bugIssue}`);
+      if (obs.like) lines.push(`Like: ${obs.like}`);
+      if (obs.dislike) lines.push(`Dislike: ${obs.dislike}`);
+      if (obs.otherNotes) lines.push(`Other: ${obs.otherNotes}`);
+      return `### ${cat.label}\n${lines.join('\n') || 'No observations.'}`;
+    }).join('\n\n');
+
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: `You are a QA engineer writing exploratory test session summaries. Be concise and professional.`,
+      messages: [{
+        role: 'user',
+        content: `Write a brief summary of this exploratory test session.\n\nProduct: ${session.productName}\nPlatform: ${session.platform || 'N/A'}\nDate: ${session.createdAt}\n\n${catSummaries}\n\nProvide 3-5 sentences covering overall findings, notable issues, and highlights.`,
+      }],
+    });
+
+    const aiSummary = message.content[0].text.trim();
+    const updated = { ...session, aiSummary };
+    await writeFile(filePath, JSON.stringify(updated, null, 2));
+    res.json({ aiSummary });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'AI summary failed', details: err.message });
   }
 });
 

@@ -138,6 +138,9 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   const [firmwarePerProduct, setFirmwarePerProduct] = useState({});
 
   const [notes, setNotes] = useState('');
+  const [testEnvOpen, setTestEnvOpen] = useState(false);
+  const [testEnv, setTestEnv] = useState({ phoneType: '', osVersion: '', appVersion: '', username: '', password: '', deviceId: '' });
+  const [showEnvPassword, setShowEnvPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError] = useState('');
@@ -280,6 +283,14 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         appConfigId: isMulti ? null : (firstAppConfig?.id || null),
         appConfigName: isMulti ? null : (firstAppConfig?.appName || null),
         products: isMulti ? products : null,
+        testEnvironment: {
+          phoneType: testEnv.phoneType,
+          osVersion: testEnv.osVersion,
+          appVersion: testEnv.appVersion,
+          username: testEnv.username,
+          password: testEnv.password,
+          deviceId: testEnv.deviceId,
+        },
       });
 
       let testCases;
@@ -619,6 +630,59 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
             onChange={e => setNotes(e.target.value)}
             rows={3}
           />
+        </div>
+
+        {/* Test Environment — collapsible */}
+        <div className="form-group">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', fontWeight: 600, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: testEnvOpen ? 10 : 0 }}
+            onClick={() => setTestEnvOpen(v => !v)}
+          >
+            <span>{testEnvOpen ? '▾' : '▸'}</span>
+            <span>Test Environment</span>
+          </button>
+          {testEnvOpen && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Phone / Device Type</label>
+                <input type="text" placeholder="e.g. iPhone 15 Pro" value={testEnv.phoneType} onChange={e => setTestEnv(p => ({ ...p, phoneType: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>OS Version</label>
+                <input type="text" placeholder="e.g. iOS 17.4" value={testEnv.osVersion} onChange={e => setTestEnv(p => ({ ...p, osVersion: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>App Version</label>
+                <input type="text" placeholder="e.g. 3.2.1" value={testEnv.appVersion} onChange={e => setTestEnv(p => ({ ...p, appVersion: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Device ID / DID</label>
+                <input type="text" placeholder="e.g. ABC123456" value={testEnv.deviceId} onChange={e => setTestEnv(p => ({ ...p, deviceId: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Account Username</label>
+                <input type="text" placeholder="e.g. test@example.com" value={testEnv.username} onChange={e => setTestEnv(p => ({ ...p, username: e.target.value }))} autoComplete="off" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Account Password</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type={showEnvPassword ? 'text' : 'password'}
+                    placeholder="Password"
+                    value={testEnv.password}
+                    onChange={e => setTestEnv(p => ({ ...p, password: e.target.value }))}
+                    autoComplete="new-password"
+                    style={{ flex: 1 }}
+                  />
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowEnvPassword(v => !v)} style={{ flexShrink: 0 }}>
+                    {showEnvPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* CSV Section — single product only */}
