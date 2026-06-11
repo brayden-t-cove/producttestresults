@@ -24,6 +24,7 @@ const PLATFORM_OPTIONS = [
 ];
 
 const DEFAULT_CATEGORIES = [
+  { id: 'packaging-unboxing', label: 'Packaging & Unboxing' },
   { id: 'account-creation', label: 'Onboarding & Account Creation' },
   { id: 'hardware-setup', label: 'Hardware Setup' },
   { id: 'live-feed', label: 'Live Feed' },
