@@ -24,7 +24,7 @@ const PLATFORM_OPTIONS = [
 ];
 
 const DEFAULT_CATEGORIES = [
-  { id: 'account-creation', label: 'Account Creation' },
+  { id: 'account-creation', label: 'Onboarding & Account Creation' },
   { id: 'hardware-setup', label: 'Hardware Setup' },
   { id: 'live-feed', label: 'Live Feed' },
   { id: 'playback', label: 'Playback' },
@@ -55,6 +55,7 @@ export default function ExploratoryStart({ catalog, onCreated, onBack }) {
   const [platform, setPlatform] = useState('native');
   const [envOpen, setEnvOpen] = useState(true);
   const [env, setEnv] = useState({
+    appName: '',
     phoneType: '',
     osVersion: '',
     appVersion: '',
@@ -108,6 +109,7 @@ export default function ExploratoryStart({ catalog, onCreated, onBack }) {
         catalogId: selectedProduct.id,
         platform,
         testEnvironment: {
+          appName: env.appName,
           phoneType: env.phoneType,
           osVersion: env.osVersion,
           appVersion: env.appVersion,
@@ -236,6 +238,15 @@ export default function ExploratoryStart({ catalog, onCreated, onBack }) {
           </button>
           {envOpen && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>App Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Instavision, Cove App"
+                  value={env.appName}
+                  onChange={e => setEnvField('appName', e.target.value)}
+                />
+              </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label>Phone / Device Type</label>
                 <input

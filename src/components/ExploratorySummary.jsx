@@ -88,6 +88,7 @@ export default function ExploratorySummary({ session, onBack, onOpenSession }) {
 
   const hasEnvData = Object.values(env).some(v => v && v.trim());
   const envFields = [
+    { label: 'App Name', value: env.appName },
     { label: 'Device', value: env.phoneType },
     { label: 'OS Version', value: env.osVersion },
     { label: 'App Version', value: env.appVersion },
