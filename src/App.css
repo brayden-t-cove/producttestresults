@@ -1739,19 +1739,18 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 /* ── Print / PDF export ─────────────────────────────────────────────────────── */
 @media print {
-  /* Hide everything except the summary content */
-  body > #root > div > *:not(.exploratory-summary-print) { display: none !important; }
+  @page { margin: 20mm; }
 
-  .btn,
-  .toast,
-  nav,
-  .session-start-header button,
-  [class*="btn-ghost"],
-  [class*="btn-secondary"] { display: none !important; }
+  body, html {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+  }
 
-  /* Reset page */
-  body, html { background: #fff !important; color: #000 !important; font-size: 12pt; }
+  /* Hide all buttons and UI chrome */
+  .btn { display: none !important; }
 
+  /* Full width, no card shadow */
   .session-start {
     max-width: 100% !important;
     padding: 0 !important;
@@ -1759,20 +1758,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
     box-shadow: none !important;
   }
 
-  /* Keep cards visible but flatten them */
-  [style*="background: var(--card)"],
-  [style*="background:var(--card)"] {
-    background: #fff !important;
-    border: 1px solid #ccc !important;
-    box-shadow: none !important;
-  }
-
-  /* Force all collapsible sections open */
-  [style*="display: none"] { display: block !important; }
-
   /* Avoid page breaks inside category cards */
   .exploratory-cat-card { page-break-inside: avoid; break-inside: avoid; }
-
-  /* Page margins */
-  @page { margin: 20mm; }
 }
