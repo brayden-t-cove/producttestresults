@@ -24,19 +24,20 @@ const PLATFORM_OPTIONS = [
 ];
 
 const DEFAULT_CATEGORIES = [
-  { id: 'packaging-unboxing', label: 'Packaging & Unboxing' },
-  { id: 'account-creation', label: 'Account Creation' },
-  { id: 'device-setup-pairing', label: 'Device Setup & Pairing' },
-  { id: 'installation-mounting', label: 'Installation & Mounting' },
-  { id: 'live-feed', label: 'Live Feed' },
-  { id: 'playback', label: 'Playback' },
-  { id: 'settings', label: 'Settings' },
+  { id: 'packaging-unboxing', label: 'Packaging & Unboxing', description: 'First impressions of the retail/sample packaging, unboxing experience, included accessories, documentation quality, and physical hardware inspection — form factor, build quality, ports, buttons, and overall aesthetics.' },
+  { id: 'account-creation', label: 'Account Creation', description: 'Sign-up flow, email verification, password requirements, onboarding screens, and any friction encountered creating a new account from scratch.' },
+  { id: 'device-setup-pairing', label: 'Device Setup & Pairing', description: 'App-guided device enrollment: QR code scanning, Wi-Fi configuration, device naming, and the overall quality of the in-app setup flow from pairing start to first successful connection.' },
+  { id: 'installation-mounting', label: 'Installation & Mounting', description: 'Physical installation experience: mount hardware quality, cable routing, weatherproofing, placement flexibility, screw sizing, and any in-app mounting guidance or placement recommendations provided by the vendor.' },
+  { id: 'live-feed', label: 'Live Feed', description: 'Real-time video stream quality, latency, resolution, night vision, audio, pan/tilt performance if applicable, and reliability of the live view on both the native platform and our app.' },
+  { id: 'playback', label: 'Playback', description: 'Recorded footage access and quality: event-based vs. continuous recording, scrubbing UX, clip download, cloud vs. local storage experience, and any gaps or reliability issues in recordings.' },
+  { id: 'settings', label: 'Settings', description: 'Depth and usability of device and account settings: motion sensitivity, notification controls, recording schedules, firmware updates, privacy options, and how intuitive the settings architecture is.' },
 ];
 
 function buildCategories(selectedIds) {
   return DEFAULT_CATEGORIES.filter(c => selectedIds.has(c.id)).map(c => ({
     id: c.id,
     label: c.label,
+    description: c.description || '',
     observations: {
       performance: '',
       uiux: '',

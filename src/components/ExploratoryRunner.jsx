@@ -187,11 +187,16 @@ export default function ExploratoryRunner({ session, onUpdate, onFinish, onBack 
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
         {activeCategory ? (
           <>
-            <div style={{ marginBottom: 20 }}>
-              <h2 style={{ margin: 0, fontSize: 20 }}>{activeCategory.label}</h2>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
                 Category {activeCatIndex + 1} of {categories.length}
               </div>
+              <h2 style={{ margin: '0 0 8px' }}>{activeCategory.label}</h2>
+              {activeCategory.description && (
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, maxWidth: 620, borderLeft: '3px solid var(--border)', paddingLeft: 12 }}>
+                  {activeCategory.description}
+                </p>
+              )}
             </div>
 
             {/* Observation fields */}
