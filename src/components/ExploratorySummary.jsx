@@ -82,8 +82,14 @@ export default function ExploratorySummary({ session, onBack, onOpenSession }) {
     }
   }
 
+  // TODO: replace with pdfkit server-side generation (POST /api/sessions/:id/export/pdf)
+  // for a true file download without requiring the print dialog.
   function handleExport() {
-    setToast('Export coming soon');
+    // Expand all sections so nothing is hidden in the print output
+    setEnvOpen(true);
+    setCollapsedCats({});
+    // Small delay to let state re-render before the print dialog opens
+    setTimeout(() => window.print(), 100);
   }
 
   const hasEnvData = Object.values(env).some(v => v && v.trim());
