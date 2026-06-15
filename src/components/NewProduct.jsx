@@ -581,19 +581,6 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
           </div>
         )}
 
-        {/* Camera: Hub/NVR/DVR Connection Type */}
-        {category === 'camera' && (
-          <div className="form-group">
-            <label>Hub / NVR / DVR Connection</label>
-            <select value={hubConnectionType} onChange={e => setHubConnectionType(e.target.value)}>
-              <option value="standalone">Standalone (no hub required)</option>
-              <option value="hub">Connects to Hub / Chime</option>
-              <option value="nvr-dvr">Connects to NVR / DVR</option>
-              <option value="proprietary-base">Connects to Proprietary Base Station</option>
-            </select>
-          </div>
-        )}
-
         {/* Subclass — shown when category has defined subclasses */}
         {SUBCLASS_OPTIONS[category] && (
           <div className="form-group">
@@ -615,6 +602,19 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
                 Capabilities pre-filled based on subclass — adjust below as needed.
               </div>
             )}
+          </div>
+        )}
+
+        {/* Camera: Hub/NVR/DVR Connection Type */}
+        {category === 'camera' && (
+          <div className="form-group">
+            <label>Hub / NVR / DVR Connection</label>
+            <select value={hubConnectionType} onChange={e => setHubConnectionType(e.target.value)}>
+              <option value="standalone">Standalone (no hub required)</option>
+              <option value="hub">Connects to Hub / Chime</option>
+              <option value="nvr-dvr">Connects to NVR / DVR</option>
+              <option value="proprietary-base">Connects to Proprietary Base Station</option>
+            </select>
           </div>
         )}
 
