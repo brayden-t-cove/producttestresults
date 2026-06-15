@@ -16,14 +16,15 @@ dotenv.config({ path: join(__dirname, '.env') });
 const app = express();
 const PORT = process.env.PORT || 3001;
 const ENV_FILE = join(__dirname, '.env');
-const SESSIONS_DIR = join(__dirname, 'data', 'sessions');
-const COMPARISONS_DIR = join(__dirname, 'data', 'comparisons');
-const DEVICES_FILE = join(__dirname, 'data', 'devices.json');
-const FIRMWARES_FILE = join(__dirname, 'data', 'firmwares.json');
-const CATALOG_FILE = join(__dirname, 'data', 'catalog.json');
-const SPEC_SCHEMA_FILE = join(__dirname, 'data', 'specSchema.json');
-const CERT_SCHEMA_FILE = join(__dirname, 'data', 'certSchema.json');
-const IMAGES_DIR = join(__dirname, 'data', 'images');
+const DATA_BASE = process.env.DATA_DIR || join(__dirname, 'data');
+const SESSIONS_DIR = join(DATA_BASE, 'sessions');
+const COMPARISONS_DIR = join(DATA_BASE, 'comparisons');
+const DEVICES_FILE = join(DATA_BASE, 'devices.json');
+const FIRMWARES_FILE = join(DATA_BASE, 'firmwares.json');
+const CATALOG_FILE = join(DATA_BASE, 'catalog.json');
+const SPEC_SCHEMA_FILE = join(DATA_BASE, 'specSchema.json');
+const CERT_SCHEMA_FILE = join(DATA_BASE, 'certSchema.json');
+const IMAGES_DIR = join(DATA_BASE, 'images');
 
 app.use(cors());
 app.use(express.json());
@@ -42,6 +43,9 @@ if (existsSync(DIST_DIR)) {
 }
 
 // Ensure data dirs exist
+if (!existsSync(DATA_BASE)) {
+  await mkdir(DATA_BASE, { recursive: true });
+}
 if (!existsSync(SESSIONS_DIR)) {
   await mkdir(SESSIONS_DIR, { recursive: true });
 }
