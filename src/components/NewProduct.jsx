@@ -46,6 +46,38 @@ const SUBCLASS_OPTIONS = {
   ],
 };
 
+// Default capabilities pre-checked per subclass
+const SUBCLASS_PRESETS = {
+  camera: {
+    'Indoor Stationary':  ['indoor','wifi-2_4','motion-detection','person-detection','ir-night-vision','two-way-audio','cloud-recording','event-only-recording','cam-set-motion-sensitivity','cam-set-night-vision','cam-set-notif-cooldown'],
+    'Indoor P/T':         ['indoor','wifi-2_4','form-pan-tilt','motion-detection','person-detection','ir-night-vision','two-way-audio','cloud-recording','event-only-recording','cam-set-motion-sensitivity','cam-set-night-vision','cam-set-autotrack','cam-set-notif-cooldown'],
+    'Outdoor Stationary': ['outdoor','wifi-2_4','motion-detection','person-detection','color-night-vision','two-way-audio','cloud-recording','event-only-recording','cam-set-motion-sensitivity','cam-set-night-vision','cam-set-notif-cooldown'],
+    'Outdoor P/T':        ['outdoor','wifi-2_4','form-pan-tilt','motion-detection','person-detection','color-night-vision','two-way-audio','cloud-recording','event-only-recording','cam-set-motion-sensitivity','cam-set-night-vision','cam-set-autotrack','cam-set-notif-cooldown'],
+    'Doorbell':           ['doorbell','form-doorbell','doorbell-button','wifi-2_4','motion-detection','person-detection','two-way-audio','cloud-recording','event-only-recording','cam-set-motion-sensitivity','cam-set-notif-cooldown'],
+    'Lightbulb':          ['lightbulb','form-bulb','wifi-2_4','motion-detection','two-way-audio','cloud-recording','event-only-recording','cam-set-motion-sensitivity','cam-set-notif-cooldown'],
+    'Window':             ['window','indoor','wifi-2_4','motion-detection','cloud-recording','event-only-recording','cam-set-motion-sensitivity','cam-set-notif-cooldown'],
+    'Pet':                ['indoor','form-pan-tilt','wifi-2_4','motion-detection','person-detection','two-way-audio','cloud-recording','event-only-recording','cam-set-motion-sensitivity','cam-set-autotrack','cam-set-notif-cooldown'],
+  },
+  hub: {
+    'Security Hub': ['z-wave','rf-sensors','wifi','battery-backup','cellular-backup','onboard-siren','touchpad','key-fob','rf-sensor-peripheral','zwave-devices','professional-monitoring','self-monitoring','hub-set-entry-delay','hub-set-exit-delay','hub-set-alarm-duration','hub-set-siren-volume','hub-set-dialer-delay'],
+    'Camera Hub':   ['wifi','ethernet','wifi-devices','professional-monitoring','self-monitoring'],
+  },
+  sensor: {
+    'Door/Window':  ['door-window','rf-345mhz','sensor-battery','tamper-detection','led-indicator','sen-set-entry-delay','sen-set-chime-type','sen-set-chime-volume','sen-set-supervision'],
+    'Motion':       ['motion-pir','rf-345mhz','sensor-battery','tamper-detection','led-indicator','pet-immune','sen-set-motion-sensitivity','sen-set-pet-immunity','sen-set-supervision'],
+    'Glass Break':  ['glass-break','rf-345mhz','sensor-battery','tamper-detection','led-indicator','sen-set-supervision'],
+    'Smoke':        ['smoke-photoelectric','rf-345mhz','sensor-battery','tamper-detection','led-indicator'],
+    'CO':           ['co-detector','rf-345mhz','sensor-battery','tamper-detection','led-indicator'],
+    'Keyfob':       ['keyfob','rf-345mhz','sensor-battery'],
+    'Panic':        ['panic-button','rf-345mhz','sensor-battery'],
+    'Flood/Freeze': ['flood-water','freeze','rf-345mhz','sensor-battery','tamper-detection'],
+  },
+  touchpad: {
+    'Touchpad': ['bluetooth','battery-backup','tp-set-brightness','tp-set-volume','tp-set-button-tone'],
+    'Keypad':   ['bluetooth','tp-set-brightness','tp-set-volume','tp-set-button-tone'],
+  },
+};
+
 // Helper: look up capability label by ID
 function getCapabilityLabel(capId) {
   for (const groupList of Object.values(CAPABILITY_GROUPS)) {
@@ -549,6 +581,37 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
           </div>
         )}
 
+        {/* Technical Specifications Section */}
+        {specSchema && (
+          <div className="app-config-section" style={{ marginBottom: 16 }}>
+            <button
+              type="button"
+              className="spec-group-header"
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--border)' }}
+              onClick={() => setSpecsOpen(o => !o)}
+              aria-expanded={specsOpen}
+            >
+              <span style={{ fontWeight: 700, fontSize: 15 }}>
+                {specsOpen ? '▾' : '▸'} Technical Specifications
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>
+                Optional — for internal records and QA reference.
+              </span>
+            </button>
+            {specsOpen && (
+              <div style={{ marginTop: 12 }}>
+                <SpecsForm
+                  schema={specSchema}
+                  values={specs}
+                  notes={specNotes}
+                  onChange={(id, val) => setSpecs(prev => ({ ...prev, [id]: val }))}
+                  onNoteChange={(id, val) => setSpecNotes(prev => ({ ...prev, [id]: val }))}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Camera: Hub/NVR/DVR Connection Type */}
         {category === 'camera' && (
           <div className="form-group">
@@ -566,12 +629,23 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         {SUBCLASS_OPTIONS[category] && (
           <div className="form-group">
             <label>Subclass <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 12, color: 'var(--text-muted)' }}>(optional)</span></label>
-            <select value={subclass} onChange={e => setSubclass(e.target.value)}>
+            <select value={subclass} onChange={e => {
+              const val = e.target.value;
+              setSubclass(val);
+              if (!isEdit && val && SUBCLASS_PRESETS[category]?.[val]) {
+                setCapabilities(new Set(SUBCLASS_PRESETS[category][val]));
+              }
+            }}>
               <option value="">— Select subclass —</option>
               {SUBCLASS_OPTIONS[category].map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
+            {subclass && SUBCLASS_PRESETS[category]?.[subclass] && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                Capabilities pre-filled based on subclass — adjust below as needed.
+              </div>
+            )}
           </div>
         )}
 
@@ -610,37 +684,6 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
             </div>
           );
         })()}
-
-        {/* Technical Specifications Section */}
-        {specSchema && (
-          <div className="app-config-section" style={{ marginBottom: 16 }}>
-            <button
-              type="button"
-              className="spec-group-header"
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--border)' }}
-              onClick={() => setSpecsOpen(o => !o)}
-              aria-expanded={specsOpen}
-            >
-              <span style={{ fontWeight: 700, fontSize: 15 }}>
-                {specsOpen ? '▾' : '▸'} Technical Specifications
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>
-                Optional — for internal records and QA reference.
-              </span>
-            </button>
-            {specsOpen && (
-              <div style={{ marginTop: 12 }}>
-                <SpecsForm
-                  schema={specSchema}
-                  values={specs}
-                  notes={specNotes}
-                  onChange={(id, val) => setSpecs(prev => ({ ...prev, [id]: val }))}
-                  onNoteChange={(id, val) => setSpecNotes(prev => ({ ...prev, [id]: val }))}
-                />
-              </div>
-            )}
-          </div>
-        )}
 
         {/* App Configurations Section */}
         {showAppConfigs && (
