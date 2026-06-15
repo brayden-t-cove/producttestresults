@@ -5,6 +5,9 @@ import { SPEC_SCHEMA } from '../data/productSpecs.js';
 // Subclass options — mirrors NewProduct.jsx; update both when adding categories
 const SUBCLASS_OPTIONS = {
   camera: ['Indoor Stationary', 'Indoor P/T', 'Outdoor Stationary', 'Outdoor P/T', 'Doorbell', 'Lightbulb', 'Window', 'Pet'],
+  hub: ['Security Hub', 'Camera Hub'],
+  sensor: ['Door/Window', 'Motion', 'Glass Break', 'Smoke', 'CO', 'Keyfob', 'Panic', 'Flood/Freeze'],
+  touchpad: ['Touchpad', 'Keypad'],
 };
 
 const CATEGORY_LABELS = {

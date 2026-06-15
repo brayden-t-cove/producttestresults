@@ -26,6 +26,24 @@ const SUBCLASS_OPTIONS = {
     'Window',
     'Pet',
   ],
+  hub: [
+    'Security Hub',
+    'Camera Hub',
+  ],
+  sensor: [
+    'Door/Window',
+    'Motion',
+    'Glass Break',
+    'Smoke',
+    'CO',
+    'Keyfob',
+    'Panic',
+    'Flood/Freeze',
+  ],
+  touchpad: [
+    'Touchpad',
+    'Keypad',
+  ],
 };
 
 // Helper: look up capability label by ID
