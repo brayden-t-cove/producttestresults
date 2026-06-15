@@ -31,17 +31,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/api/images', express.static(IMAGES_DIR));
 
-// Serve built frontend in production
-const DIST_DIR = join(__dirname, 'dist');
-if (existsSync(DIST_DIR)) {
-  app.use(express.static(DIST_DIR));
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(join(DIST_DIR, 'index.html'));
-    }
-  });
-}
-
 // Ensure data dirs exist
 if (!existsSync(DATA_BASE)) {
   await mkdir(DATA_BASE, { recursive: true });
@@ -1168,6 +1157,15 @@ app.delete('/api/comparisons/:id', async (req, res) => {
     res.status(404).json({ error: 'Not found' });
   }
 });
+
+// Serve built frontend in production — must be AFTER all API routes
+const DIST_DIR = join(__dirname, 'dist');
+if (existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+  app.get('*', (req, res) => {
+    res.sendFile(join(DIST_DIR, 'index.html'));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`API server running on http://localhost:${PORT}`);
