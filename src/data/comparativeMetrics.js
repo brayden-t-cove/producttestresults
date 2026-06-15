@@ -420,10 +420,93 @@ export const COMPARATIVE_METRICS = [
     defaultThresholdType: null,
     category: 'universal',
   },
+  // System-level metrics (camera + hub/base station evaluated as a whole)
+  {
+    id: 'system-setup-experience',
+    label: 'Setup & Onboarding Experience',
+    unit: '',
+    type: 'rating',
+    direction: 'higher_better',
+    defaultThreshold: null,
+    defaultThresholdType: null,
+    category: 'system',
+  },
+  {
+    id: 'system-app-integration',
+    label: 'App Integration Quality',
+    unit: '',
+    type: 'rating',
+    direction: 'higher_better',
+    defaultThreshold: null,
+    defaultThresholdType: null,
+    category: 'system',
+  },
+  {
+    id: 'system-notification-reliability',
+    label: 'Notification Reliability',
+    unit: '',
+    type: 'rating',
+    direction: 'higher_better',
+    defaultThreshold: null,
+    defaultThresholdType: null,
+    category: 'system',
+  },
+  {
+    id: 'system-cloud-storage',
+    label: 'Cloud Storage & Playback',
+    unit: '',
+    type: 'rating',
+    direction: 'higher_better',
+    defaultThreshold: null,
+    defaultThresholdType: null,
+    category: 'system',
+  },
+  {
+    id: 'system-offline-behavior',
+    label: 'Offline / Connectivity Loss Behavior',
+    unit: '',
+    type: 'observation',
+    direction: null,
+    defaultThreshold: null,
+    defaultThresholdType: null,
+    category: 'system',
+  },
+  {
+    id: 'system-ecosystem-reliability',
+    label: 'Ecosystem Reliability (Overall)',
+    unit: '',
+    type: 'rating',
+    direction: 'higher_better',
+    defaultThreshold: null,
+    defaultThresholdType: null,
+    category: 'system',
+  },
+  {
+    id: 'system-value',
+    label: 'Price / Value',
+    unit: '',
+    type: 'rating',
+    direction: 'higher_better',
+    defaultThreshold: null,
+    defaultThresholdType: null,
+    category: 'system',
+  },
+  {
+    id: 'system-notes',
+    label: 'System Notes',
+    unit: '',
+    type: 'observation',
+    direction: null,
+    defaultThreshold: null,
+    defaultThresholdType: null,
+    category: 'system',
+  },
 ];
 
-export function getMetricsForCategories(categorySet) {
+export function getMetricsForCategories(categorySet, includeSystem = false) {
   return COMPARATIVE_METRICS.filter(
-    m => m.category === 'universal' || categorySet.has(m.category)
+    m => m.category === 'universal'
+      || categorySet.has(m.category)
+      || (includeSystem && m.category === 'system')
   );
 }

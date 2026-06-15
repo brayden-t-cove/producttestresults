@@ -9,6 +9,7 @@ const CATEGORY_LABELS = {
   touchpad: 'Touchpad',
   app: 'App',
   universal: 'Universal',
+  system: 'System (Full Ecosystem)',
 };
 
 const PRODUCT_CLASSES = [
@@ -21,10 +22,18 @@ const PRODUCT_CLASSES = [
   },
   {
     id: 'camera',
-    label: 'Cameras & Camera Systems',
+    label: 'Cameras',
     icon: '📷',
-    description: 'Indoor, outdoor, doorbell, and NVR/DVR systems',
+    description: 'Indoor, outdoor, doorbell cameras — camera hardware only',
     categories: ['camera'],
+  },
+  {
+    id: 'camera-system',
+    label: 'Camera Systems (Full)',
+    icon: '🎥',
+    description: 'Full vendor system — camera + hub/base station + app. Use this when evaluating the whole vendor ecosystem.',
+    categories: ['camera'],
+    systemLevel: true,
   },
   {
     id: 'app',
@@ -58,6 +67,10 @@ const DEFAULT_METRIC_IDS = {
   ]),
   universal: new Set([
     'universal-price', 'universal-overall-rating', 'universal-vendor-support-quality',
+  ]),
+  system: new Set([
+    'system-setup-experience', 'system-app-integration', 'system-notification-reliability',
+    'system-cloud-storage', 'system-ecosystem-reliability', 'system-value',
   ]),
 };
 
@@ -159,7 +172,8 @@ export default function ComparativeStart({ catalog, sessions, onBack, onCreated 
 
   // Step 2 helpers
   const categorySet = new Set(selectedProducts.map(p => (p.category || '').toLowerCase()).filter(Boolean));
-  const availableMetrics = getMetricsForCategories(categorySet);
+  const isSystemClass = PRODUCT_CLASSES.find(c => c.id === selectedClass)?.systemLevel || false;
+  const availableMetrics = getMetricsForCategories(categorySet, isSystemClass);
 
   const metricsByCategory = {};
   for (const m of availableMetrics) {
@@ -184,6 +198,11 @@ export default function ComparativeStart({ catalog, sessions, onBack, onCreated 
       setError('Please select at least 2 products.');
       return;
     }
+    const ids = filled.map(s => s.catalogId);
+    if (new Set(ids).size !== ids.length) {
+      setError('Each product slot must have a different product. Remove the duplicate selection.');
+      return;
+    }
     // Pre-select defaults based on selected categories
     const defaults = new Set();
     for (const cat of categorySet) {
@@ -191,6 +210,9 @@ export default function ComparativeStart({ catalog, sessions, onBack, onCreated 
       for (const id of defSet) defaults.add(id);
     }
     for (const id of DEFAULT_METRIC_IDS.universal) defaults.add(id);
+    if (isSystemClass) {
+      for (const id of DEFAULT_METRIC_IDS.system) defaults.add(id);
+    }
     // Only include defaults that are in available metrics
     const availableIds = new Set(availableMetrics.map(m => m.id));
     const filtered = new Set([...defaults].filter(id => availableIds.has(id)));
@@ -364,9 +386,14 @@ export default function ComparativeStart({ catalog, sessions, onBack, onCreated 
                         onChange={e => setSlotField(idx, 'catalogId', e.target.value)}
                       >
                         <option value="">— Choose from catalog —</option>
-                        {classCatalog.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}{p.version ? ` ${p.version}` : ''}{p.category ? ` · ${p.category}` : ''}</option>
-                        ))}
+                        {classCatalog.map(p => {
+                          const takenByOther = productSlots.some((s, i) => i !== idx && s.catalogId === p.id);
+                          return (
+                            <option key={p.id} value={p.id} disabled={takenByOther}>
+                              {takenByOther ? '✕ ' : ''}{p.name}{p.version ? ` ${p.version}` : ''}{p.category ? ` · ${p.category}` : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                     <div className="form-group" style={{ marginBottom: 0 }}>

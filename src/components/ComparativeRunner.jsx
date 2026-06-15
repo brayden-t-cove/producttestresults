@@ -196,6 +196,7 @@ export default function ComparativeRunner({ session, onUpdate, onComplete, onExi
   const CATEGORY_LABELS = {
     camera: 'Camera', hub: 'Hub', sensor: 'Sensor',
     touchpad: 'Touchpad', app: 'App', universal: 'Universal',
+    system: 'System (Full Ecosystem)',
   };
 
   const metricCategories = [...new Set(metrics.map(m => {
