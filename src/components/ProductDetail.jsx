@@ -29,6 +29,7 @@ function boolDisplay(val) {
 function TechSpecsTab({ product }) {
   const schema = SPEC_SCHEMA[product.category];
   const specs = product.specs || {};
+  const specNotes = product.specNotes || {};
 
   if (!schema) {
     return (
@@ -67,15 +68,22 @@ function TechSpecsTab({ product }) {
               const isBool = field.type === 'boolean';
               const boolInfo = isBool ? boolDisplay(val) : null;
               return (
-                <div key={field.id} className="spec-sheet-row">
-                  <span className="spec-sheet-key">{field.label}</span>
-                  <span className="spec-sheet-val">
-                    {isBool && boolInfo ? (
-                      <span style={{ color: boolInfo.color, fontWeight: 700 }}>{boolInfo.symbol}</span>
-                    ) : (
-                      String(val)
-                    )}
-                  </span>
+                <div key={field.id} className="spec-sheet-row" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span className="spec-sheet-key">{field.label}</span>
+                    <span className="spec-sheet-val">
+                      {isBool && boolInfo ? (
+                        <span style={{ color: boolInfo.color, fontWeight: 700 }}>{boolInfo.symbol}</span>
+                      ) : (
+                        String(val)
+                      )}
+                    </span>
+                  </div>
+                  {specNotes[field.id] && (
+                    <div style={{ fontSize: 11, color: 'var(--primary)', marginTop: 2, fontStyle: 'italic' }}>
+                      📝 {specNotes[field.id]}
+                    </div>
+                  )}
                 </div>
               );
             })}

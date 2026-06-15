@@ -114,10 +114,15 @@ function SpecField({ field, value, onChange }) {
   }
 }
 
-function SpecGroup({ group, values, onChange }) {
+function SpecGroup({ group, values, notes, onChange, onNoteChange }) {
   const [open, setOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState({});
   const filled = countFilled(group.fields, values);
   const total = group.fields.length;
+
+  function toggleNote(fieldId) {
+    setNoteOpen(prev => ({ ...prev, [fieldId]: !prev[fieldId] }));
+  }
 
   return (
     <div className="spec-group">
@@ -147,18 +152,43 @@ function SpecGroup({ group, values, onChange }) {
           <div className="spec-fields-grid">
             {group.fields.map(field => {
               const isWide = field.type === 'textarea';
+              const hasNote = !!(notes?.[field.id]);
+              const noteVisible = noteOpen[field.id] || hasNote;
               return (
                 <div
                   key={field.id}
                   className="spec-field-row"
                   style={isWide ? { gridColumn: '1 / -1' } : {}}
                 >
-                  <label className="spec-field-label">{field.label}</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                    <label className="spec-field-label">{field.label}</label>
+                    <button
+                      type="button"
+                      onClick={() => toggleNote(field.id)}
+                      title={hasNote ? 'Has note' : 'Add note'}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px',
+                        fontSize: 12, color: hasNote ? 'var(--primary)' : 'var(--text-muted)',
+                        flexShrink: 0, lineHeight: 1,
+                      }}
+                    >
+                      {hasNote ? '📝' : '+ note'}
+                    </button>
+                  </div>
                   <SpecField
                     field={field}
                     value={values[field.id]}
                     onChange={val => onChange(field.id, val)}
                   />
+                  {noteVisible && (
+                    <input
+                      type="text"
+                      placeholder="Note (e.g. vendor claims X, actual measured Y)..."
+                      value={notes?.[field.id] || ''}
+                      onChange={e => onNoteChange(field.id, e.target.value)}
+                      style={{ marginTop: 4, width: '100%', fontSize: 12, color: 'var(--primary)', borderColor: 'rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.05)' }}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -169,7 +199,7 @@ function SpecGroup({ group, values, onChange }) {
   );
 }
 
-export default function SpecsForm({ schema, values, onChange }) {
+export default function SpecsForm({ schema, values, notes, onChange, onNoteChange }) {
   if (!schema || schema.length === 0) return null;
 
   return (
@@ -179,7 +209,9 @@ export default function SpecsForm({ schema, values, onChange }) {
           key={group.label}
           group={group}
           values={values}
+          notes={notes}
           onChange={onChange}
+          onNoteChange={onNoteChange}
         />
       ))}
     </div>

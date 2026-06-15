@@ -174,6 +174,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
   const [capabilities, setCapabilities] = useState(new Set(product?.capabilities || []));
   const [appConfigs, setAppConfigs] = useState(product?.appConfigs || []);
   const [specs, setSpecs] = useState(product?.specs || {});
+  const [specNotes, setSpecNotes] = useState(product?.specNotes || {});
   const [compatibleWith, setCompatibleWith] = useState(product?.compatibleWith || []);
   const [hubConnectionType, setHubConnectionType] = useState(product?.hubConnectionType || 'standalone');
   const [subclass, setSubclass] = useState(product?.subclass || '');
@@ -278,6 +279,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         capabilities: Array.from(capabilities),
         appConfigs,
         specs,
+        specNotes: Object.keys(specNotes).length > 0 ? specNotes : undefined,
         compatibleWith,
         hubConnectionType: category === 'camera' ? hubConnectionType : undefined,
         subclass: SUBCLASS_OPTIONS[category] ? subclass : undefined,
@@ -613,7 +615,9 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
                 <SpecsForm
                   schema={specSchema}
                   values={specs}
+                  notes={specNotes}
                   onChange={(id, val) => setSpecs(prev => ({ ...prev, [id]: val }))}
+                  onNoteChange={(id, val) => setSpecNotes(prev => ({ ...prev, [id]: val }))}
                 />
               </div>
             )}
