@@ -659,6 +659,9 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
               </div>
               <div className="product-detail-sub product-detail-oem">
                 {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || product.category}
+                {product.subclass && (
+                  <span style={{ marginLeft: 8, color: 'var(--primary)', fontWeight: 500, fontSize: 12 }}>· {product.subclass}</span>
+                )}
               </div>
             </div>
           </div>

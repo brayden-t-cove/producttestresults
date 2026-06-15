@@ -15,6 +15,19 @@ const CATEGORY_ICONS = {
 // Show app configs for all categories except sensor and touchpad
 const SHOW_APP_CONFIGS_FOR = ['hub', 'camera', 'app'];
 
+const SUBCLASS_OPTIONS = {
+  camera: [
+    'Indoor Stationary',
+    'Indoor P/T',
+    'Outdoor Stationary',
+    'Outdoor P/T',
+    'Doorbell',
+    'Lightbulb',
+    'Window',
+    'Pet',
+  ],
+};
+
 // Helper: look up capability label by ID
 function getCapabilityLabel(capId) {
   for (const groupList of Object.values(CAPABILITY_GROUPS)) {
@@ -163,6 +176,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
   const [specs, setSpecs] = useState(product?.specs || {});
   const [compatibleWith, setCompatibleWith] = useState(product?.compatibleWith || []);
   const [hubConnectionType, setHubConnectionType] = useState(product?.hubConnectionType || 'standalone');
+  const [subclass, setSubclass] = useState(product?.subclass || '');
   const [entity, setEntity] = useState(product?.entity || []);
   const [productType, setProductType] = useState(product?.type || 'production');
   const [showAddAppForm, setShowAddAppForm] = useState(false);
@@ -266,6 +280,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         specs,
         compatibleWith,
         hubConnectionType: category === 'camera' ? hubConnectionType : undefined,
+        subclass: SUBCLASS_OPTIONS[category] ? subclass : undefined,
         imageUrl,
         entity,
         type: productType,
@@ -523,6 +538,19 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
               <option value="hub">Connects to Hub / Chime</option>
               <option value="nvr-dvr">Connects to NVR / DVR</option>
               <option value="proprietary-base">Connects to Proprietary Base Station</option>
+            </select>
+          </div>
+        )}
+
+        {/* Subclass — shown when category has defined subclasses */}
+        {SUBCLASS_OPTIONS[category] && (
+          <div className="form-group">
+            <label>Subclass <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 12, color: 'var(--text-muted)' }}>(optional)</span></label>
+            <select value={subclass} onChange={e => setSubclass(e.target.value)}>
+              <option value="">— Select subclass —</option>
+              {SUBCLASS_OPTIONS[category].map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
           </div>
         )}

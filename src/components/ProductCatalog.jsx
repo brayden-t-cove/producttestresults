@@ -323,6 +323,9 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                       </div>
                       <div className="catalog-card-meta">
                         {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || CATEGORY_LABELS[product.category] || product.category}
+                        {product.subclass && (
+                          <span style={{ marginLeft: 6, color: 'var(--primary)', fontWeight: 500, fontSize: 11 }}>· {product.subclass}</span>
+                        )}
                       </div>
                       {(product.entity || []).length > 0 && (
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
