@@ -299,3 +299,42 @@ export async function saveSettings(apiKey) {
   if (!res.ok) throw new Error('Failed to save settings');
   return res.json();
 }
+
+export async function listComparisons(catalogId) {
+  const url = catalogId ? `${BASE}/comparisons?catalogId=${catalogId}` : `${BASE}/comparisons`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to list comparisons');
+  return res.json();
+}
+
+export async function getComparison(id) {
+  const res = await fetch(`${BASE}/comparisons/${id}`);
+  if (!res.ok) throw new Error('Failed to get comparison');
+  return res.json();
+}
+
+export async function createComparison(data) {
+  const res = await fetch(`${BASE}/comparisons`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create comparison');
+  return res.json();
+}
+
+export async function updateComparison(id, data) {
+  const res = await fetch(`${BASE}/comparisons/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update comparison');
+  return res.json();
+}
+
+export async function deleteComparison(id) {
+  const res = await fetch(`${BASE}/comparisons/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete comparison');
+  return res.json();
+}

@@ -17,6 +17,7 @@ const app = express();
 const PORT = 3001;
 const ENV_FILE = join(__dirname, '.env');
 const SESSIONS_DIR = join(__dirname, 'data', 'sessions');
+const COMPARISONS_DIR = join(__dirname, 'data', 'comparisons');
 const DEVICES_FILE = join(__dirname, 'data', 'devices.json');
 const FIRMWARES_FILE = join(__dirname, 'data', 'firmwares.json');
 const CATALOG_FILE = join(__dirname, 'data', 'catalog.json');
@@ -29,9 +30,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/api/images', express.static(IMAGES_DIR));
 
-// Ensure sessions dir exists
+// Ensure data dirs exist
 if (!existsSync(SESSIONS_DIR)) {
   await mkdir(SESSIONS_DIR, { recursive: true });
+}
+if (!existsSync(COMPARISONS_DIR)) {
+  await mkdir(COMPARISONS_DIR, { recursive: true });
 }
 if (!existsSync(IMAGES_DIR)) {
   await mkdir(IMAGES_DIR, { recursive: true });
@@ -1053,6 +1057,70 @@ app.post('/api/settings', async (req, res) => {
     res.json({ success: true, apiKeyPreview: `${trimmed.slice(0, 8)}...${trimmed.slice(-4)}` });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save API key' });
+  }
+});
+
+// ── Comparisons ──────────────────────────────────────────────────────────────
+
+app.get('/api/comparisons', async (req, res) => {
+  try {
+    const files = await readdir(COMPARISONS_DIR);
+    const comps = await Promise.all(
+      files.filter(f => f.endsWith('.json')).map(async f => {
+        const raw = await readFile(join(COMPARISONS_DIR, f), 'utf-8');
+        return JSON.parse(raw);
+      })
+    );
+    const { catalogId } = req.query;
+    const filtered = catalogId
+      ? comps.filter(c => c.products?.some(p => p.catalogId === catalogId))
+      : comps;
+    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(filtered);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/comparisons/:id', async (req, res) => {
+  try {
+    const raw = await readFile(join(COMPARISONS_DIR, `${req.params.id}.json`), 'utf-8');
+    res.json(JSON.parse(raw));
+  } catch {
+    res.status(404).json({ error: 'Not found' });
+  }
+});
+
+app.post('/api/comparisons', async (req, res) => {
+  try {
+    const id = crypto.randomUUID();
+    const comparison = { id, createdAt: new Date().toISOString(), ...req.body };
+    await writeFile(join(COMPARISONS_DIR, `${id}.json`), JSON.stringify(comparison, null, 2));
+    res.status(201).json(comparison);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/comparisons/:id', async (req, res) => {
+  try {
+    const filePath = join(COMPARISONS_DIR, `${req.params.id}.json`);
+    const raw = await readFile(filePath, 'utf-8');
+    const existing = JSON.parse(raw);
+    const updated = { ...existing, ...req.body, id: existing.id, createdAt: existing.createdAt };
+    await writeFile(filePath, JSON.stringify(updated, null, 2));
+    res.json(updated);
+  } catch {
+    res.status(404).json({ error: 'Not found' });
+  }
+});
+
+app.delete('/api/comparisons/:id', async (req, res) => {
+  try {
+    await unlink(join(COMPARISONS_DIR, `${req.params.id}.json`));
+    res.json({ success: true });
+  } catch {
+    res.status(404).json({ error: 'Not found' });
   }
 });
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import { CERT_STATUS_LABELS, CERT_STATUS_COLORS } from '../data/certSchema.js';
+import { listComparisons } from '../lib/api.js';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -287,7 +288,7 @@ const MEDIA_CATEGORIES = [
   { id: 'other', label: 'Other', icon: '🔗' },
 ];
 
-function MediaTab({ product, onProductUpdate }) {
+function MediaTab({ product, onProductUpdate, comparisons, onOpenComparison, onStartComparison }) {
   const mediaLinks = product.mediaLinks || [];
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -380,6 +381,41 @@ function MediaTab({ product, onProductUpdate }) {
           );
         })
       )}
+
+      {/* Comparisons */}
+      <div style={{ marginTop: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+            Comparisons
+          </div>
+          {onStartComparison && (
+            <button className="btn btn-ghost btn-sm" onClick={onStartComparison}>+ New Comparison</button>
+          )}
+        </div>
+        {comparisons && comparisons.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {comparisons.map(comp => (
+              <div
+                key={comp.id}
+                onClick={() => onOpenComparison && onOpenComparison(comp)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer' }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    {comp.mode === '1v1' ? '1:1' : 'Ranking'}: {comp.products?.map(p => p.name).join(' vs ')}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    {formatDate(comp.completedAt || comp.createdAt)} · {comp.products?.length || 0} products
+                  </div>
+                </div>
+                <span style={{ fontSize: 18, color: 'var(--text-muted)' }}>→</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 0' }}>No comparisons yet.</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -628,9 +664,14 @@ function PdfExportModal({ product, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onCertUpdate, certSchema, onProductUpdate }) {
+export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate }) {
   const [activeTab, setActiveTab] = useState('Tech Specs');
   const [showPdfModal, setShowPdfModal] = useState(false);
+  const [comparisons, setComparisons] = useState([]);
+
+  useEffect(() => {
+    listComparisons(product.id).then(setComparisons).catch(() => {});
+  }, [product.id]);
 
   return (
     <div className="product-detail">
@@ -666,7 +707,10 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', paddingTop: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', paddingTop: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+          {onStartComparison && (
+            <button className="btn btn-secondary btn-sm" onClick={onStartComparison}>⚖ Compare</button>
+          )}
           <button className="btn btn-secondary btn-sm" onClick={() => setShowPdfModal(true)}>
             🖨 Export PDF
           </button>
@@ -691,7 +735,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Certifications' && <CertificationsTab product={product} onCertUpdate={onCertUpdate} certSchema={certSchema} />}
       {activeTab === 'Testing Results' && <TestingResultsTab sessions={sessions} onOpenSession={onOpenSession} />}
       {activeTab === 'Known Issues' && <KnownIssuesTab product={product} onOpenSession={onOpenSession} />}
-      {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} />}
+      {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} />}
       {activeTab === 'Project Docs' && <ProjectDocsTab product={product} onProductUpdate={onProductUpdate} />}
     </div>
   );

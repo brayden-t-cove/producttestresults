@@ -5,8 +5,11 @@ import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
 import TestRunner from './components/TestRunner.jsx';
 import SessionSummary from './components/SessionSummary.jsx';
-import ExploratoryStart from './components/ExploratoryStart.jsx';import ExploratoryRunner from './components/ExploratoryRunner.jsx';
+import ExploratoryStart from './components/ExploratoryStart.jsx';
+import ExploratoryRunner from './components/ExploratoryRunner.jsx';
 import ExploratorySummary from './components/ExploratorySummary.jsx';
+import ComparisonBuilder from './components/ComparisonBuilder.jsx';
+import ComparisonView from './components/ComparisonView.jsx';
 import ProductCatalog from './components/ProductCatalog.jsx';
 import NewProduct from './components/NewProduct.jsx';
 import AnalyticsPage from './components/AnalyticsPage.jsx';
@@ -218,7 +221,7 @@ function classifySession(s, catalog) {
   return 'production';
 }
 
-function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
+function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewComparison, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
   const [activeTab, setActiveTab] = useState('production');
 
   const productionSessions = sessions.filter(s => classifySession(s, catalog) === 'production');
@@ -242,6 +245,9 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onOpen
           <button className="btn btn-ghost" onClick={onIssues}>🐛 Issues</button>
           <button className="btn btn-secondary" onClick={onNewExploratory}>
             + Exploratory
+          </button>
+          <button className="btn btn-secondary" onClick={onNewComparison}>
+            + Compare
           </button>
           <button className="btn btn-primary btn-lg" onClick={onNew}>
             + New Session
@@ -315,6 +321,8 @@ export default function App() {
   const [specSchema, setSpecSchema] = useState(null);
   const [certSchema, setCertSchema] = useState(null);
   const [currentProduct, setCurrentProduct] = useState(null);
+  const [currentComparison, setCurrentComparison] = useState(null);
+  const [comparisonPreselectedId, setComparisonPreselectedId] = useState(null);
 
   async function refreshSessions() {
     try {
@@ -467,6 +475,7 @@ export default function App() {
           loading={loadingSessions}
           onNew={() => setView('sessionStart')}
           onNewExploratory={() => setView('exploratoryStart')}
+          onNewComparison={() => { setComparisonPreselectedId(null); setCurrentComparison(null); setView('comparisonBuilder'); }}
           onOpen={handleOpenSession}
           onCatalog={() => setView('catalog')}
           onSettings={() => setShowSettings(true)}
@@ -500,6 +509,15 @@ export default function App() {
             onEdit={() => { setEditingProduct(currentProduct); setCurrentProduct(null); setView('editProduct'); }}
             onDelete={async () => { await handleDeleteProduct(currentProduct.id); setCurrentProduct(null); setView('catalog'); }}
             onOpenSession={handleOpenSession}
+            onStartComparison={() => {
+              setComparisonPreselectedId(currentProduct.id);
+              setCurrentComparison(null);
+              setView('comparisonBuilder');
+            }}
+            onOpenComparison={(comp) => {
+              setCurrentComparison(comp);
+              setView('comparisonView');
+            }}
             certSchema={certSchema}
             onCertUpdate={async (productId, certData) => {
               const updated = await updateCatalogEntry(productId, { certifications: certData });
@@ -511,6 +529,39 @@ export default function App() {
               setCurrentProduct(updated);
               await refreshCatalog();
             }}
+          />
+        </div>
+      )}
+
+      {view === 'comparisonBuilder' && (
+        <div className="dashboard">
+          <ComparisonBuilder
+            catalog={catalog}
+            specSchema={specSchema}
+            preselectedCatalogId={comparisonPreselectedId}
+            existingComparison={currentComparison}
+            onSaved={(comp) => {
+              setCurrentComparison(comp);
+              setView('comparisonView');
+            }}
+            onBack={() => {
+              if (comparisonPreselectedId) setView('productDetail');
+              else setView('testing');
+            }}
+          />
+        </div>
+      )}
+
+      {view === 'comparisonView' && currentComparison && (
+        <div className="dashboard">
+          <ComparisonView
+            comparison={currentComparison}
+            onEdit={() => setView('comparisonBuilder')}
+            onDeleted={() => {
+              setCurrentComparison(null);
+              setView(currentProduct ? 'productDetail' : 'testing');
+            }}
+            onBack={() => setView(currentProduct ? 'productDetail' : 'testing')}
           />
         </div>
       )}
