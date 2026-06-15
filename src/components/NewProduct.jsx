@@ -581,37 +581,6 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
           </div>
         )}
 
-        {/* Technical Specifications Section */}
-        {specSchema && (
-          <div className="app-config-section" style={{ marginBottom: 16 }}>
-            <button
-              type="button"
-              className="spec-group-header"
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--border)' }}
-              onClick={() => setSpecsOpen(o => !o)}
-              aria-expanded={specsOpen}
-            >
-              <span style={{ fontWeight: 700, fontSize: 15 }}>
-                {specsOpen ? '▾' : '▸'} Technical Specifications
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>
-                Optional — for internal records and QA reference.
-              </span>
-            </button>
-            {specsOpen && (
-              <div style={{ marginTop: 12 }}>
-                <SpecsForm
-                  schema={specSchema}
-                  values={specs}
-                  notes={specNotes}
-                  onChange={(id, val) => setSpecs(prev => ({ ...prev, [id]: val }))}
-                  onNoteChange={(id, val) => setSpecNotes(prev => ({ ...prev, [id]: val }))}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Camera: Hub/NVR/DVR Connection Type */}
         {category === 'camera' && (
           <div className="form-group">
@@ -644,6 +613,37 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
             {subclass && SUBCLASS_PRESETS[category]?.[subclass] && (
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 Capabilities pre-filled based on subclass — adjust below as needed.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Technical Specifications Section */}
+        {specSchema && (
+          <div className="app-config-section" style={{ marginBottom: 16 }}>
+            <button
+              type="button"
+              className="spec-group-header"
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--border)' }}
+              onClick={() => setSpecsOpen(o => !o)}
+              aria-expanded={specsOpen}
+            >
+              <span style={{ fontWeight: 700, fontSize: 15 }}>
+                {specsOpen ? '▾' : '▸'} Technical Specifications
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>
+                Optional — for internal records and QA reference.
+              </span>
+            </button>
+            {specsOpen && (
+              <div style={{ marginTop: 12 }}>
+                <SpecsForm
+                  schema={specSchema}
+                  values={specs}
+                  notes={specNotes}
+                  onChange={(id, val) => setSpecs(prev => ({ ...prev, [id]: val }))}
+                  onNoteChange={(id, val) => setSpecNotes(prev => ({ ...prev, [id]: val }))}
+                />
               </div>
             )}
           </div>
