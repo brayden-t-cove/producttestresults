@@ -14,7 +14,7 @@ import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '.env') });
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const ENV_FILE = join(__dirname, '.env');
 const SESSIONS_DIR = join(__dirname, 'data', 'sessions');
 const COMPARISONS_DIR = join(__dirname, 'data', 'comparisons');
@@ -29,6 +29,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/api/images', express.static(IMAGES_DIR));
+
+// Serve built frontend in production
+const DIST_DIR = join(__dirname, 'dist');
+if (existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(join(DIST_DIR, 'index.html'));
+    }
+  });
+}
 
 // Ensure data dirs exist
 if (!existsSync(SESSIONS_DIR)) {
