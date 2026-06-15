@@ -338,3 +338,19 @@ export async function deleteComparison(id) {
   if (!res.ok) throw new Error('Failed to delete comparison');
   return res.json();
 }
+
+export async function listIssuesForProduct(catalogId) {
+  const res = await fetch(`${BASE}/issues?catalogId=${encodeURIComponent(catalogId)}`);
+  if (!res.ok) throw new Error('Failed to list issues');
+  return res.json();
+}
+
+export async function patchIssue(sessionId, issueId, data) {
+  const res = await fetch(`${BASE}/sessions/${sessionId}/issues/${issueId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update issue');
+  return res.json();
+}

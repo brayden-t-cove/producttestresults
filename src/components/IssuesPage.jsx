@@ -86,6 +86,10 @@ function IssueRow({ issue, expanded, onToggle }) {
         </td>
         <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle' }}>
           <StatusBadge status={issue.derivedStatus} />
+          {issue.regressionFlag && <span style={{ marginLeft: 5, fontSize: 11, color: '#ea580c', fontWeight: 700 }}>⚠ Regression</span>}
+        </td>
+        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+          {issue.reproCount > 0 ? <span title="Times reproduced" style={{ fontWeight: 600, color: 'var(--fail)' }}>×{issue.reproCount}</span> : '—'}
         </td>
         <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle', fontSize: 12 }}>
           {issue.sourceTicket || issue.ticketUrl
@@ -97,7 +101,7 @@ function IssueRow({ issue, expanded, onToggle }) {
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={8} style={{ background: 'var(--surface)', padding: 0, borderBottom: '1px solid var(--border)' }}>
+          <td colSpan={9} style={{ background: 'var(--surface)', padding: 0, borderBottom: '1px solid var(--border)' }}>
             <div style={{ padding: '16px 20px', fontSize: 13, lineHeight: 1.6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px', marginBottom: 12 }}>
                 {issue.description && (
@@ -310,6 +314,9 @@ export default function IssuesPage({ onBack }) {
                   </th>
                   <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>
                     Status
+                  </th>
+                  <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>
+                    Repros
                   </th>
                   <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>
                     Ticket

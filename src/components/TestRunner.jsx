@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { updateSession } from '../lib/api.js';
+import { updateSession, listIssuesForProduct, patchIssue } from '../lib/api.js';
 import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 import IssueLogger from './IssueLogger.jsx';
 import IssueVerification from './IssueVerification.jsx';
@@ -233,26 +233,38 @@ function TestDetailHeader({ test, onDelete, onRenameTitle }) {
   const [title, setTitle] = useState(test.title || '');
   useEffect(() => { setTitle(test.title || ''); }, [test.id]);
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
-      <TestNumberBadge testNumber={test.testNumber} />
-      <input
-        type="text"
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        onBlur={e => {
-          const v = e.target.value.trim();
-          if (v && v !== test.title) onRenameTitle(v);
-        }}
-        style={{ flex: 1, fontWeight: 700, fontSize: 16, border: 'none', borderBottom: '1px solid transparent', background: 'transparent', padding: '0 0 2px', color: 'var(--text)', outline: 'none' }}
-        onFocus={e => { e.target.style.borderBottomColor = 'var(--primary)'; }}
-        onBlurCapture={e => { e.target.style.borderBottomColor = 'transparent'; }}
-      />
-      <button
-        className="btn btn-ghost btn-sm"
-        style={{ color: 'var(--fail)', flexShrink: 0 }}
-        onClick={onDelete}
-        title="Remove test case"
-      >✕</button>
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <TestNumberBadge testNumber={test.testNumber} />
+        <input
+          type="text"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onBlur={e => {
+            const v = e.target.value.trim();
+            if (v && v !== test.title) onRenameTitle(v);
+          }}
+          style={{ flex: 1, fontWeight: 700, fontSize: 16, border: 'none', borderBottom: '1px solid transparent', background: 'transparent', padding: '0 0 2px', color: 'var(--text)', outline: 'none' }}
+          onFocus={e => { e.target.style.borderBottomColor = 'var(--primary)'; }}
+          onBlurCapture={e => { e.target.style.borderBottomColor = 'transparent'; }}
+        />
+        <button
+          className="btn btn-ghost btn-sm"
+          style={{ color: 'var(--fail)', flexShrink: 0 }}
+          onClick={onDelete}
+          title="Remove test case"
+        >✕</button>
+      </div>
+      {test.regressionFlag && (
+        <div style={{ marginTop: 6, padding: '6px 10px', background: 'rgba(234,88,12,0.12)', border: '1px solid rgba(234,88,12,0.4)', borderRadius: 6, fontSize: 12, color: '#ea580c', fontWeight: 600 }}>
+          ⚠ Regression — this issue was previously marked Fixed
+        </div>
+      )}
+      {test.linkedIssueTitle && (
+        <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', background: 'var(--fail-dim)', border: '1px solid var(--fail)', borderRadius: 12, fontSize: 12, color: 'var(--fail)' }}>
+          🔗 Linked: {test.linkedIssueTitle}
+        </div>
+      )}
     </div>
   );
 }
@@ -545,6 +557,13 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const [skipSectionState, setSkipSectionState] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
+  // Fail → issue popup
+  const [failPopup, setFailPopup] = useState(null); // { testId } when open
+  const [failPopupMode, setFailPopupMode] = useState(null); // 'new' | 'existing' | null
+  const [existingIssues, setExistingIssues] = useState([]);
+  const [selectedExistingIssueKey, setSelectedExistingIssueKey] = useState('');
+  const [loadingIssues, setLoadingIssues] = useState(false);
+
   const selectedTest = session.testCases.find(t => t.id === selectedTestId);
 
   const completed = session.testCases.filter(t => t.status !== 'pending').length;
@@ -593,8 +612,64 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   }
 
   function handleVerdict(status) {
+    if (status === 'fail') {
+      setFailPopup({ testId: selectedTestId });
+      setFailPopupMode(null);
+      setSelectedExistingIssueKey('');
+      return;
+    }
     const testNotes = notes[selectedTestId] ?? selectedTest?.notes ?? '';
     saveTestUpdate(selectedTestId, { status, notes: testNotes });
+    advanceToNextTest();
+  }
+
+  function handleFailJustMark() {
+    const testNotes = notes[failPopup.testId] ?? session.testCases.find(t => t.id === failPopup.testId)?.notes ?? '';
+    saveTestUpdate(failPopup.testId, { status: 'fail', notes: testNotes });
+    setFailPopup(null);
+    advanceToNextTest();
+  }
+
+  async function handleFailChooseExisting() {
+    setFailPopupMode('existing');
+    setLoadingIssues(true);
+    try {
+      const catalogId = session.catalogId || session.products?.[0]?.catalogId;
+      const issues = catalogId ? await listIssuesForProduct(catalogId) : [];
+      setExistingIssues(issues.filter(i => i.derivedStatus !== 'Fixed' || true)); // show all including fixed (for regression)
+    } catch {
+      setExistingIssues([]);
+    } finally {
+      setLoadingIssues(false);
+    }
+  }
+
+  async function handleLinkExistingIssue() {
+    if (!selectedExistingIssueKey) return;
+    const [sessionId, issueId] = selectedExistingIssueKey.split('::');
+    const linked = existingIssues.find(i => i.sessionId === sessionId && i.id === issueId);
+    if (!linked) return;
+
+    const isRegression = linked.derivedStatus === 'Fixed';
+    const newReproCount = (linked.reproCount || 0) + 1;
+
+    // Patch the issue with incremented reproCount (and regressionFlag if fixed)
+    await patchIssue(sessionId, issueId, {
+      reproCount: newReproCount,
+      ...(isRegression ? { regressionFlag: true } : {}),
+    });
+
+    const test = session.testCases.find(t => t.id === failPopup.testId);
+    const testNotes = notes[failPopup.testId] ?? test?.notes ?? '';
+    await saveTestUpdate(failPopup.testId, {
+      status: 'fail',
+      notes: testNotes,
+      linkedIssueId: issueId,
+      linkedIssueSessionId: sessionId,
+      linkedIssueTitle: linked.title,
+      regressionFlag: isRegression,
+    });
+    setFailPopup(null);
     advanceToNextTest();
   }
 
@@ -933,6 +1008,70 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
       </div>
 
       {/* Delete test confirmation */}
+      {/* Fail → issue popup */}
+      {failPopup && (
+        <div className="modal-overlay" onClick={() => setFailPopup(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <h3 style={{ marginBottom: 4 }}>Test Failed</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+              "{session.testCases.find(t => t.id === failPopup.testId)?.title}" — would you like to log or link an issue?
+            </p>
+
+            {failPopupMode === null && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }} onClick={() => { setFailPopup(null); setShowIssueLogger(true); const testNotes = notes[failPopup.testId] ?? session.testCases.find(t => t.id === failPopup.testId)?.notes ?? ''; saveTestUpdate(failPopup.testId, { status: 'fail', notes: testNotes }); advanceToNextTest(); }}>
+                  🐛 Log as New Issue
+                </button>
+                <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }} onClick={handleFailChooseExisting}>
+                  🔗 Link to Existing Issue
+                </button>
+                <button className="btn btn-ghost" style={{ justifyContent: 'flex-start' }} onClick={handleFailJustMark}>
+                  ✗ Just Mark as Failed
+                </button>
+              </div>
+            )}
+
+            {failPopupMode === 'existing' && (
+              <div>
+                {loadingIssues ? (
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 0' }}>Loading issues...</div>
+                ) : existingIssues.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 0' }}>No issues found for this product.</div>
+                ) : (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Select Issue</label>
+                    <select
+                      value={selectedExistingIssueKey}
+                      onChange={e => setSelectedExistingIssueKey(e.target.value)}
+                      style={{ width: '100%' }}
+                    >
+                      <option value="">— Choose an issue —</option>
+                      {existingIssues.map(i => (
+                        <option key={`${i.sessionId}::${i.id}`} value={`${i.sessionId}::${i.id}`}>
+                          [{i.severity}] {i.title}{i.derivedStatus === 'Fixed' ? ' ⚠ (marked Fixed — regression?)' : ''}{i.reproCount ? ` (×${i.reproCount} repros)` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn btn-ghost" onClick={() => setFailPopupMode(null)}>← Back</button>
+                  <button className="btn btn-primary" onClick={handleLinkExistingIssue} disabled={!selectedExistingIssueKey}>
+                    Link &amp; Mark Failed
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {failPopupMode === null && (
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setFailPopup(null)}>Cancel</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {confirmDeleteId && (
         <div className="modal-overlay" onClick={() => setConfirmDeleteId(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>

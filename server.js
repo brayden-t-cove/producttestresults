@@ -852,10 +852,40 @@ app.get('/api/issues', async (req, res) => {
       if (sa !== sb) return sa - sb;
       return new Date(b.sessionDate) - new Date(a.sessionDate);
     });
-    res.json(allIssues);
+    const { productName, catalogId } = req.query;
+    let result = allIssues;
+    if (productName) result = result.filter(i => i.productName === productName);
+    if (catalogId) {
+      // match sessions whose catalogId matches
+      const sessionFiles = await readdir(SESSIONS_DIR);
+      const matchingSessionIds = new Set();
+      for (const f of sessionFiles.filter(f => f.endsWith('.json'))) {
+        const s = JSON.parse(await readFile(join(SESSIONS_DIR, f), 'utf-8'));
+        if (s.catalogId === catalogId) matchingSessionIds.add(s.id);
+      }
+      result = result.filter(i => matchingSessionIds.has(i.sessionId));
+    }
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to load issues' });
+  }
+});
+
+// PATCH /api/sessions/:sessionId/issues/:issueId — update reproCount, regressionFlag, etc.
+app.patch('/api/sessions/:sessionId/issues/:issueId', async (req, res) => {
+  try {
+    const filePath = join(SESSIONS_DIR, `${req.params.sessionId}.json`);
+    const session = JSON.parse(await readFile(filePath, 'utf-8'));
+    const issues = session.issues || [];
+    const idx = issues.findIndex(i => i.id === req.params.issueId);
+    if (idx === -1) return res.status(404).json({ error: 'Issue not found' });
+    issues[idx] = { ...issues[idx], ...req.body };
+    session.issues = issues;
+    await writeFile(filePath, JSON.stringify(session, null, 2));
+    res.json(issues[idx]);
+  } catch {
+    res.status(404).json({ error: 'Session not found' });
   }
 });
 
