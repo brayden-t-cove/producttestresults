@@ -4,13 +4,14 @@ import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 import IssueLogger from './IssueLogger.jsx';
 import IssueVerification from './IssueVerification.jsx';
 
-const STATUS_ORDER = { fail: 0, 'reproduced': 0, 'regression-found': 0, pending: 1, pass: 2, skip: 3, na: 3, 'cannot-reproduce': 2, 'fixed-verified': 2, 'needs-more-info': 1.5, 'cannot-test': 3 };
+const STATUS_ORDER = { fail: 0, 'reproduced': 0, 'regression-found': 0, pending: 1, pass: 2, skip: 3, na: 3, blocked: 0.5, 'cannot-reproduce': 2, 'fixed-verified': 2, 'needs-more-info': 1.5, 'cannot-test': 3 };
 
 function badgeClass(status) {
   const map = {
     pass: 'badge-pass',
     fail: 'badge-fail',
     skip: 'badge-skip',
+    blocked: 'badge-blocked',
     pending: 'badge-pending',
     na: 'badge-na',
     reproduced: 'badge-reproduced',
@@ -28,6 +29,7 @@ function statusLabel(status) {
     pass: 'Pass',
     fail: 'Fail',
     skip: 'Skip',
+    blocked: 'Blocked',
     pending: 'Pending',
     na: 'N/A',
     reproduced: 'Reproduced',
@@ -501,6 +503,12 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
             onClick={() => onVerdict('na')}
           >
             — N/A
+          </button>
+          <button
+            className={`btn btn-blocked ${test.status === 'blocked' ? 'active' : ''}`}
+            onClick={() => onVerdict('blocked')}
+          >
+            ⊘ Blocked
           </button>
         </div>
 

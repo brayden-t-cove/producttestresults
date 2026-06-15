@@ -111,6 +111,9 @@ h3 { font-size: 1rem; font-weight: 600; }
 .btn-skip { background: var(--skip-dim); color: var(--skip); border-color: rgba(107,114,128,0.3); }
 .btn-skip:hover:not(:disabled) { background: var(--skip); color: #fff; }
 .btn-skip.active { background: var(--skip); color: #fff; }
+.btn-blocked { background: rgba(234,88,12,0.12); color: #ea580c; border-color: rgba(234,88,12,0.3); }
+.btn-blocked:hover:not(:disabled) { background: #ea580c; color: #fff; }
+.btn-blocked.active { background: #ea580c; color: #fff; }
 
 .btn-lg {
   padding: 12px 24px;
@@ -173,6 +176,7 @@ select { cursor: pointer; }
 .badge-pass { background: var(--pass-dim); color: var(--pass); }
 .badge-fail { background: var(--fail-dim); color: var(--fail); }
 .badge-skip { background: var(--skip-dim); color: var(--skip); }
+.badge-blocked { background: rgba(234,88,12,0.12); color: #ea580c; }
 .badge-pending { background: var(--pending-dim); color: var(--pending); }
 .badge-active { background: var(--primary-dim); color: var(--primary); }
 .badge-completed { background: rgba(34,197,94,0.1); color: var(--pass); }

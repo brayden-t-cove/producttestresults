@@ -176,7 +176,7 @@ function SessionCard({ s, onOpen }) {
   );
 }
 
-function HomePage({ onCatalog, onTesting, onSettings }) {
+function HomePage({ onCatalog, onTesting, onIssues, onSettings }) {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -189,23 +189,20 @@ function HomePage({ onCatalog, onTesting, onSettings }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 20, marginTop: 24, flexWrap: 'wrap' }}>
-        <div
-          className="session-type-card"
-          onClick={onCatalog}
-          style={{ flex: '1 1 220px', cursor: 'pointer' }}
-        >
+        <div className="session-type-card" onClick={onCatalog} style={{ flex: '1 1 220px', cursor: 'pointer' }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>📦</div>
           <h3 style={{ marginBottom: 6 }}>Product Catalog</h3>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Manage your product inventory</p>
         </div>
-        <div
-          className="session-type-card"
-          onClick={onTesting}
-          style={{ flex: '1 1 220px', cursor: 'pointer' }}
-        >
+        <div className="session-type-card" onClick={onTesting} style={{ flex: '1 1 220px', cursor: 'pointer' }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>🧪</div>
           <h3 style={{ marginBottom: 6 }}>Product Testing</h3>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Run test sessions and view results</p>
+        </div>
+        <div className="session-type-card" onClick={onIssues} style={{ flex: '1 1 220px', cursor: 'pointer' }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>🐛</div>
+          <h3 style={{ marginBottom: 6 }}>Issues</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>View and track all active issues</p>
         </div>
       </div>
     </div>
@@ -464,6 +461,7 @@ export default function App() {
         <HomePage
           onCatalog={() => setView('catalog')}
           onTesting={() => setView('testing')}
+          onIssues={() => setView('issues')}
           onSettings={() => setShowSettings(true)}
         />
       )}
