@@ -539,48 +539,6 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
           </div>
         </div>
 
-        {category && groups.length > 0 && (
-          <div className="form-group">
-            <label>Capabilities</label>
-            <div className="capability-groups">
-              {groups.map(group => {
-                const allSelected = group.capabilities.every(c => capabilities.has(c.id));
-                return (
-                  <div key={group.label} className="capability-group">
-                    <div className="capability-group-header">
-                      <span>{group.label.toUpperCase()}</span>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        style={{ fontSize: 11, padding: '2px 8px' }}
-                        onClick={() => selectAllInGroup(group.capabilities)}
-                      >
-                        {allSelected ? 'Deselect all' : 'Select all'}
-                      </button>
-                    </div>
-                    <div className="capability-checkboxes">
-                      {group.capabilities.map(cap => (
-                        <label key={cap.id} className="capability-checkbox-item">
-                          <input
-                            type="checkbox"
-                            checked={capabilities.has(cap.id)}
-                            onChange={() => toggleCapability(cap.id)}
-                            style={{ width: 'auto', marginRight: 8 }}
-                          />
-                          {cap.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>
-              <span className="capability-count-badge">{capabilities.size} capabilities selected</span>
-            </div>
-          </div>
-        )}
-
         {/* Subclass — shown when category has defined subclasses */}
         {SUBCLASS_OPTIONS[category] && (
           <div className="form-group">
@@ -646,6 +604,48 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {category && groups.length > 0 && (
+          <div className="form-group">
+            <label>Capabilities</label>
+            <div className="capability-groups">
+              {groups.map(group => {
+                const allSelected = group.capabilities.every(c => capabilities.has(c.id));
+                return (
+                  <div key={group.label} className="capability-group">
+                    <div className="capability-group-header">
+                      <span>{group.label.toUpperCase()}</span>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ fontSize: 11, padding: '2px 8px' }}
+                        onClick={() => selectAllInGroup(group.capabilities)}
+                      >
+                        {allSelected ? 'Deselect all' : 'Select all'}
+                      </button>
+                    </div>
+                    <div className="capability-checkboxes">
+                      {group.capabilities.map(cap => (
+                        <label key={cap.id} className="capability-checkbox-item">
+                          <input
+                            type="checkbox"
+                            checked={capabilities.has(cap.id)}
+                            onChange={() => toggleCapability(cap.id)}
+                            style={{ width: 'auto', marginRight: 8 }}
+                          />
+                          {cap.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>
+              <span className="capability-count-badge">{capabilities.size} capabilities selected</span>
+            </div>
           </div>
         )}
 
