@@ -51,7 +51,13 @@ if (!existsSync(FIRMWARES_FILE)) {
   await writeFile(FIRMWARES_FILE, JSON.stringify([], null, 2));
 }
 if (!existsSync(CATALOG_FILE)) {
-  await writeFile(CATALOG_FILE, JSON.stringify([], null, 2));
+  const seedFile = join(__dirname, 'data', 'seed-catalog.json');
+  if (existsSync(seedFile)) {
+    const seed = await readFile(seedFile, 'utf-8');
+    await writeFile(CATALOG_FILE, seed);
+  } else {
+    await writeFile(CATALOG_FILE, JSON.stringify([], null, 2));
+  }
 }
 if (!existsSync(SPEC_SCHEMA_FILE)) {
   const { SPEC_SCHEMA } = await import('./src/data/productSpecs.js');
