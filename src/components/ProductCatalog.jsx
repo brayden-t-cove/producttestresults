@@ -314,15 +314,18 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="catalog-card-name">
-                        {product.name}
+                        {product.modelNumber || product.name}
                         {product.version && (
                           <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'rgba(99,102,241,0.15)', borderRadius: 4, padding: '1px 6px' }}>
                             {product.version}
                           </span>
                         )}
                       </div>
+                      {product.modelNumber && product.name && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{product.name}</div>
+                      )}
                       <div className="catalog-card-meta">
-                        {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || CATEGORY_LABELS[product.category] || product.category}
+                        {product.manufacturer || CATEGORY_LABELS[product.category] || product.category}
                         {product.subclass && (
                           <span style={{ marginLeft: 6, color: 'var(--primary)', fontWeight: 500, fontSize: 11 }}>· {product.subclass}</span>
                         )}

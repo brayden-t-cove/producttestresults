@@ -444,6 +444,67 @@ app.get('/api/sessions/:id', async (req, res) => {
   }
 });
 
+// GET /api/sessions/:id/export/csv
+app.get('/api/sessions/:id/export/csv', async (req, res) => {
+  try {
+    const filePath = join(SESSIONS_DIR, `${req.params.id}.json`);
+    if (!existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
+    const session = JSON.parse(await readFile(filePath, 'utf-8'));
+    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [['Test #', 'Title', 'Status', 'Notes', 'Linked Issue', 'Firmware', 'Date']];
+    for (const t of (session.tests || [])) {
+      rows.push([
+        escape(t.testNumber ?? ''),
+        escape(t.title ?? ''),
+        escape(t.status ?? ''),
+        escape(t.notes ?? ''),
+        escape(t.linkedIssueTitle ?? ''),
+        escape(session.firmware ?? ''),
+        escape(session.date ?? session.createdAt ?? ''),
+      ]);
+    }
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const filename = `session-${req.params.id}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to export session' });
+  }
+});
+
+// GET /api/sessions/:id/export/exploratory-csv
+app.get('/api/sessions/:id/export/exploratory-csv', async (req, res) => {
+  try {
+    const filePath = join(SESSIONS_DIR, `${req.params.id}.json`);
+    if (!existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
+    const session = JSON.parse(await readFile(filePath, 'utf-8'));
+    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [['Category', 'Performance', 'UI/UX', 'Bug/Issue', 'Like', 'Dislike', 'Other Notes', 'Rating', 'Product', 'Date']];
+    for (const cat of (session.categories || [])) {
+      const obs = cat.observations || {};
+      rows.push([
+        escape(cat.label ?? ''),
+        escape(obs.performance ?? ''),
+        escape(obs.uiux ?? ''),
+        escape(obs.bugIssue ?? ''),
+        escape(obs.like ?? ''),
+        escape(obs.dislike ?? ''),
+        escape(obs.otherNotes ?? ''),
+        escape(cat.rating ?? ''),
+        escape(session.productName ?? ''),
+        escape(session.date ?? session.createdAt ?? ''),
+      ]);
+    }
+    const csv = rows.map(r => r.join(',')).join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="exploratory-${req.params.id}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to export session' });
+  }
+});
+
 // POST /api/sessions - create new session
 app.post('/api/sessions', async (req, res) => {
   try {

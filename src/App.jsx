@@ -155,6 +155,19 @@ function SessionCard({ s, onOpen }) {
         )}
       </div>
       <div className="session-card-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+        <button
+          className="btn btn-ghost btn-sm"
+          style={{ fontSize: 11, padding: '2px 8px' }}
+          title="Export test results as CSV"
+          onClick={e => {
+            e.stopPropagation();
+            const isExploratory = s.testPlan === 'exploratory';
+            const a = document.createElement('a');
+            a.href = isExploratory ? `/api/sessions/${s.id}/export/exploratory-csv` : `/api/sessions/${s.id}/export/csv`;
+            a.download = isExploratory ? `exploratory-${s.id}.csv` : `session-${s.id}.csv`;
+            a.click();
+          }}
+        >↓ CSV</button>
         <span className={`badge badge-${s.status}`}>{s.status}</span>
         {s.testPlan === 'vendor-eval' && (
           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: '#ede9fe', color: '#6d28d9', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
@@ -240,12 +253,16 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewC
           <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
           <button className="btn btn-ghost" onClick={onAnalytics}>📊 Analytics</button>
           <button className="btn btn-ghost" onClick={onIssues}>🐛 Issues</button>
-          <button className="btn btn-secondary" onClick={onNewExploratory}>
-            + Exploratory
-          </button>
-          <button className="btn btn-secondary" onClick={onNewComparison}>
-            + Compare
-          </button>
+          {activeTab === 'evaluation' && (
+            <>
+              <button className="btn btn-secondary" onClick={onNewExploratory}>
+                + Exploratory
+              </button>
+              <button className="btn btn-secondary" onClick={onNewComparison}>
+                + Compare
+              </button>
+            </>
+          )}
           <button className="btn btn-primary btn-lg" onClick={onNew}>
             + New Session
           </button>
