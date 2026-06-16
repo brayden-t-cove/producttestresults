@@ -138,6 +138,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   const [firmwarePerProduct, setFirmwarePerProduct] = useState({});
 
   const [notes, setNotes] = useState('');
+  const [testerName, setTesterName] = useState('');
   const [testEnvOpen, setTestEnvOpen] = useState(false);
   const [testEnv, setTestEnv] = useState({ phoneType: '', osVersion: '', appVersion: '', username: '', password: '', deviceId: '' });
   const [showEnvPassword, setShowEnvPassword] = useState(false);
@@ -278,6 +279,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         catalogId: firstProduct.id,
         firmware: isMulti ? (firmwarePerProduct[firstProduct.id] || '') : firmware,
         notes,
+        testerName: testerName.trim() || undefined,
         type: sessionType,
         testPlan,
         appConfigId: isMulti ? null : (firstAppConfig?.id || null),
@@ -620,6 +622,17 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
             )}
           </div>
         )}
+
+        {/* Tester Name */}
+        <div className="form-group">
+          <label>Tester Name <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)', textTransform: 'none' }}>(optional — will be shown on results)</span></label>
+          <input
+            type="text"
+            placeholder="Your name"
+            value={testerName}
+            onChange={e => setTesterName(e.target.value)}
+          />
+        </div>
 
         {/* Session Notes */}
         <div className="form-group">

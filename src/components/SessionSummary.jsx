@@ -96,6 +96,8 @@ export default function SessionSummary({ session, onBack }) {
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(true);
   const [copyMsg, setCopyMsg] = useState('');
+  const [showPdfOptions, setShowPdfOptions] = useState(false);
+  const [includePassed, setIncludePassed] = useState(false);
 
   const testCases = session.testCases || [];
   const issues = session.issues || [];
@@ -149,7 +151,13 @@ export default function SessionSummary({ session, onBack }) {
   );
 
   function handleExportPdf() {
+    if (includePassed) {
+      document.body.classList.add('pdf-include-passed');
+    } else {
+      document.body.classList.remove('pdf-include-passed');
+    }
     window.print();
+    document.body.classList.remove('pdf-include-passed');
   }
 
   return (
@@ -178,6 +186,12 @@ export default function SessionSummary({ session, onBack }) {
           <div className="meta-label">Duration</div>
           <div className="meta-value">{formatDuration(session.createdAt, session.completedAt)}</div>
         </div>
+        {session.testerName && (
+          <div className="summary-meta-item">
+            <div className="meta-label">Tester</div>
+            <div className="meta-value">{session.testerName}</div>
+          </div>
+        )}
         {session.appConfigName && (
           <div className="summary-meta-item">
             <div className="meta-label">Tested On</div>
@@ -332,6 +346,8 @@ export default function SessionSummary({ session, onBack }) {
                 const sNa = sec.tests.filter(t => t.status === 'na').length;
                 const allPass = sFail === 0 && sSkip === 0;
                 const failSkipTests = sec.tests.filter(t => t.status === 'fail' || t.status === 'skip');
+                const passTests = sec.tests.filter(t => t.status === 'pass');
+                const shownTests = includePassed ? [...failSkipTests, ...passTests] : failSkipTests;
                 return (
                   <div key={sec.sectionLabel} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -347,9 +363,9 @@ export default function SessionSummary({ session, onBack }) {
                         </span>
                       )}
                     </div>
-                    {failSkipTests.length > 0 && (
+                    {shownTests.length > 0 && (
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {failSkipTests.map(t => (
+                        {shownTests.map(t => (
                           <div key={t.id} style={{ paddingLeft: 10, borderLeft: '2px solid var(--border)', fontSize: 12 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <span className={`badge ${t.status === 'fail' ? 'badge-fail' : 'badge-skip'}`} style={{ flexShrink: 0 }}>
@@ -427,10 +443,19 @@ export default function SessionSummary({ session, onBack }) {
         <button className="btn btn-primary" onClick={handleCopy} disabled={loading}>
           {copyMsg || '📋 Copy Summary'}
         </button>
-        <button className="btn btn-secondary" onClick={handleExportPdf} disabled={loading}>
+        <button className="btn btn-secondary" onClick={() => setShowPdfOptions(v => !v)} disabled={loading}>
           🖨 Export PDF
         </button>
       </div>
+      {showPdfOptions && (
+        <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={includePassed} onChange={e => setIncludePassed(e.target.checked)} style={{ width: 'auto' }} />
+            Include passed test cases
+          </label>
+          <button className="btn btn-primary btn-sm" onClick={handleExportPdf}>Print / Save PDF</button>
+        </div>
+      )}
     </div>
     </div>
   );

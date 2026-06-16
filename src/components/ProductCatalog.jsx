@@ -154,10 +154,19 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
   const [activeFilter, setActiveFilter] = useState('all');
   const [activeEntity, setActiveEntity] = useState('all');
   const [activePage, setActivePage] = useState('production');
+  const [search, setSearch] = useState('');
 
   const categories = ['all', ...Object.keys(CATEGORY_LABELS).filter(cat => products.some(p => p.category === cat))];
   const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
-  const filtered = activeFilter === 'all' ? sorted : sorted.filter(p => p.category === activeFilter);
+  const searched = search.trim()
+    ? sorted.filter(p => {
+        const q = search.toLowerCase();
+        return (p.modelNumber || '').toLowerCase().includes(q)
+          || (p.name || '').toLowerCase().includes(q)
+          || (p.manufacturer || '').toLowerCase().includes(q);
+      })
+    : sorted;
+  const filtered = activeFilter === 'all' ? searched : searched.filter(p => p.category === activeFilter);
   const entityTabs = ['all', ...ENTITIES.filter(e => products.some(p => (p.entity || []).includes(e)))];
   const entityFiltered = activeEntity === 'all' ? filtered : filtered.filter(p => (p.entity || []).includes(activeEntity));
   const pageFiltered = activePage === 'production'
@@ -223,6 +232,16 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
             + Add Product
           </button>
         </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <input
+          type="text"
+          placeholder="Search by model number, name, or manufacturer…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14 }}
+        />
       </div>
 
       <div className="product-tabs" style={{ marginBottom: 16 }}>

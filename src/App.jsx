@@ -128,7 +128,8 @@ function SessionCard({ s, onOpen }) {
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{s.appConfigName}</div>
         )}
         <div className="session-card-meta">
-          <span>{formatDate(s.date)}</span>
+          <span>{s.createdAt ? new Date(s.createdAt).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : formatDate(s.date)}</span>
+          {s.testerName && <span style={{ color: 'var(--primary)', fontWeight: 500 }}>👤 {s.testerName}</span>}
           {s.issueCount > 0 && (
             <span className="issue-count">{s.issueCount} issue{s.issueCount !== 1 ? 's' : ''}</span>
           )}
