@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
+import QRCode from 'qrcode';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -441,6 +442,18 @@ app.get('/api/sessions/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to read session' });
+  }
+});
+
+// GET /api/qr?url=... — generate QR code PNG as data URL
+app.get('/api/qr', async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ error: 'url param required' });
+  try {
+    const dataUrl = await QRCode.toDataURL(url, { width: 120, margin: 1 });
+    res.json({ dataUrl });
+  } catch (e) {
+    res.status(500).json({ error: 'QR generation failed' });
   }
 });
 

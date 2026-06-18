@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import QRCode from 'qrcode';
 import { updateSession } from '../lib/api.js';
 
 const OBSERVATION_FIELDS = [
@@ -51,7 +50,10 @@ export default function ExploratorySummary({ session, onBack, onOpenSession }) {
 
   useEffect(() => {
     const url = `${window.location.origin}${window.location.pathname}#session-${session.id}`;
-    QRCode.toDataURL(url, { width: 120, margin: 1 }).then(setQrDataUrl).catch(() => {});
+    fetch(`/api/qr?url=${encodeURIComponent(url)}`)
+      .then(r => r.json())
+      .then(d => { if (d.dataUrl) setQrDataUrl(d.dataUrl); })
+      .catch(() => {});
   }, [session.id]);
 
   const env = session.testEnvironment || {};
@@ -96,7 +98,11 @@ export default function ExploratorySummary({ session, onBack, onOpenSession }) {
     const sessionUrl = `${window.location.origin}${window.location.pathname}#session-${session.id}`;
     let qrImg = qrDataUrl;
     if (!qrImg) {
-      try { qrImg = await QRCode.toDataURL(sessionUrl, { width: 120, margin: 1 }); } catch (_) {}
+      try {
+        const r = await fetch(`/api/qr?url=${encodeURIComponent(sessionUrl)}`);
+        const d = await r.json();
+        qrImg = d.dataUrl || '';
+      } catch (_) {}
     }
     const qrBlock = qrImg ? `
       <div class="qr-block">
