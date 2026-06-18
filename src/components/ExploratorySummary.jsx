@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { updateSession } from '../lib/api.js';
 
 const OBSERVATION_FIELDS = [
@@ -46,6 +47,12 @@ export default function ExploratorySummary({ session, onBack, onOpenSession }) {
   const [collapsedCats, setCollapsedCats] = useState({});
   const [savingOverall, setSavingOverall] = useState(false);
   const [toast, setToast] = useState('');
+  const [qrDataUrl, setQrDataUrl] = useState('');
+
+  useEffect(() => {
+    const url = `${window.location.origin}${window.location.pathname}#session-${session.id}`;
+    QRCode.toDataURL(url, { width: 120, margin: 1 }).then(setQrDataUrl).catch(() => {});
+  }, [session.id]);
 
   const env = session.testEnvironment || {};
   const categories = session.categories || [];
@@ -84,8 +91,19 @@ export default function ExploratorySummary({ session, onBack, onOpenSession }) {
 
   // TODO: replace with pdfkit server-side generation (POST /api/sessions/:id/export/pdf)
   // for a true file download without requiring the print dialog.
-  function handleExport() {
+  async function handleExport() {
     const env = session.testEnvironment || {};
+    const sessionUrl = `${window.location.origin}${window.location.pathname}#session-${session.id}`;
+    let qrImg = qrDataUrl;
+    if (!qrImg) {
+      try { qrImg = await QRCode.toDataURL(sessionUrl, { width: 120, margin: 1 }); } catch (_) {}
+    }
+    const qrBlock = qrImg ? `
+      <div class="qr-block">
+        <img src="${qrImg}" alt="QR code" width="100" height="100">
+        <div class="qr-label">Scan to view interactive report</div>
+      </div>` : '';
+
     const envRows = [
       ['App Name', env.appName],
       ['Device', env.phoneType],
@@ -146,6 +164,8 @@ export default function ExploratorySummary({ session, onBack, onOpenSession }) {
     .media-links { margin-top: 10px; font-size: 10pt; }
     .media-links a { color: #6366f1; }
     .muted { color: #999; font-size: 10pt; }
+    .qr-block { display: flex; flex-direction: column; align-items: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; }
+    .qr-label { font-size: 9pt; color: #888; margin-top: 6px; }
     @page { margin: 20mm; }
   </style>
 </head>
@@ -168,6 +188,7 @@ export default function ExploratorySummary({ session, onBack, onOpenSession }) {
 
   <div class="section-title">Category Observations</div>
   ${categoriesHtml}
+  ${qrBlock}
 </body>
 </html>`;
 
