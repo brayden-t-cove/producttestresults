@@ -1364,6 +1364,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .session-summary { box-shadow: none !important; background: white !important; color: black !important; max-width: 100% !important; }
   .stat-card { border: 1px solid #ccc !important; background: white !important; color: black !important; }
   .badge { border: 1px solid #ccc !important; }
+  .pdf-qr-block { display: flex !important; flex-direction: column; align-items: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #ccc; }
 }
 
 /* ============================================================

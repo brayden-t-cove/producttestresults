@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { aiSummarize } from '../lib/api.js';
+import QRCode from 'qrcode';
 import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 
 function formatDate(iso) {
@@ -98,6 +99,12 @@ export default function SessionSummary({ session, onBack }) {
   const [copyMsg, setCopyMsg] = useState('');
   const [showPdfOptions, setShowPdfOptions] = useState(false);
   const [includePassed, setIncludePassed] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+
+  useEffect(() => {
+    const url = `${window.location.origin}${window.location.pathname}#session-${session.id}`;
+    QRCode.toDataURL(url, { width: 120, margin: 1 }).then(setQrDataUrl).catch(() => {});
+  }, [session.id]);
 
   const testCases = session.testCases || [];
   const issues = session.issues || [];
@@ -454,6 +461,14 @@ export default function SessionSummary({ session, onBack }) {
             Include passed test cases
           </label>
           <button className="btn btn-primary btn-sm" onClick={handleExportPdf}>Print / Save PDF</button>
+        </div>
+      )}
+
+      {/* QR code — print only */}
+      {qrDataUrl && (
+        <div className="pdf-qr-block" style={{ display: 'none' }}>
+          <img src={qrDataUrl} alt="QR code to digital report" style={{ width: 100, height: 100 }} />
+          <div style={{ fontSize: 10, color: '#666', marginTop: 4, textAlign: 'center' }}>Scan to view interactive report</div>
         </div>
       )}
     </div>

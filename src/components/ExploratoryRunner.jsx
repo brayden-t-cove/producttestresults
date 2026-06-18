@@ -200,7 +200,18 @@ export default function ExploratoryRunner({ session, onUpdate, onFinish, onBack 
             </div>
 
             {/* Observation fields */}
-            {OBSERVATION_FIELDS.map(field => (
+            {activeCategory.id === 'auxiliary-other' ? (
+              <div className="form-group">
+                <label>General Observations</label>
+                <textarea
+                  rows={6}
+                  value={activeCategory.observations?.otherNotes || ''}
+                  onChange={e => updateObservation(activeCatIndex, 'otherNotes', e.target.value)}
+                  onBlur={handleBlur}
+                  placeholder="Was anything else noted that doesn't fit under the other categories?"
+                />
+              </div>
+            ) : OBSERVATION_FIELDS.map(field => (
               <div className="form-group" key={field.key}>
                 <label>{field.label}</label>
                 <textarea

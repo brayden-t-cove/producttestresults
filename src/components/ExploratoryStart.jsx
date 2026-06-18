@@ -31,6 +31,8 @@ const DEFAULT_CATEGORIES = [
   { id: 'live-feed', label: 'Live Feed', description: 'Real-time video stream quality, latency, resolution, night vision, audio, pan/tilt performance if applicable, and reliability of the live view on both the native platform and our app.' },
   { id: 'playback', label: 'Playback', description: 'Recorded footage access and quality: event-based vs. continuous recording, scrubbing UX, clip download, cloud vs. local storage experience, and any gaps or reliability issues in recordings.' },
   { id: 'settings', label: 'Settings', description: 'Depth and usability of device and account settings: motion sensitivity, notification controls, recording schedules, firmware updates, privacy options, and how intuitive the settings architecture is.' },
+  { id: 'power-battery', label: 'Power & Battery Performance', description: 'Battery life under normal and heavy usage, charge time, power consumption, solar charging effectiveness (if applicable), low-battery behavior, and any power-related app notifications or indicators.' },
+  { id: 'auxiliary-other', label: 'Auxiliary / Other', description: 'Anything else worth noting that doesn\'t fit the categories above — unexpected behaviors, standout moments, comparisons to similar products, or general impressions.' },
 ];
 
 function buildCategories(selectedIds) {
