@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { readdir, readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir } from 'fs/promises';
 import { unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import multer from 'multer';
@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
 import QRCode from 'qrcode';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
+import { initDb, catalog, sessions, comparisons, devices, firmwares, config } from './lib/storage.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '.env') });
@@ -18,13 +19,6 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const ENV_FILE = join(__dirname, '.env');
 const DATA_BASE = process.env.DATA_DIR || join(__dirname, 'data');
-const SESSIONS_DIR = join(DATA_BASE, 'sessions');
-const COMPARISONS_DIR = join(DATA_BASE, 'comparisons');
-const DEVICES_FILE = join(DATA_BASE, 'devices.json');
-const FIRMWARES_FILE = join(DATA_BASE, 'firmwares.json');
-const CATALOG_FILE = join(DATA_BASE, 'catalog.json');
-const SPEC_SCHEMA_FILE = join(DATA_BASE, 'specSchema.json');
-const CERT_SCHEMA_FILE = join(DATA_BASE, 'certSchema.json');
 const IMAGES_DIR = join(DATA_BASE, 'images');
 
 app.use(cors());
@@ -32,183 +26,143 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/api/images', express.static(IMAGES_DIR));
 
-// Ensure data dirs exist
-if (!existsSync(DATA_BASE)) {
-  await mkdir(DATA_BASE, { recursive: true });
-}
-if (!existsSync(SESSIONS_DIR)) {
-  await mkdir(SESSIONS_DIR, { recursive: true });
-}
-if (!existsSync(COMPARISONS_DIR)) {
-  await mkdir(COMPARISONS_DIR, { recursive: true });
-}
-if (!existsSync(IMAGES_DIR)) {
-  await mkdir(IMAGES_DIR, { recursive: true });
-}
-if (!existsSync(DEVICES_FILE)) {
-  await writeFile(DEVICES_FILE, JSON.stringify([], null, 2));
-}
-if (!existsSync(FIRMWARES_FILE)) {
-  await writeFile(FIRMWARES_FILE, JSON.stringify([], null, 2));
-}
-if (!existsSync(CATALOG_FILE)) {
-  const seedFile = join(__dirname, 'data', 'seed-catalog.json');
-  if (existsSync(seedFile)) {
-    const seed = await readFile(seedFile, 'utf-8');
-    await writeFile(CATALOG_FILE, seed);
-  } else {
-    await writeFile(CATALOG_FILE, JSON.stringify([], null, 2));
-  }
-}
-if (!existsSync(SPEC_SCHEMA_FILE)) {
+// ── Startup: init DB or file dirs ─────────────────────────────────────────────
+
+await initDb();
+
+if (!process.env.DATABASE_URL) {
+  // Local file-based mode — ensure directories exist
   const { SPEC_SCHEMA } = await import('./src/data/productSpecs.js');
-  await writeFile(SPEC_SCHEMA_FILE, JSON.stringify(SPEC_SCHEMA, null, 2));
-}
-if (!existsSync(CERT_SCHEMA_FILE)) {
   const { CERT_SCHEMA } = await import('./src/data/certSchema.js');
-  await writeFile(CERT_SCHEMA_FILE, JSON.stringify(CERT_SCHEMA, null, 2));
+  const SESSIONS_DIR = join(DATA_BASE, 'sessions');
+  const COMPARISONS_DIR = join(DATA_BASE, 'comparisons');
+  for (const dir of [DATA_BASE, SESSIONS_DIR, COMPARISONS_DIR, IMAGES_DIR]) {
+    if (!existsSync(dir)) await mkdir(dir, { recursive: true });
+  }
+  const CATALOG_FILE = join(DATA_BASE, 'catalog.json');
+  const DEVICES_FILE = join(DATA_BASE, 'devices.json');
+  const FIRMWARES_FILE = join(DATA_BASE, 'firmwares.json');
+  const SPEC_SCHEMA_FILE = join(DATA_BASE, 'specSchema.json');
+  const CERT_SCHEMA_FILE = join(DATA_BASE, 'certSchema.json');
+  if (!existsSync(CATALOG_FILE)) {
+    const seedFile = join(__dirname, 'data', 'seed-catalog.json');
+    if (existsSync(seedFile)) {
+      await writeFile(CATALOG_FILE, await readFile(seedFile, 'utf-8'));
+    } else {
+      await writeFile(CATALOG_FILE, JSON.stringify([], null, 2));
+    }
+  }
+  if (!existsSync(DEVICES_FILE)) await writeFile(DEVICES_FILE, '[]');
+  if (!existsSync(FIRMWARES_FILE)) await writeFile(FIRMWARES_FILE, '[]');
+  if (!existsSync(SPEC_SCHEMA_FILE)) await writeFile(SPEC_SCHEMA_FILE, JSON.stringify(SPEC_SCHEMA, null, 2));
+  if (!existsSync(CERT_SCHEMA_FILE)) await writeFile(CERT_SCHEMA_FILE, JSON.stringify(CERT_SCHEMA, null, 2));
+} else {
+  // DB mode — ensure images dir exists (images stay on filesystem)
+  if (!existsSync(IMAGES_DIR)) await mkdir(IMAGES_DIR, { recursive: true });
 }
 
-// GET /api/firmwares?catalogId=xxx (or ?deviceName=xxx for backward compat)
+// ── Firmwares ─────────────────────────────────────────────────────────────────
+
 app.get('/api/firmwares', async (req, res) => {
   try {
-    const data = JSON.parse(await readFile(FIRMWARES_FILE, 'utf8'));
+    const data = await firmwares.getAll();
     const { catalogId, deviceName } = req.query;
-    if (catalogId) {
-      res.json(data.filter(f => f.catalogId === catalogId || f.deviceName === catalogId));
-    } else if (deviceName) {
-      res.json(data.filter(f => f.deviceName === deviceName || f.catalogId === deviceName));
-    } else {
-      res.json(data);
-    }
-  } catch {
-    res.json([]);
-  }
+    if (catalogId) return res.json(data.filter(f => f.catalogId === catalogId || f.deviceName === catalogId));
+    if (deviceName) return res.json(data.filter(f => f.deviceName === deviceName || f.catalogId === deviceName));
+    res.json(data);
+  } catch { res.json([]); }
 });
 
-// POST /api/firmwares
 app.post('/api/firmwares', async (req, res) => {
   try {
     const { catalogId, deviceName, version } = req.body;
     const key = catalogId || deviceName;
     if (!key || !version) return res.status(400).json({ error: 'catalogId (or deviceName) and version required' });
-    const data = JSON.parse(await readFile(FIRMWARES_FILE, 'utf8'));
-    const existing = data.find(f => (f.catalogId === key || f.deviceName === key) && f.version === version);
+    const all = await firmwares.getAll();
+    const existing = all.find(f => (f.catalogId === key || f.deviceName === key) && f.version === version);
     if (existing) return res.json(existing);
     const entry = { id: uuidv4(), catalogId: catalogId || null, deviceName: deviceName || key, version: version.trim() };
-    data.push(entry);
-    await writeFile(FIRMWARES_FILE, JSON.stringify(data, null, 2));
+    await firmwares.create(entry);
     res.status(201).json(entry);
-  } catch {
-    res.status(500).json({ error: 'Failed to save firmware' });
-  }
+  } catch { res.status(500).json({ error: 'Failed to save firmware' }); }
 });
 
-// ── Debug / health endpoint ───────────────────────────────────────────────────
+// ── Debug / health ────────────────────────────────────────────────────────────
 
 app.get('/api/debug', async (req, res) => {
   const checks = {};
   try {
-    const raw = await readFile(CATALOG_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    checks.catalogFile = { ok: true, entries: parsed.length, path: CATALOG_FILE };
+    const data = await catalog.getAll();
+    checks.catalog = { ok: true, entries: data.length, mode: process.env.DATABASE_URL ? 'postgres' : 'files' };
   } catch (e) {
-    checks.catalogFile = { ok: false, error: e.message, path: CATALOG_FILE };
-  }
-  try {
-    await readFile(FIRMWARES_FILE, 'utf8');
-    checks.firmwaresFile = { ok: true };
-  } catch (e) {
-    checks.firmwaresFile = { ok: false, error: e.message };
+    checks.catalog = { ok: false, error: e.message };
   }
   checks.server = { ok: true, port: PORT, uptime: Math.round(process.uptime()) + 's', nodeVersion: process.version };
-  checks.env = { anthropicKeySet: !!process.env.ANTHROPIC_API_KEY };
+  checks.env = { anthropicKeySet: !!process.env.ANTHROPIC_API_KEY, databaseUrl: !!process.env.DATABASE_URL };
   const allOk = Object.values(checks).every(c => c.ok);
   res.status(allOk ? 200 : 500).json({ status: allOk ? 'ok' : 'degraded', checks });
 });
 
-// GET /api/spec-schema
+// ── Spec / Cert schema ────────────────────────────────────────────────────────
+
 app.get('/api/spec-schema', async (req, res) => {
   try {
-    const data = await readFile(SPEC_SCHEMA_FILE, 'utf8');
-    res.json(JSON.parse(data));
-  } catch {
-    res.status(404).json({ error: 'Schema not found' });
-  }
+    const data = await config.get('specSchema');
+    if (!data) return res.status(404).json({ error: 'Schema not found' });
+    res.json(data);
+  } catch { res.status(404).json({ error: 'Schema not found' }); }
 });
 
-// PUT /api/spec-schema
 app.put('/api/spec-schema', async (req, res) => {
   try {
-    await writeFile(SPEC_SCHEMA_FILE, JSON.stringify(req.body, null, 2));
+    await config.set('specSchema', req.body);
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to save schema', detail: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: 'Failed to save schema', detail: e.message }); }
 });
 
-// GET /api/cert-schema
 app.get('/api/cert-schema', async (req, res) => {
   try {
-    const data = await readFile(CERT_SCHEMA_FILE, 'utf8');
-    res.json(JSON.parse(data));
-  } catch {
-    res.status(404).json({ error: 'Cert schema not found' });
-  }
+    const data = await config.get('certSchema');
+    if (!data) return res.status(404).json({ error: 'Cert schema not found' });
+    res.json(data);
+  } catch { res.status(404).json({ error: 'Cert schema not found' }); }
 });
 
-// PUT /api/cert-schema
 app.put('/api/cert-schema', async (req, res) => {
   try {
-    await writeFile(CERT_SCHEMA_FILE, JSON.stringify(req.body, null, 2));
+    await config.set('certSchema', req.body);
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to save cert schema', detail: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: 'Failed to save cert schema', detail: e.message }); }
 });
 
-// ── Catalog endpoints ─────────────────────────────────────────────────────────
+// ── Catalog ───────────────────────────────────────────────────────────────────
 
-// GET /api/catalog
 app.get('/api/catalog', async (req, res) => {
-  try {
-    const data = await readFile(CATALOG_FILE, 'utf8');
-    res.json(JSON.parse(data));
-  } catch {
-    res.json([]);
-  }
+  try { res.json(await catalog.getAll()); }
+  catch { res.json([]); }
 });
 
-// GET /api/catalog/export/csv
 app.get('/api/catalog/export/csv', async (req, res) => {
   try {
-    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
-    const headers = ['id','name','manufacturer','modelNumber','version','category','createdAt'];
-    const rows = data.map(p => headers.map(h => {
-      const v = p[h] ?? '';
-      return `"${String(v).replace(/"/g, '""')}"`;
-    }).join(','));
-    const csv = [headers.join(','), ...rows].join('\n');
+    const data = await catalog.getAll();
+    const headers = ['id', 'name', 'manufacturer', 'modelNumber', 'version', 'category', 'createdAt'];
+    const rows = data.map(p => headers.map(h => `"${String(p[h] ?? '').replace(/"/g, '""')}"`).join(','));
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="catalog-export.csv"');
-    res.send(csv);
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to export CSV' });
-  }
+    res.send([headers.join(','), ...rows].join('\n'));
+  } catch { res.status(500).json({ error: 'Failed to export CSV' }); }
 });
 
-// GET /api/catalog/export/json
 app.get('/api/catalog/export/json', async (req, res) => {
   try {
-    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
+    const data = await catalog.getAll();
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename="catalog-export.json"');
     res.send(JSON.stringify(data, null, 2));
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to export JSON' });
-  }
+  } catch { res.status(500).json({ error: 'Failed to export JSON' }); }
 });
 
+// Image upload (images always stay on filesystem)
 const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, IMAGES_DIR),
   filename: (req, file, cb) => {
@@ -225,33 +179,27 @@ const upload = multer({
   },
 });
 
-// POST /api/catalog/:id/image
 app.post('/api/catalog/:id/image', (req, res, next) => {
   upload.single('image')(req, res, async (err) => {
     if (err) {
-      // Clean up any partial file multer may have written
       if (req.file) unlink(req.file.path).catch(() => {});
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'Image too large — maximum size is 5 MB' });
-      }
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Image too large — maximum size is 5 MB' });
       return res.status(400).json({ error: err.message || 'Upload failed' });
     }
     try {
       if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
-      const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
-      const idx = data.findIndex(e => e.id === req.params.id);
-      if (idx === -1) {
+      const entry = await catalog.getById(req.params.id);
+      if (!entry) {
         unlink(req.file.path).catch(() => {});
         return res.status(404).json({ error: 'Not found' });
       }
-      // Delete old image if present
-      if (data[idx].imageUrl) {
-        const oldPath = join(IMAGES_DIR, data[idx].imageUrl.split('/').pop());
+      if (entry.imageUrl) {
+        const oldPath = join(IMAGES_DIR, entry.imageUrl.split('/').pop());
         unlink(oldPath).catch(() => {});
       }
-      data[idx].imageUrl = `/api/images/${req.file.filename}`;
-      await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
-      res.json({ imageUrl: data[idx].imageUrl });
+      const imageUrl = `/api/images/${req.file.filename}`;
+      await catalog.update(req.params.id, { imageUrl });
+      res.json({ imageUrl });
     } catch (e) {
       if (req.file) unlink(req.file.path).catch(() => {});
       res.status(500).json({ error: 'Failed to upload image', detail: e.message });
@@ -259,47 +207,32 @@ app.post('/api/catalog/:id/image', (req, res, next) => {
   });
 });
 
-// DELETE /api/catalog/:id/image
 app.delete('/api/catalog/:id/image', async (req, res) => {
   try {
-    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
-    const idx = data.findIndex(e => e.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Not found' });
-    if (data[idx].imageUrl) {
-      const oldPath = join(IMAGES_DIR, data[idx].imageUrl.split('/').pop());
+    const entry = await catalog.getById(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Not found' });
+    if (entry.imageUrl) {
+      const oldPath = join(IMAGES_DIR, entry.imageUrl.split('/').pop());
       unlink(oldPath).catch(() => {});
-      data[idx].imageUrl = null;
-      await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+      await catalog.update(req.params.id, { imageUrl: null });
     }
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to delete image' });
-  }
+  } catch { res.status(500).json({ error: 'Failed to delete image' }); }
 });
 
-// GET /api/catalog/:id
 app.get('/api/catalog/:id', async (req, res) => {
   try {
-    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
-    const entry = data.find(e => e.id === req.params.id);
+    const entry = await catalog.getById(req.params.id);
     if (!entry) return res.status(404).json({ error: 'Not found' });
     res.json(entry);
-  } catch {
-    res.status(500).json({ error: 'Failed to read catalog' });
-  }
+  } catch { res.status(500).json({ error: 'Failed to read catalog' }); }
 });
 
-// POST /api/catalog
 app.post('/api/catalog', async (req, res) => {
   try {
-    const { name, manufacturer, modelNumber, version, status, category, capabilities, appConfigs, specs, certifications, compatibleWith, entity, type, hubConnectionType } = req.body;
+    const { name, manufacturer, modelNumber, version, status, category, capabilities, appConfigs,
+            specs, certifications, compatibleWith, entity, type, hubConnectionType, subclass } = req.body;
     if (!name || !category) return res.status(400).json({ error: 'name and category required', code: 'CAT_001_MISSING_FIELDS' });
-    let data;
-    try {
-      data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
-    } catch (e) {
-      return res.status(500).json({ error: 'Failed to read catalog file', code: 'CAT_002_READ_ERROR', detail: e.message });
-    }
     const entry = {
       id: uuidv4(),
       name: name.trim(),
@@ -308,6 +241,7 @@ app.post('/api/catalog', async (req, res) => {
       version: (version || '').trim(),
       status: status || 'active',
       category,
+      subclass: subclass || null,
       capabilities: capabilities || [],
       compatibleWith: compatibleWith || [],
       hubConnectionType: hubConnectionType || null,
@@ -318,213 +252,148 @@ app.post('/api/catalog', async (req, res) => {
       type: type || 'production',
       createdAt: new Date().toISOString(),
     };
-    data.push(entry);
-    try {
-      await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
-    } catch (e) {
-      return res.status(500).json({ error: 'Failed to write catalog file', code: 'CAT_003_WRITE_ERROR', detail: e.message });
-    }
+    await catalog.create(entry);
     res.status(201).json(entry);
   } catch (e) {
-    res.status(500).json({ error: 'Unexpected error creating catalog entry', code: 'CAT_004_UNKNOWN', detail: e.message });
+    res.status(500).json({ error: 'Unexpected error creating catalog entry', detail: e.message });
   }
 });
 
-// PUT /api/catalog/:id
 app.put('/api/catalog/:id', async (req, res) => {
   try {
-    let data;
-    try {
-      data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
-    } catch (e) {
-      return res.status(500).json({ error: 'Failed to read catalog file', code: 'CAT_005_READ_ERROR', detail: e.message });
-    }
-    const idx = data.findIndex(e => e.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Not found', code: 'CAT_006_NOT_FOUND' });
-    data[idx] = { ...data[idx], ...req.body, id: data[idx].id, createdAt: data[idx].createdAt };
-    try {
-      await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
-    } catch (e) {
-      return res.status(500).json({ error: 'Failed to write catalog file', code: 'CAT_007_WRITE_ERROR', detail: e.message });
-    }
-    res.json(data[idx]);
+    const updated = await catalog.update(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
   } catch (e) {
-    res.status(500).json({ error: 'Unexpected error updating catalog entry', code: 'CAT_008_UNKNOWN', detail: e.message });
+    res.status(500).json({ error: 'Unexpected error updating catalog entry', detail: e.message });
   }
 });
 
-// DELETE /api/catalog/:id
 app.delete('/api/catalog/:id', async (req, res) => {
   try {
-    const data = JSON.parse(await readFile(CATALOG_FILE, 'utf8'));
-    const idx = data.findIndex(e => e.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Not found' });
-    const [removed] = data.splice(idx, 1);
-    await writeFile(CATALOG_FILE, JSON.stringify(data, null, 2));
+    const removed = await catalog.delete(req.params.id);
+    if (!removed) return res.status(404).json({ error: 'Not found' });
     res.json(removed);
-  } catch {
-    res.status(500).json({ error: 'Failed to delete catalog entry' });
-  }
+  } catch { res.status(500).json({ error: 'Failed to delete catalog entry' }); }
 });
 
-// GET /api/devices
+// ── Devices ───────────────────────────────────────────────────────────────────
+
 app.get('/api/devices', async (req, res) => {
-  try {
-    const data = await readFile(DEVICES_FILE, 'utf8');
-    res.json(JSON.parse(data));
-  } catch {
-    res.json([]);
-  }
+  try { res.json(await devices.getAll()); }
+  catch { res.json([]); }
 });
 
-// POST /api/devices
 app.post('/api/devices', async (req, res) => {
   try {
     const { name, category } = req.body;
     if (!name || !category) return res.status(400).json({ error: 'name and category required' });
-    const data = JSON.parse(await readFile(DEVICES_FILE, 'utf8'));
-    const existing = data.find(d => d.name.toLowerCase() === name.toLowerCase() && d.category === category);
+    const all = await devices.getAll();
+    const existing = all.find(d => d.name.toLowerCase() === name.toLowerCase() && d.category === category);
     if (existing) return res.json(existing);
     const device = { id: uuidv4(), name: name.trim(), category };
-    data.push(device);
-    await writeFile(DEVICES_FILE, JSON.stringify(data, null, 2));
+    await devices.create(device);
     res.status(201).json(device);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to save device' });
-  }
+  } catch { res.status(500).json({ error: 'Failed to save device' }); }
 });
 
+// ── Sessions ──────────────────────────────────────────────────────────────────
+
 function getAnthropicClient() {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return null;
-  }
+  if (!process.env.ANTHROPIC_API_KEY) return null;
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
 
-// GET /api/sessions - list all sessions
 app.get('/api/sessions', async (req, res) => {
   try {
-    const files = await readdir(SESSIONS_DIR);
-    const jsonFiles = files.filter(f => f.endsWith('.json'));
-    const sessions = await Promise.all(
-      jsonFiles.map(async (file) => {
-        const raw = await readFile(join(SESSIONS_DIR, file), 'utf-8');
-        const session = JSON.parse(raw);
-        return {
-          id: session.id,
-          productName: session.productName,
-          date: session.createdAt,
-          status: session.status,
-          issueCount: (session.issues || []).length,
-          testPlan: session.testPlan || 'production',
-          catalogId: session.catalogId || session.productId || null,
-          appConfigName: session.appConfigName || null,
-          products: session.products ? session.products.map(p => ({ catalogId: p.catalogId })) : null,
-          testCases: session.testCases || [],
-        };
-      })
-    );
-    sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
-    res.json(sessions);
+    const all = await sessions.getAll();
+    const result = all.map(s => ({
+      id: s.id,
+      productName: s.productName,
+      date: s.createdAt,
+      status: s.status,
+      issueCount: (s.issues || []).length,
+      testPlan: s.testPlan || 'production',
+      catalogId: s.catalogId || s.productId || null,
+      appConfigName: s.appConfigName || null,
+      testerName: s.testerName || null,
+      products: s.products ? s.products.map(p => ({ catalogId: p.catalogId })) : null,
+      testCases: s.testCases || [],
+      createdAt: s.createdAt,
+    }));
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to list sessions' });
   }
 });
 
-// GET /api/sessions/:id
 app.get('/api/sessions/:id', async (req, res) => {
   try {
-    const filePath = join(SESSIONS_DIR, `${req.params.id}.json`);
-    if (!existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
-    const raw = await readFile(filePath, 'utf-8');
-    res.json(JSON.parse(raw));
+    const session = await sessions.getById(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    res.json(session);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to read session' });
   }
 });
 
-// GET /api/qr?url=... — generate QR code PNG as data URL
+// GET /api/qr?url=...
 app.get('/api/qr', async (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: 'url param required' });
   try {
     const dataUrl = await QRCode.toDataURL(url, { width: 120, margin: 1 });
     res.json({ dataUrl });
-  } catch (e) {
-    res.status(500).json({ error: 'QR generation failed' });
-  }
+  } catch { res.status(500).json({ error: 'QR generation failed' }); }
 });
 
-// GET /api/sessions/:id/export/csv
 app.get('/api/sessions/:id/export/csv', async (req, res) => {
   try {
-    const filePath = join(SESSIONS_DIR, `${req.params.id}.json`);
-    if (!existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
-    const session = JSON.parse(await readFile(filePath, 'utf-8'));
+    const session = await sessions.getById(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
     const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows = [['Test #', 'Title', 'Status', 'Notes', 'Linked Issue', 'Firmware', 'Date']];
     for (const t of (session.tests || [])) {
       rows.push([
-        escape(t.testNumber ?? ''),
-        escape(t.title ?? ''),
-        escape(t.status ?? ''),
-        escape(t.notes ?? ''),
-        escape(t.linkedIssueTitle ?? ''),
-        escape(session.firmware ?? ''),
-        escape(session.date ?? session.createdAt ?? ''),
+        escape(t.testNumber ?? ''), escape(t.title ?? ''), escape(t.status ?? ''),
+        escape(t.notes ?? ''), escape(t.linkedIssueTitle ?? ''),
+        escape(session.firmware ?? ''), escape(session.date ?? session.createdAt ?? ''),
       ]);
     }
-    const csv = rows.map(r => r.join(',')).join('\n');
-    const filename = `session-${req.params.id}.csv`;
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(csv);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to export session' });
-  }
+    res.setHeader('Content-Disposition', `attachment; filename="session-${req.params.id}.csv"`);
+    res.send(rows.map(r => r.join(',')).join('\n'));
+  } catch { res.status(500).json({ error: 'Failed to export session' }); }
 });
 
-// GET /api/sessions/:id/export/exploratory-csv
 app.get('/api/sessions/:id/export/exploratory-csv', async (req, res) => {
   try {
-    const filePath = join(SESSIONS_DIR, `${req.params.id}.json`);
-    if (!existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
-    const session = JSON.parse(await readFile(filePath, 'utf-8'));
+    const session = await sessions.getById(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
     const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows = [['Category', 'Performance', 'UI/UX', 'Bug/Issue', 'Like', 'Dislike', 'Other Notes', 'Rating', 'Product', 'Date']];
     for (const cat of (session.categories || [])) {
       const obs = cat.observations || {};
       rows.push([
-        escape(cat.label ?? ''),
-        escape(obs.performance ?? ''),
-        escape(obs.uiux ?? ''),
-        escape(obs.bugIssue ?? ''),
-        escape(obs.like ?? ''),
-        escape(obs.dislike ?? ''),
-        escape(obs.otherNotes ?? ''),
-        escape(cat.rating ?? ''),
-        escape(session.productName ?? ''),
-        escape(session.date ?? session.createdAt ?? ''),
+        escape(cat.label ?? ''), escape(obs.performance ?? ''), escape(obs.uiux ?? ''),
+        escape(obs.bugIssue ?? ''), escape(obs.like ?? ''), escape(obs.dislike ?? ''),
+        escape(obs.otherNotes ?? ''), escape(cat.rating ?? ''),
+        escape(session.productName ?? ''), escape(session.date ?? session.createdAt ?? ''),
       ]);
     }
-    const csv = rows.map(r => r.join(',')).join('\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="exploratory-${req.params.id}.csv"`);
-    res.send(csv);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to export session' });
-  }
+    res.send(rows.map(r => r.join(',')).join('\n'));
+  } catch { res.status(500).json({ error: 'Failed to export session' }); }
 });
 
-// POST /api/sessions - create new session
 app.post('/api/sessions', async (req, res) => {
   try {
     const { productId, productName, category, subcategory, firmware, notes, type, testPlan,
-            products, metrics, results, autoPulled,
-            platform, testEnvironment, categories, overallSummary,
-            catalogId } = req.body;
+            products, metrics, results, autoPulled, platform, testEnvironment, categories,
+            overallSummary, catalogId, testerName } = req.body;
     const id = uuidv4();
     const session = {
       id,
@@ -534,6 +403,7 @@ app.post('/api/sessions', async (req, res) => {
       subcategory: subcategory || null,
       firmware: firmware || '',
       sessionNotes: notes || '',
+      testerName: testerName || null,
       type: type || 'e2e',
       testPlan: testPlan || 'production',
       createdAt: new Date().toISOString(),
@@ -559,7 +429,7 @@ app.post('/api/sessions', async (req, res) => {
       if (products && products.length > 0) session.products = products;
       if (testEnvironment) session.testEnvironment = testEnvironment;
     }
-    await writeFile(join(SESSIONS_DIR, `${id}.json`), JSON.stringify(session, null, 2));
+    await sessions.create(session);
     res.status(201).json(session);
   } catch (err) {
     console.error(err);
@@ -567,15 +437,10 @@ app.post('/api/sessions', async (req, res) => {
   }
 });
 
-// PUT /api/sessions/:id - update session
 app.put('/api/sessions/:id', async (req, res) => {
   try {
-    const filePath = join(SESSIONS_DIR, `${req.params.id}.json`);
-    if (!existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
-    const raw = await readFile(filePath, 'utf-8');
-    const existing = JSON.parse(raw);
-    const updated = { ...existing, ...req.body, id: existing.id };
-    await writeFile(filePath, JSON.stringify(updated, null, 2));
+    const updated = await sessions.update(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Session not found' });
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -583,15 +448,12 @@ app.put('/api/sessions/:id', async (req, res) => {
   }
 });
 
-// POST /api/sessions/:id/ai-summary — generate AI summary for exploratory sessions
 app.post('/api/sessions/:id/ai-summary', async (req, res) => {
   const client = getAnthropicClient();
   if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set.' });
   try {
-    const filePath = join(SESSIONS_DIR, `${req.params.id}.json`);
-    if (!existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
-    const session = JSON.parse(await readFile(filePath, 'utf-8'));
-
+    const session = await sessions.getById(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
     const catSummaries = (session.categories || []).map(cat => {
       const obs = cat.observations || {};
       const lines = [];
@@ -603,20 +465,14 @@ app.post('/api/sessions/:id/ai-summary', async (req, res) => {
       if (obs.otherNotes) lines.push(`Other: ${obs.otherNotes}`);
       return `### ${cat.label}\n${lines.join('\n') || 'No observations.'}`;
     }).join('\n\n');
-
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: `You are a QA engineer writing exploratory test session summaries. Be concise and professional.`,
-      messages: [{
-        role: 'user',
-        content: `Write a brief summary of this exploratory test session.\n\nProduct: ${session.productName}\nPlatform: ${session.platform || 'N/A'}\nDate: ${session.createdAt}\n\n${catSummaries}\n\nProvide 3-5 sentences covering overall findings, notable issues, and highlights.`,
-      }],
+      messages: [{ role: 'user', content: `Write a brief summary of this exploratory test session.\n\nProduct: ${session.productName}\nPlatform: ${session.platform || 'N/A'}\nDate: ${session.createdAt}\n\n${catSummaries}\n\nProvide 3-5 sentences covering overall findings, notable issues, and highlights.` }],
     });
-
     const aiSummary = message.content[0].text.trim();
-    const updated = { ...session, aiSummary };
-    await writeFile(filePath, JSON.stringify(updated, null, 2));
+    await sessions.update(session.id, { aiSummary });
     res.json({ aiSummary });
   } catch (err) {
     console.error(err);
@@ -624,173 +480,80 @@ app.post('/api/sessions/:id/ai-summary', async (req, res) => {
   }
 });
 
-// POST /api/ai/populate-tests
+// ── AI endpoints ──────────────────────────────────────────────────────────────
+
 app.post('/api/ai/populate-tests', async (req, res) => {
   const client = getAnthropicClient();
-  if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set. Please add it to your .env file.' });
-
+  if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set.' });
   const { productName, category, subcategory, firmware } = req.body;
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      system: `You are a QA engineer specializing in security hardware testing for smart home products.
-You generate structured, thorough test cases for QA testing sessions.
-Always respond with valid JSON only, no markdown code blocks, no explanation.`,
-      messages: [
-        {
-          role: 'user',
-          content: `Generate a comprehensive list of test cases for QA testing the following product:
-Product: ${productName}
-Category: ${category}
-${subcategory ? `Subcategory: ${subcategory}` : ''}
-${firmware ? `Firmware Version: ${firmware}` : ''}
-
-Return a JSON array of test case objects. Each object must have:
-- id: a unique UUID string
-- title: short test case title (5-10 words)
-- description: what to do step by step (2-4 sentences)
-- expected: what the expected result should be (1-2 sentences)
-- status: "pending"
-- notes: ""
-- aiGenerated: true
-
-Tailor the test cases specifically for this product and its firmware context. Include 12-18 test cases covering the most important aspects for this product category.`,
-        },
-      ],
+      system: `You are a QA engineer specializing in security hardware testing for smart home products. Generate structured, thorough test cases. Always respond with valid JSON only, no markdown code blocks, no explanation.`,
+      messages: [{ role: 'user', content: `Generate a comprehensive list of test cases for QA testing the following product:\nProduct: ${productName}\nCategory: ${category}\n${subcategory ? `Subcategory: ${subcategory}` : ''}\n${firmware ? `Firmware Version: ${firmware}` : ''}\n\nReturn a JSON array of test case objects. Each object must have:\n- id: a unique UUID string\n- title: short test case title (5-10 words)\n- description: what to do step by step (2-4 sentences)\n- expected: what the expected result should be (1-2 sentences)\n- status: "pending"\n- notes: ""\n- aiGenerated: true\n\nInclude 12-18 test cases covering the most important aspects for this product category.` }],
     });
-
-    let text = message.content[0].text.trim();
-    // Strip markdown code block if present
-    text = text.replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '');
-    const testCases = JSON.parse(text);
-    res.json({ testCases });
+    let text = message.content[0].text.trim().replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '');
+    res.json({ testCases: JSON.parse(text) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'AI call failed', details: err.message });
   }
 });
 
-// POST /api/ai/suggest-issue
 app.post('/api/ai/suggest-issue', async (req, res) => {
   const client = getAnthropicClient();
-  if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set. Please add it to your .env file.' });
-
+  if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set.' });
   const { description, productName, category } = req.body;
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 512,
-      system: `You are a QA engineer specializing in security hardware testing.
-Analyze bug descriptions and classify them accurately.
-Always respond with valid JSON only, no markdown, no explanation.`,
-      messages: [
-        {
-          role: 'user',
-          content: `Analyze this issue description for a QA test of "${productName}" (category: ${category}):
-
-"${description}"
-
-Return a JSON object with:
-- severity: one of "Critical", "High", "Medium", "Low"
-- issueCategory: one of "Connectivity", "UI/UX", "Performance", "Security", "Crash/ANR", "False Positive", "False Negative", "Setup/Pairing", "Firmware", "Audio/Video", "Hardware"
-- title: a clean, concise issue title (5-10 words, imperative/noun form, no punctuation at end)`,
-        },
-      ],
+      system: `You are a QA engineer specializing in security hardware testing. Analyze bug descriptions and classify them. Always respond with valid JSON only.`,
+      messages: [{ role: 'user', content: `Analyze this issue description for a QA test of "${productName}" (category: ${category}):\n\n"${description}"\n\nReturn a JSON object with:\n- severity: one of "Critical", "High", "Medium", "Low"\n- issueCategory: one of "Connectivity", "UI/UX", "Performance", "Security", "Crash/ANR", "False Positive", "False Negative", "Setup/Pairing", "Firmware", "Audio/Video", "Hardware"\n- title: a clean, concise issue title (5-10 words)` }],
     });
-
-    let text = message.content[0].text.trim();
-    text = text.replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '');
-    const result = JSON.parse(text);
-    res.json(result);
+    let text = message.content[0].text.trim().replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '');
+    res.json(JSON.parse(text));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'AI call failed', details: err.message });
   }
 });
 
-// POST /api/ai/write-repro
 app.post('/api/ai/write-repro', async (req, res) => {
   const client = getAnthropicClient();
-  if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set. Please add it to your .env file.' });
-
+  if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set.' });
   const { description, productName, productCategory, firmwareVersion } = req.body;
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
-      system: `You are a QA engineer specializing in security hardware testing for smart home products.
-Convert rough bug notes into structured, professional reproduction steps.
-Always respond with valid JSON only, no markdown code blocks, no explanation.`,
-      messages: [
-        {
-          role: 'user',
-          content: `Turn these rough notes into structured reproduction steps for a bug in "${productName}" (${productCategory}, firmware: ${firmwareVersion || 'unknown'}):
-
-"${description}"
-
-Return a JSON object with:
-- reproSteps: a markdown numbered list of clear, specific steps to reproduce the issue
-- preconditions: a short paragraph describing what must be set up before starting the repro steps`,
-        },
-      ],
+      system: `You are a QA engineer specializing in security hardware testing. Convert rough bug notes into structured repro steps. Always respond with valid JSON only.`,
+      messages: [{ role: 'user', content: `Turn these rough notes into structured reproduction steps for a bug in "${productName}" (${productCategory}, firmware: ${firmwareVersion || 'unknown'}):\n\n"${description}"\n\nReturn a JSON object with:\n- reproSteps: a markdown numbered list of clear, specific steps\n- preconditions: a short paragraph describing setup required` }],
     });
-
-    let text = message.content[0].text.trim();
-    text = text.replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '');
-    const result = JSON.parse(text);
-    res.json(result);
+    let text = message.content[0].text.trim().replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '');
+    res.json(JSON.parse(text));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'AI call failed', details: err.message });
   }
 });
 
-// POST /api/ai/summarize
 app.post('/api/ai/summarize', async (req, res) => {
   const client = getAnthropicClient();
-  if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set. Please add it to your .env file.' });
-
+  if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set.' });
   const { session } = req.body;
   try {
     const passCount = session.testCases.filter(t => t.status === 'pass').length;
     const failCount = session.testCases.filter(t => t.status === 'fail').length;
     const skipCount = session.testCases.filter(t => t.status === 'skip').length;
-    const total = passCount + failCount; // skip/na excluded from pass rate
-
+    const total = passCount + failCount;
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
-      system: `You are a senior QA engineer writing professional test session summaries for security hardware products.
-Write in a clear, professional tone. Use markdown formatting.`,
-      messages: [
-        {
-          role: 'user',
-          content: `Write a QA session summary for the following test session:
-
-Product: ${session.productName}
-Firmware: ${session.firmware || 'N/A'}
-Date: ${session.createdAt}
-Session Notes: ${session.sessionNotes || 'None'}
-
-Test Results:
-- Total: ${total}
-- Passed: ${passCount}
-- Failed: ${failCount}
-- Skipped: ${skipCount}
-- Pass Rate: ${total > 0 ? Math.round((passCount / total) * 100) : 0}%
-
-Failed Tests:
-${session.testCases.filter(t => t.status === 'fail').map(t => `- ${t.title}: ${t.notes || 'No notes'}`).join('\n') || 'None'}
-
-Issues Logged (${session.issues.length}):
-${session.issues.map(i => `- [${i.severity}] ${i.title} (${i.issueCategory})`).join('\n') || 'None'}
-
-Write a professional summary with sections: Overview, Test Results, Key Issues, Recommendations. Use markdown headings.`,
-        },
-      ],
+      system: `You are a senior QA engineer writing professional test session summaries. Use markdown formatting.`,
+      messages: [{ role: 'user', content: `Write a QA session summary:\n\nProduct: ${session.productName}\nFirmware: ${session.firmware || 'N/A'}\nDate: ${session.createdAt}\nSession Notes: ${session.sessionNotes || 'None'}\n\nTest Results:\n- Total: ${total}\n- Passed: ${passCount}\n- Failed: ${failCount}\n- Skipped: ${skipCount}\n- Pass Rate: ${total > 0 ? Math.round((passCount / total) * 100) : 0}%\n\nFailed Tests:\n${session.testCases.filter(t => t.status === 'fail').map(t => `- ${t.title}: ${t.notes || 'No notes'}`).join('\n') || 'None'}\n\nIssues Logged (${session.issues.length}):\n${session.issues.map(i => `- [${i.severity}] ${i.title} (${i.issueCategory})`).join('\n') || 'None'}\n\nWrite a professional summary with sections: Overview, Test Results, Key Issues, Recommendations.` }],
     });
-
     res.json({ summary: message.content[0].text });
   } catch (err) {
     console.error(err);
@@ -798,69 +561,43 @@ Write a professional summary with sections: Overview, Test Results, Key Issues, 
   }
 });
 
-// GET /api/csv-template/:type
-app.get('/api/csv-template/:type', (req, res) => {
-  const { type } = req.params;
-  const template = CSV_TEMPLATES[type];
-  if (!template) return res.status(400).json({ error: `Unknown type: ${type}` });
+// ── CSV templates / import ────────────────────────────────────────────────────
 
+app.get('/api/csv-template/:type', (req, res) => {
+  const template = CSV_TEMPLATES[req.params.type];
+  if (!template) return res.status(400).json({ error: `Unknown type: ${req.params.type}` });
   function escapeField(val) {
     const s = String(val ?? '');
-    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-      return '"' + s.replace(/"/g, '""') + '"';
-    }
-    return s;
+    return (s.includes(',') || s.includes('"') || s.includes('\n')) ? `"${s.replace(/"/g, '""')}"` : s;
   }
-
-  const lines = [
-    template.headers.join(','),
-    ...template.exampleRows.map(row => row.map(escapeField).join(',')),
-  ];
-  const csv = lines.join('\r\n') + '\r\n';
-
+  const lines = [template.headers.join(','), ...template.exampleRows.map(row => row.map(escapeField).join(','))];
   res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="template-${type}.csv"`);
-  res.send(csv);
+  res.setHeader('Content-Disposition', `attachment; filename="template-${req.params.type}.csv"`);
+  res.send(lines.join('\r\n') + '\r\n');
 });
 
-// Simple CSV parser that handles quoted fields
 function parseCsv(text) {
-  // Strip BOM
   if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
   const rows = [];
-  const lines = text.split(/\r?\n/);
-  for (const line of lines) {
+  for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     const fields = [];
     let i = 0;
     while (i < line.length) {
       if (line[i] === '"') {
-        // Quoted field
         let val = '';
-        i++; // skip opening quote
+        i++;
         while (i < line.length) {
-          if (line[i] === '"' && line[i + 1] === '"') {
-            val += '"';
-            i += 2;
-          } else if (line[i] === '"') {
-            i++; // skip closing quote
-            break;
-          } else {
-            val += line[i++];
-          }
+          if (line[i] === '"' && line[i + 1] === '"') { val += '"'; i += 2; }
+          else if (line[i] === '"') { i++; break; }
+          else val += line[i++];
         }
         fields.push(val);
-        if (line[i] === ',') i++; // skip comma
+        if (line[i] === ',') i++;
       } else {
-        // Unquoted field
         const end = line.indexOf(',', i);
-        if (end === -1) {
-          fields.push(line.slice(i));
-          break;
-        } else {
-          fields.push(line.slice(i, end));
-          i = end + 1;
-        }
+        if (end === -1) { fields.push(line.slice(i)); break; }
+        else { fields.push(line.slice(i, end)); i = end + 1; }
       }
     }
     rows.push(fields);
@@ -868,86 +605,51 @@ function parseCsv(text) {
   return rows;
 }
 
-// POST /api/csv-import
 app.post('/api/csv-import', (req, res) => {
   const { csvText, type } = req.body;
   if (!csvText || !type) return res.status(400).json({ error: 'csvText and type are required' });
   const template = CSV_TEMPLATES[type];
   if (!template) return res.status(400).json({ error: `Unknown type: ${type}` });
-
   const rows = parseCsv(csvText);
   if (rows.length < 2) return res.status(400).json({ error: 'CSV must have a header row and at least one data row' });
-
   const [headerRow, ...dataRows] = rows;
   const headers = headerRow.map(h => h.trim());
-
   if (type === 'reproduction') {
-    const issues = dataRows.map(row => {
-      const obj = { id: uuidv4() };
-      headers.forEach((h, i) => { obj[h] = row[i] ?? ''; });
-      return obj;
-    });
-    return res.json({ issues });
-  } else {
-    const testCases = dataRows.map(row => {
-      const obj = { id: uuidv4(), status: 'pending' };
-      headers.forEach((h, i) => { obj[h] = row[i] ?? ''; });
-      return obj;
-    });
-    return res.json({ testCases });
+    return res.json({ issues: dataRows.map(row => { const obj = { id: uuidv4() }; headers.forEach((h, i) => { obj[h] = row[i] ?? ''; }); return obj; }) });
   }
+  res.json({ testCases: dataRows.map(row => { const obj = { id: uuidv4(), status: 'pending' }; headers.forEach((h, i) => { obj[h] = row[i] ?? ''; }); return obj; }) });
 });
 
-// GET /api/issues - flat list of all issues across all sessions
+// ── Issues ────────────────────────────────────────────────────────────────────
+
 app.get('/api/issues', async (req, res) => {
   const SEVERITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
   try {
-    const files = await readdir(SESSIONS_DIR);
-    const jsonFiles = files.filter(f => f.endsWith('.json'));
+    const allSessions = await sessions.getAll();
     const allIssues = [];
-    for (const file of jsonFiles) {
-      const raw = await readFile(join(SESSIONS_DIR, file), 'utf-8');
-      const session = JSON.parse(raw);
-      const issues = session.issues || [];
+    for (const session of allSessions) {
       const verifications = session.verifications || [];
-      for (const issue of issues) {
-        // Derive status from verifications
+      for (const issue of (session.issues || [])) {
         const issueVerifs = verifications.filter(v => v.issueId === issue.id);
         let status = 'Open';
         if (issueVerifs.length > 0) {
-          const latestVerif = issueVerifs[issueVerifs.length - 1];
-          if (latestVerif.result === 'Fixed' || latestVerif.result === 'fixed-verified') status = 'Fixed';
-          else if (latestVerif.result === 'Cannot Reproduce' || latestVerif.result === 'cannot-reproduce') status = 'Cannot Reproduce';
+          const latest = issueVerifs[issueVerifs.length - 1];
+          if (latest.result === 'Fixed' || latest.result === 'fixed-verified') status = 'Fixed';
+          else if (latest.result === 'Cannot Reproduce' || latest.result === 'cannot-reproduce') status = 'Cannot Reproduce';
         }
-        allIssues.push({
-          ...issue,
-          sessionId: session.id,
-          productName: session.productName,
-          sessionDate: session.createdAt,
-          firmware: session.firmware || '',
-          verificationHistory: issueVerifs,
-          derivedStatus: status,
-        });
+        allIssues.push({ ...issue, sessionId: session.id, productName: session.productName, sessionDate: session.createdAt, firmware: session.firmware || '', verificationHistory: issueVerifs, derivedStatus: status });
       }
     }
     allIssues.sort((a, b) => {
-      const sa = SEVERITY_ORDER[a.severity] ?? 99;
-      const sb = SEVERITY_ORDER[b.severity] ?? 99;
-      if (sa !== sb) return sa - sb;
-      return new Date(b.sessionDate) - new Date(a.sessionDate);
+      const sa = SEVERITY_ORDER[a.severity] ?? 99, sb = SEVERITY_ORDER[b.severity] ?? 99;
+      return sa !== sb ? sa - sb : new Date(b.sessionDate) - new Date(a.sessionDate);
     });
     const { productName, catalogId } = req.query;
     let result = allIssues;
     if (productName) result = result.filter(i => i.productName === productName);
     if (catalogId) {
-      // match sessions whose catalogId matches
-      const sessionFiles = await readdir(SESSIONS_DIR);
-      const matchingSessionIds = new Set();
-      for (const f of sessionFiles.filter(f => f.endsWith('.json'))) {
-        const s = JSON.parse(await readFile(join(SESSIONS_DIR, f), 'utf-8'));
-        if (s.catalogId === catalogId) matchingSessionIds.add(s.id);
-      }
-      result = result.filter(i => matchingSessionIds.has(i.sessionId));
+      const matchingIds = new Set(allSessions.filter(s => s.catalogId === catalogId).map(s => s.id));
+      result = result.filter(i => matchingIds.has(i.sessionId));
     }
     res.json(result);
   } catch (err) {
@@ -956,43 +658,34 @@ app.get('/api/issues', async (req, res) => {
   }
 });
 
-// PATCH /api/sessions/:sessionId/issues/:issueId — update reproCount, regressionFlag, etc.
 app.patch('/api/sessions/:sessionId/issues/:issueId', async (req, res) => {
   try {
-    const filePath = join(SESSIONS_DIR, `${req.params.sessionId}.json`);
-    const session = JSON.parse(await readFile(filePath, 'utf-8'));
+    const session = await sessions.getById(req.params.sessionId);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
     const issues = session.issues || [];
     const idx = issues.findIndex(i => i.id === req.params.issueId);
     if (idx === -1) return res.status(404).json({ error: 'Issue not found' });
     issues[idx] = { ...issues[idx], ...req.body };
-    session.issues = issues;
-    await writeFile(filePath, JSON.stringify(session, null, 2));
+    await sessions.update(req.params.sessionId, { issues });
     res.json(issues[idx]);
-  } catch {
-    res.status(404).json({ error: 'Session not found' });
-  }
+  } catch { res.status(404).json({ error: 'Session not found' }); }
 });
 
-// GET /api/analytics - pre-computed analytics across all sessions
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
 app.get('/api/analytics', async (req, res) => {
   try {
-    const files = await readdir(SESSIONS_DIR);
-    const jsonFiles = files.filter(f => f.endsWith('.json'));
-    const sessions = await Promise.all(
-      jsonFiles.map(async f => JSON.parse(await readFile(join(SESSIONS_DIR, f), 'utf-8')))
-    );
-
+    const allSessions = await sessions.getAll();
     let totalTests = 0, passCount = 0, failCount = 0, skipCount = 0, naCount = 0;
     const productMap = {};
     const testFailMap = {};
     const issueSeverityBreakdown = { Critical: 0, High: 0, Medium: 0, Low: 0 };
     const issueCategoryBreakdown = {};
 
-    for (const session of sessions) {
+    for (const session of allSessions) {
       const tc = session.testCases || [];
       const issues = session.issues || [];
       const verifications = session.verifications || [];
-
       let sPass = 0, sFail = 0, sSkip = 0, sNa = 0;
       for (const t of tc) {
         totalTests++;
@@ -1000,7 +693,6 @@ app.get('/api/analytics', async (req, res) => {
         else if (t.status === 'fail') { failCount++; sFail++; }
         else if (t.status === 'skip') { skipCount++; sSkip++; }
         else if (t.status === 'na') { naCount++; sNa++; }
-
         if (t.status === 'fail' && t.title) {
           const key = t.testNumber ? `${t.testNumber}|${t.title}` : t.title;
           if (!testFailMap[key]) testFailMap[key] = { title: t.title, testNumber: t.testNumber || '', failCount: 0, totalCount: 0 };
@@ -1012,87 +704,41 @@ app.get('/api/analytics', async (req, res) => {
           testFailMap[key].totalCount++;
         }
       }
-
-      const sTotal = sPass + sFail; // skip/na excluded from pass rate denominator
-      const sPassRate = sTotal > 0 ? sPass / sTotal : 0;
-
+      const sTotal = sPass + sFail;
       const pName = session.productName || 'Unknown';
-      if (!productMap[pName]) {
-        productMap[pName] = {
-          productName: pName,
-          catalogId: session.productId || null,
-          sessionCount: 0,
-          totalPass: 0, totalFail: 0, totalSkip: 0, totalNa: 0,
-          sessions: [],
-          openIssues: 0,
-        };
-      }
+      if (!productMap[pName]) productMap[pName] = { productName: pName, sessionCount: 0, totalPass: 0, totalFail: 0, totalSkip: 0, totalNa: 0, sessions: [], openIssues: 0 };
       const pm = productMap[pName];
       pm.sessionCount++;
       pm.totalPass += sPass; pm.totalFail += sFail; pm.totalSkip += sSkip; pm.totalNa += sNa;
-      pm.sessions.push({
-        sessionId: session.id,
-        date: session.createdAt,
-        firmware: session.firmware || '',
-        passRate: sPassRate,
-        passCount: sPass, failCount: sFail, skipCount: sSkip, naCount: sNa,
-      });
-
-      // Issues
-      const SEVERITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+      pm.sessions.push({ sessionId: session.id, date: session.createdAt, firmware: session.firmware || '', passRate: sTotal > 0 ? sPass / sTotal : 0, passCount: sPass, failCount: sFail, skipCount: sSkip, naCount: sNa });
       for (const issue of issues) {
-        const sev = issue.severity;
-        if (sev in issueSeverityBreakdown) issueSeverityBreakdown[sev]++;
+        if (issue.severity in issueSeverityBreakdown) issueSeverityBreakdown[issue.severity]++;
         const cat = issue.issueCategory || issue.category || 'Other';
         issueCategoryBreakdown[cat] = (issueCategoryBreakdown[cat] || 0) + 1;
-
-        // Check if open
         const issueVerifs = verifications.filter(v => v.issueId === issue.id);
         let isOpen = true;
         if (issueVerifs.length > 0) {
           const latest = issueVerifs[issueVerifs.length - 1];
-          if (latest.result === 'Fixed' || latest.result === 'fixed-verified' ||
-              latest.result === 'Cannot Reproduce' || latest.result === 'cannot-reproduce') {
-            isOpen = false;
-          }
+          if (latest.result === 'Fixed' || latest.result === 'fixed-verified' || latest.result === 'Cannot Reproduce' || latest.result === 'cannot-reproduce') isOpen = false;
         }
         if (isOpen) pm.openIssues++;
       }
     }
 
-    // Build productStats
     const productStats = Object.values(productMap).map(pm => {
-      const tot = pm.totalPass + pm.totalFail; // skip/na excluded
-      return {
-        productName: pm.productName,
-        catalogId: pm.catalogId,
-        sessionCount: pm.sessionCount,
-        passRate: tot > 0 ? pm.totalPass / tot : 0,
-        sessions: pm.sessions.sort((a, b) => new Date(a.date) - new Date(b.date)),
-        openIssues: pm.openIssues,
-      };
+      const tot = pm.totalPass + pm.totalFail;
+      return { productName: pm.productName, sessionCount: pm.sessionCount, passRate: tot > 0 ? pm.totalPass / tot : 0, sessions: pm.sessions.sort((a, b) => new Date(a.date) - new Date(b.date)), openIssues: pm.openIssues };
     }).sort((a, b) => a.passRate - b.passRate);
 
-    // Top failing tests (min 1 fail, top 10 by failCount)
-    const topFailingTests = Object.values(testFailMap)
-      .filter(t => t.failCount >= 1)
-      .sort((a, b) => b.failCount - a.failCount)
-      .slice(0, 10);
-
-    // Open issues by product
     const openIssuesByProduct = Object.values(productMap).map(pm => {
-      // Count by severity
       let crit = 0, high = 0, medLow = 0, oldestDays = 0;
-      for (const session of sessions.filter(s => s.productName === pm.productName)) {
+      for (const session of allSessions.filter(s => s.productName === pm.productName)) {
         for (const issue of (session.issues || [])) {
           const issueVerifs = (session.verifications || []).filter(v => v.issueId === issue.id);
           let isOpen = true;
           if (issueVerifs.length > 0) {
             const latest = issueVerifs[issueVerifs.length - 1];
-            if (latest.result === 'Fixed' || latest.result === 'fixed-verified' ||
-                latest.result === 'Cannot Reproduce' || latest.result === 'cannot-reproduce') {
-              isOpen = false;
-            }
+            if (latest.result === 'Fixed' || latest.result === 'fixed-verified' || latest.result === 'Cannot Reproduce' || latest.result === 'cannot-reproduce') isOpen = false;
           }
           if (isOpen) {
             if (issue.severity === 'Critical') crit++;
@@ -1103,30 +749,15 @@ app.get('/api/analytics', async (req, res) => {
           }
         }
       }
-      return {
-        productName: pm.productName,
-        openCount: pm.openIssues,
-        critical: crit,
-        high,
-        medLow,
-        oldestDays,
-      };
+      return { productName: pm.productName, openCount: pm.openIssues, critical: crit, high, medLow, oldestDays };
     }).filter(p => p.openCount > 0).sort((a, b) => b.openCount - a.openCount);
 
     res.json({
-      overallStats: {
-        sessionCount: sessions.length,
-        totalTests,
-        passCount,
-        failCount,
-        skipCount,
-        naCount,
-        overallPassRate: (passCount + failCount) > 0 ? passCount / (passCount + failCount) : 0,
-      },
+      overallStats: { sessionCount: allSessions.length, totalTests, passCount, failCount, skipCount, naCount, overallPassRate: (passCount + failCount) > 0 ? passCount / (passCount + failCount) : 0 },
       productStats,
       issueSeverityBreakdown,
       issueCategoryBreakdown,
-      topFailingTests,
+      topFailingTests: Object.values(testFailMap).filter(t => t.failCount >= 1).sort((a, b) => b.failCount - a.failCount).slice(0, 10),
       openIssuesByProduct,
       totalIssues: Object.values(issueSeverityBreakdown).reduce((a, b) => a + b, 0),
       totalOpenIssues: openIssuesByProduct.reduce((a, p) => a + p.openCount, 0),
@@ -1137,119 +768,82 @@ app.get('/api/analytics', async (req, res) => {
   }
 });
 
-// GET /api/settings - return masked API key status
+// ── Settings ──────────────────────────────────────────────────────────────────
+
 app.get('/api/settings', (req, res) => {
   const key = process.env.ANTHROPIC_API_KEY || '';
-  res.json({
-    hasApiKey: !!key,
-    apiKeyPreview: key ? `${key.slice(0, 8)}...${key.slice(-4)}` : null,
-  });
+  res.json({ hasApiKey: !!key, apiKeyPreview: key ? `${key.slice(0, 8)}...${key.slice(-4)}` : null });
 });
 
-// POST /api/settings - save API key to .env and hot-reload
 app.post('/api/settings', async (req, res) => {
   try {
     const { apiKey } = req.body;
     if (!apiKey || typeof apiKey !== 'string') return res.status(400).json({ error: 'apiKey required' });
     const trimmed = apiKey.trim();
-
-    // Read existing .env or start fresh
-    let envContent = '';
-    if (existsSync(ENV_FILE)) {
-      envContent = await readFile(ENV_FILE, 'utf8');
-    }
-
-    // Replace or append ANTHROPIC_API_KEY line
+    let envContent = existsSync(ENV_FILE) ? await readFile(ENV_FILE, 'utf8') : '';
     if (/^ANTHROPIC_API_KEY=.*/m.test(envContent)) {
       envContent = envContent.replace(/^ANTHROPIC_API_KEY=.*/m, `ANTHROPIC_API_KEY=${trimmed}`);
     } else {
       envContent = envContent.trimEnd() + `\nANTHROPIC_API_KEY=${trimmed}\n`;
     }
-
     await writeFile(ENV_FILE, envContent);
-    process.env.ANTHROPIC_API_KEY = trimmed; // hot-reload without restart
+    process.env.ANTHROPIC_API_KEY = trimmed;
     res.json({ success: true, apiKeyPreview: `${trimmed.slice(0, 8)}...${trimmed.slice(-4)}` });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to save API key' });
-  }
+  } catch { res.status(500).json({ error: 'Failed to save API key' }); }
 });
 
-// ── Comparisons ──────────────────────────────────────────────────────────────
+// ── Comparisons ───────────────────────────────────────────────────────────────
 
 app.get('/api/comparisons', async (req, res) => {
   try {
-    const files = await readdir(COMPARISONS_DIR);
-    const comps = await Promise.all(
-      files.filter(f => f.endsWith('.json')).map(async f => {
-        const raw = await readFile(join(COMPARISONS_DIR, f), 'utf-8');
-        return JSON.parse(raw);
-      })
-    );
+    const all = await comparisons.getAll();
     const { catalogId } = req.query;
-    const filtered = catalogId
-      ? comps.filter(c => c.products?.some(p => p.catalogId === catalogId))
-      : comps;
-    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    res.json(filtered);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json(catalogId ? all.filter(c => c.products?.some(p => p.catalogId === catalogId)) : all);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/comparisons/:id', async (req, res) => {
   try {
-    const raw = await readFile(join(COMPARISONS_DIR, `${req.params.id}.json`), 'utf-8');
-    res.json(JSON.parse(raw));
-  } catch {
-    res.status(404).json({ error: 'Not found' });
-  }
+    const comp = await comparisons.getById(req.params.id);
+    if (!comp) return res.status(404).json({ error: 'Not found' });
+    res.json(comp);
+  } catch { res.status(404).json({ error: 'Not found' }); }
 });
 
 app.post('/api/comparisons', async (req, res) => {
   try {
-    const id = crypto.randomUUID();
-    const comparison = { id, createdAt: new Date().toISOString(), ...req.body };
-    await writeFile(join(COMPARISONS_DIR, `${id}.json`), JSON.stringify(comparison, null, 2));
-    res.status(201).json(comparison);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const id = uuidv4();
+    const comp = { id, createdAt: new Date().toISOString(), ...req.body };
+    await comparisons.create(comp);
+    res.status(201).json(comp);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/comparisons/:id', async (req, res) => {
   try {
-    const filePath = join(COMPARISONS_DIR, `${req.params.id}.json`);
-    const raw = await readFile(filePath, 'utf-8');
-    const existing = JSON.parse(raw);
-    const updated = { ...existing, ...req.body, id: existing.id, createdAt: existing.createdAt };
-    await writeFile(filePath, JSON.stringify(updated, null, 2));
+    const updated = await comparisons.update(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Not found' });
     res.json(updated);
-  } catch {
-    res.status(404).json({ error: 'Not found' });
-  }
+  } catch { res.status(404).json({ error: 'Not found' }); }
 });
 
 app.delete('/api/comparisons/:id', async (req, res) => {
   try {
-    await unlink(join(COMPARISONS_DIR, `${req.params.id}.json`));
+    const ok = await comparisons.delete(req.params.id);
+    if (!ok) return res.status(404).json({ error: 'Not found' });
     res.json({ success: true });
-  } catch {
-    res.status(404).json({ error: 'Not found' });
-  }
+  } catch { res.status(404).json({ error: 'Not found' }); }
 });
 
-// Serve built frontend in production — must be AFTER all API routes
+// ── Static frontend (production only — must be after all API routes) ───────────
+
 const DIST_DIR = join(__dirname, 'dist');
 if (existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));
-  app.get('*', (req, res) => {
-    res.sendFile(join(DIST_DIR, 'index.html'));
-  });
+  app.get('*', (req, res) => res.sendFile(join(DIST_DIR, 'index.html')));
 }
 
 app.listen(PORT, () => {
-  console.log(`API server running on http://localhost:${PORT}`);
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('WARNING: ANTHROPIC_API_KEY is not set. AI features will be unavailable.');
-  }
+  console.log(`Server running on http://localhost:${PORT} (${process.env.DATABASE_URL ? 'postgres' : 'file'} mode)`);
+  if (!process.env.ANTHROPIC_API_KEY) console.warn('WARNING: ANTHROPIC_API_KEY not set. AI features unavailable.');
 });
