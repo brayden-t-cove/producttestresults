@@ -140,7 +140,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   const [notes, setNotes] = useState('');
   const [testerName, setTesterName] = useState('');
   const [testEnvOpen, setTestEnvOpen] = useState(false);
-  const [testEnv, setTestEnv] = useState({ phoneType: '', osVersion: '', appVersion: '', username: '', password: '', deviceId: '' });
+  const [testEnv, setTestEnv] = useState({ appName: '', phoneType: '', osVersion: '', appVersion: '', username: '', password: '', deviceId: '' });
   const [showEnvPassword, setShowEnvPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
@@ -286,6 +286,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         appConfigName: isMulti ? null : (firstAppConfig?.appName || null),
         products: isMulti ? products : null,
         testEnvironment: {
+          appName: testEnv.appName,
           phoneType: testEnv.phoneType,
           osVersion: testEnv.osVersion,
           appVersion: testEnv.appVersion,
@@ -658,6 +659,10 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           </button>
           {testEnvOpen && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>App Name <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)', textTransform: 'none' }}>(as found in App Store)</span></label>
+                <input type="text" placeholder="e.g. Cove Security, Instavision" value={testEnv.appName} onChange={e => setTestEnv(p => ({ ...p, appName: e.target.value }))} />
+              </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label>Phone / Device Type</label>
                 <input type="text" placeholder="e.g. iPhone 15 Pro" value={testEnv.phoneType} onChange={e => setTestEnv(p => ({ ...p, phoneType: e.target.value }))} />
