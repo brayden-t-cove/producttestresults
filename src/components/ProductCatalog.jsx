@@ -155,6 +155,7 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
   const [activeEntity, setActiveEntity] = useState('all');
   const [activePage, setActivePage] = useState('production');
   const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const categories = ['all', ...Object.keys(CATEGORY_LABELS).filter(cat => products.some(p => p.category === cat))];
   const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
@@ -234,66 +235,90 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
         </div>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
+      {/* Search + filter bar */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
         <input
           type="text"
           placeholder="Search by model number, name, or manufacturer…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14 }}
+          style={{ flex: 1 }}
         />
+        <button
+          className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setShowFilters(v => !v)}
+          title="Toggle filters"
+          style={{ flexShrink: 0, gap: 6 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          Filters
+          {(activeFilter !== 'all' || activeEntity !== 'all') && (
+            <span style={{ background: 'var(--primary)', color: '#fff', borderRadius: '50%', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
+              {(activeFilter !== 'all' ? 1 : 0) + (activeEntity !== 'all' ? 1 : 0)}
+            </span>
+          )}
+        </button>
       </div>
 
+      {showFilters && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {categories.length > 2 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Category</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    className={`btn btn-sm ${activeFilter === cat ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setActiveFilter(cat)}
+                  >
+                    {cat === 'all' ? `All (${products.length})` : `${CATEGORY_ICONS[cat] || ''} ${CATEGORY_LABELS[cat]} (${products.filter(p => p.category === cat).length})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {entityTabs.length > 2 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Entity</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {entityTabs.map(e => (
+                  <button
+                    key={e}
+                    className={`btn btn-sm ${activeEntity === e ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setActiveEntity(e)}
+                  >
+                    {e === 'all' ? `All Entities (${filtered.length})` : `${e} (${filtered.filter(p => (p.entity || []).includes(e)).length})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {(activeFilter !== 'all' || activeEntity !== 'all') && (
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ alignSelf: 'flex-start', color: 'var(--fail)', fontSize: 12 }}
+              onClick={() => { setActiveFilter('all'); setActiveEntity('all'); }}
+            >
+              ✕ Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="product-tabs" style={{ marginBottom: 16 }}>
-        <button
-          className={`product-tab${activePage === 'production' ? ' active' : ''}`}
-          onClick={() => setActivePage('production')}
-        >
+        <button className={`product-tab${activePage === 'production' ? ' active' : ''}`} onClick={() => setActivePage('production')}>
           Production ({products.filter(isProduction).length})
         </button>
-        <button
-          className={`product-tab${activePage === 'development' ? ' active' : ''}`}
-          onClick={() => setActivePage('development')}
-        >
+        <button className={`product-tab${activePage === 'development' ? ' active' : ''}`} onClick={() => setActivePage('development')}>
           Development ({products.filter(isDevelopment).length})
         </button>
-        <button
-          className={`product-tab${activePage === 'evaluation' ? ' active' : ''}`}
-          onClick={() => setActivePage('evaluation')}
-        >
+        <button className={`product-tab${activePage === 'evaluation' ? ' active' : ''}`} onClick={() => setActivePage('evaluation')}>
           Evaluation ({products.filter(isEvaluation).length})
         </button>
       </div>
-
-      {categories.length > 2 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-          {categories.map(cat => (
-            <button
-              key={cat}
-              className={`btn btn-sm ${activeFilter === cat ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveFilter(cat)}
-            >
-              {cat === 'all' ? `All (${products.length})` : `${CATEGORY_ICONS[cat] || ''} ${CATEGORY_LABELS[cat]} (${products.filter(p => p.category === cat).length})`}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {entityTabs.length > 2 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-          {entityTabs.map(e => (
-            <button
-              key={e}
-              className={`btn btn-sm ${activeEntity === e ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveEntity(e)}
-            >
-              {e === 'all'
-                ? `All Entities (${filtered.length})`
-                : `${e} (${filtered.filter(p => (p.entity || []).includes(e)).length})`}
-            </button>
-          ))}
-        </div>
-      )}
 
       {products.length === 0 ? (
         <div className="empty-state">
@@ -313,7 +338,7 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
             function renderCard(product) {
               const typeBadge = product.type === 'sample' || product.type === 'prototype' ? product.type : null;
               return (
-                <div key={product.id} className="catalog-card">
+                <div key={product.id} className="catalog-card" style={{ borderLeft: `3px solid ${STATUS_COLORS[product.status || 'active']}` }}>
                   <div
                     className="catalog-card-top"
                     style={{ cursor: onView ? 'pointer' : undefined, position: 'relative' }}
