@@ -672,7 +672,7 @@ function PdfExportModal({ product, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate }) {
+export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate, catalog, onViewProduct }) {
   const [activeTab, setActiveTab] = useState('Tech Specs');
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [comparisons, setComparisons] = useState([]);
@@ -705,6 +705,11 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
                     {product.version}
                   </span>
                 )}
+                {product.revision && (
+                  <span style={{ marginLeft: 8, fontSize: 13, fontWeight: 600, color: '#f59e0b', background: 'rgba(245,158,11,0.15)', borderRadius: 4, padding: '2px 8px' }}>
+                    {product.revision}
+                  </span>
+                )}
               </div>
               <div className="product-detail-sub product-detail-oem">
                 {[product.manufacturer, product.modelNumber].filter(Boolean).join(' · ') || product.category}
@@ -726,6 +731,41 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
           <button className="btn btn-danger btn-sm" onClick={onDelete}>Delete</button>
         </div>
       </div>
+
+      {(product.replacesProductId || product.supersededBy) && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          {product.replacesProductId && (() => {
+            const predecessor = (catalog || []).find(p => p.id === product.replacesProductId);
+            return predecessor ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Replaces</span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ padding: '0 4px', fontSize: 12, fontWeight: 600 }}
+                  onClick={() => onViewProduct && onViewProduct(predecessor)}
+                >
+                  {predecessor.modelNumber || predecessor.name}{predecessor.revision ? ` (${predecessor.revision})` : ''}
+                </button>
+              </div>
+            ) : null;
+          })()}
+          {product.supersededBy && (() => {
+            const successor = (catalog || []).find(p => p.id === product.supersededBy);
+            return successor ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '6px 12px', fontSize: 12 }}>
+                <span style={{ color: '#f59e0b' }}>⚠ Superseded by</span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ padding: '0 4px', fontSize: 12, fontWeight: 600 }}
+                  onClick={() => onViewProduct && onViewProduct(successor)}
+                >
+                  {successor.modelNumber || successor.name}{successor.revision ? ` (${successor.revision})` : ''}
+                </button>
+              </div>
+            ) : null;
+          })()}
+        </div>
+      )}
 
       <div className="product-tabs">
         {TABS.map(tab => (

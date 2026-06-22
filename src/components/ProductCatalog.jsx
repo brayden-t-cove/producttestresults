@@ -368,6 +368,11 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                             {product.version}
                           </span>
                         )}
+                        {product.revision && (
+                          <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: '#f59e0b', background: 'rgba(245,158,11,0.15)', borderRadius: 4, padding: '1px 6px' }}>
+                            {product.revision}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>
                         {product.name}

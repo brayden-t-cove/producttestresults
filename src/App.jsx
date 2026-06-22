@@ -530,6 +530,13 @@ export default function App() {
     } else {
       await createCatalogEntry(productData);
     }
+    // If this product replaces another, stamp supersededBy on the old one
+    if (productData.replacesProductId) {
+      const oldProduct = catalog.find(p => p.id === productData.replacesProductId);
+      if (oldProduct && oldProduct.supersededBy !== productData.id) {
+        await updateCatalogEntry(productData.replacesProductId, { ...oldProduct, supersededBy: productData.id });
+      }
+    }
     await refreshCatalog();
     setEditingProduct(null);
     setView('catalog');
@@ -655,6 +662,8 @@ export default function App() {
               setCurrentProduct(updated);
               await refreshCatalog();
             }}
+            catalog={catalog}
+            onViewProduct={handleOpenProduct}
           />
         </div>
       )}

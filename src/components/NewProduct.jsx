@@ -219,6 +219,8 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
   const [manufacturer, setManufacturer] = useState(product?.manufacturer || '');
   const [modelNumber, setModelNumber] = useState(product?.modelNumber || '');
   const [version, setVersion] = useState(product?.version || '');
+  const [revision, setRevision] = useState(product?.revision || '');
+  const [replacesProductId, setReplacesProductId] = useState(product?.replacesProductId || '');
   const [status, setStatus] = useState(product?.status || 'active');
   const [category, setCategory] = useState(product?.category || '');
   const [capabilities, setCapabilities] = useState(new Set(product?.capabilities || []));
@@ -324,6 +326,8 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         manufacturer: manufacturer.trim(),
         modelNumber: modelNumber.trim(),
         version: version.trim(),
+        revision: revision.trim() || undefined,
+        replacesProductId: replacesProductId || undefined,
         status,
         category,
         capabilities: Array.from(capabilities),
@@ -470,6 +474,16 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         </div>
 
         <div className="form-group">
+          <label>Hardware Revision <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+          <input
+            type="text"
+            placeholder="e.g. Rev A, Rev B, PCB-2"
+            value={revision}
+            onChange={e => setRevision(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group">
           <label>Status</label>
           <select value={status} onChange={e => setStatus(e.target.value)}>
             <option value="active">Active</option>
@@ -480,6 +494,18 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
             <option value="on-hold">On Hold</option>
             <option value="under-evaluation">Under Evaluation</option>
             <option value="rejected">Rejected</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Replaces Product <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — for hardware revisions)</span></label>
+          <select value={replacesProductId} onChange={e => setReplacesProductId(e.target.value)}>
+            <option value="">— None —</option>
+            {(catalog || []).filter(p => p.id !== product?.id).map(p => (
+              <option key={p.id} value={p.id}>
+                {p.modelNumber || p.name}{p.revision ? ` (${p.revision})` : ''}{p.version ? ` ${p.version}` : ''}
+              </option>
+            ))}
           </select>
         </div>
 
