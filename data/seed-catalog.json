@@ -38,7 +38,9 @@
       "cam-set-night-vision",
       "cam-set-speaker-volume",
       "cam-set-privacy-schedule",
-      "cam-set-spotlight-settings"
+      "cam-set-spotlight-settings",
+      "vehicle-detection-edge",
+      "animal-detection-edge"
     ],
     "appConfigs": [],
     "specs": {
@@ -207,7 +209,9 @@
       "cam-set-night-vision",
       "cam-set-speaker-volume",
       "cam-set-privacy-schedule",
-      "cam-set-spotlight-settings"
+      "cam-set-spotlight-settings",
+      "vehicle-detection-edge",
+      "animal-detection-edge"
     ],
     "appConfigs": [],
     "specs": {
@@ -351,7 +355,9 @@
       "cam-set-spotlight-settings",
       "cam-set-mic-sensitivity",
       "cam-set-night-vision",
-      "cam-set-speaker-volume"
+      "cam-set-speaker-volume",
+      "vehicle-detection-edge",
+      "animal-detection-edge"
     ],
     "appConfigs": [],
     "specs": {
@@ -491,7 +497,9 @@
       "cam-set-notif-cooldown",
       "cam-set-led-toggle",
       "cam-set-night-vision",
-      "cam-set-speaker-volume"
+      "cam-set-speaker-volume",
+      "vehicle-detection-edge",
+      "animal-detection-edge"
     ],
     "appConfigs": [],
     "specs": {
@@ -757,7 +765,9 @@
       "cam-set-wdr",
       "cam-set-mic-sensitivity",
       "cam-set-night-vision",
-      "cam-set-speaker-volume"
+      "cam-set-speaker-volume",
+      "vehicle-detection-edge",
+      "animal-detection-edge"
     ],
     "appConfigs": [],
     "specs": {
@@ -893,7 +903,8 @@
       "cam-set-mic-sensitivity",
       "cam-set-zone-schedule",
       "cam-set-night-vision",
-      "cam-set-speaker-volume"
+      "cam-set-speaker-volume",
+      "animal-detection-edge"
     ],
     "appConfigs": [],
     "specs": {
@@ -1020,7 +1031,8 @@
       "cam-set-wdr",
       "cam-set-mic-sensitivity",
       "cam-set-night-vision",
-      "cam-set-speaker-volume"
+      "cam-set-speaker-volume",
+      "animal-detection-edge"
     ],
     "appConfigs": [],
     "specs": {
@@ -1121,7 +1133,9 @@
       "cam-set-notif-cooldown",
       "cam-set-led-toggle",
       "cam-set-night-vision",
-      "cam-set-speaker-volume"
+      "cam-set-speaker-volume",
+      "vehicle-detection-edge",
+      "animal-detection-edge"
     ],
     "appConfigs": [],
     "specs": {
@@ -1624,7 +1638,9 @@
       "cam-set-flip-rotation",
       "cam-set-mic-sensitivity",
       "cam-set-zone-schedule",
-      "cam-set-notif-cooldown"
+      "cam-set-notif-cooldown",
+      "vehicle-detection-edge",
+      "animal-detection-edge"
     ],
     "compatibleWith": [],
     "appConfigs": [],
