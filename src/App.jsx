@@ -295,7 +295,7 @@ function HomePage({ onCatalog, onTesting, onIssues, onAnalytics }) {
     <div className="dashboard">
       <div className="dashboard-header">
         <div>
-          <h1>QA Testing Platform</h1>
+          <h1>Product Platform</h1>
           <p>Security hardware testing &amp; evaluation</p>
         </div>
       </div>
