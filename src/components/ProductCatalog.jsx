@@ -365,9 +365,9 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                           </span>
                         )}
                       </div>
-                      {product.modelNumber && product.name && (
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{product.name}</div>
-                      )}
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>
+                        {product.name}
+                      </div>
                       <div className="catalog-card-meta">
                         {product.manufacturer || CATEGORY_LABELS[product.category] || product.category}
                         {product.subclass && (
