@@ -18,6 +18,82 @@ import SchemaEditor from './components/SchemaEditor.jsx';
 import CertEditor from './components/CertEditor.jsx';
 import ProductDetail from './components/ProductDetail.jsx';
 
+// ── SVG Icons ─────────────────────────────────────────────────────────────────
+
+const IconCatalog = () => (
+  <svg className="top-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+    <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+  </svg>
+);
+const IconTesting = () => (
+  <svg className="top-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 3h6v7l3 10H6L9 10V3z"/><line x1="9" y1="3" x2="15" y2="3"/>
+  </svg>
+);
+const IconIssues = () => (
+  <svg className="top-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><dot cx="12" cy="16" r="1"/>
+    <circle cx="12" cy="16" r="0.5" fill="currentColor" stroke="none"/>
+  </svg>
+);
+const IconAnalytics = () => (
+  <svg className="top-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/>
+    <rect x="17" y="4" width="4" height="17" rx="1"/>
+  </svg>
+);
+const IconSettings = () => (
+  <svg className="top-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
+
+// ── Top Nav ───────────────────────────────────────────────────────────────────
+
+const TOP_LEVEL_VIEWS = {
+  dashboard: 'dashboard',
+  catalog: 'catalog', productDetail: 'catalog', newProduct: 'catalog', editProduct: 'catalog',
+  schemaEditor: 'catalog', certEditor: 'catalog',
+  testing: 'testing', sessionStart: 'testing', runner: 'testing', summary: 'testing',
+  exploratoryStart: 'testing', exploratoryRunner: 'testing', exploratorySummary: 'testing',
+  comparisonBuilder: 'testing', comparisonView: 'testing',
+  issues: 'issues',
+  analytics: 'analytics',
+};
+
+function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onSettings }) {
+  const active = TOP_LEVEL_VIEWS[view] || 'dashboard';
+  return (
+    <nav className="top-nav">
+      <div className="top-nav-brand">
+        <span className="top-nav-brand-dot" />
+        QA Platform
+      </div>
+      <div className="top-nav-links">
+        <button className={`top-nav-link${active === 'catalog' ? ' active' : ''}`} onClick={onCatalog}>
+          <IconCatalog /> Catalog
+        </button>
+        <button className={`top-nav-link${active === 'testing' ? ' active' : ''}`} onClick={onTesting}>
+          <IconTesting /> Testing
+        </button>
+        <button className={`top-nav-link${active === 'issues' ? ' active' : ''}`} onClick={onIssues}>
+          <IconIssues /> Issues
+        </button>
+        <button className={`top-nav-link${active === 'analytics' ? ' active' : ''}`} onClick={onAnalytics}>
+          <IconAnalytics /> Analytics
+        </button>
+      </div>
+      <div className="top-nav-actions">
+        <button className="top-nav-link" onClick={onSettings} title="Settings">
+          <IconSettings />
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 function formatDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', {
@@ -190,33 +266,59 @@ function SessionCard({ s, onOpen }) {
   );
 }
 
-function HomePage({ onCatalog, onTesting, onIssues, onSettings }) {
+const IconCardCatalog = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary)' }}>
+    <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+    <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+  </svg>
+);
+const IconCardTesting = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary)' }}>
+    <path d="M9 3h6v7l3 10H6L9 10V3z"/><line x1="9" y1="3" x2="15" y2="3"/>
+  </svg>
+);
+const IconCardIssues = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary)' }}>
+    <circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/>
+    <circle cx="12" cy="16" r="0.75" fill="currentColor" stroke="none"/>
+  </svg>
+);
+const IconCardAnalytics = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary)' }}>
+    <rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/>
+    <rect x="17" y="4" width="4" height="17" rx="1"/>
+  </svg>
+);
+
+function HomePage({ onCatalog, onTesting, onIssues, onAnalytics }) {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
         <div>
           <h1>QA Testing Platform</h1>
-          <p>Security hardware testing</p>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
+          <p>Security hardware testing &amp; evaluation</p>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 20, marginTop: 24, flexWrap: 'wrap' }}>
-        <div className="session-type-card" onClick={onCatalog} style={{ flex: '1 1 220px', cursor: 'pointer' }}>
-          <div style={{ fontSize: 32, marginBottom: 10 }}>📦</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginTop: 8 }}>
+        <div className="session-type-card" onClick={onCatalog} style={{ cursor: 'pointer', padding: '20px 20px' }}>
+          <div style={{ marginBottom: 14 }}><IconCardCatalog /></div>
           <h3 style={{ marginBottom: 6 }}>Product Catalog</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Manage your product inventory</p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>Manage and browse your product inventory</p>
         </div>
-        <div className="session-type-card" onClick={onTesting} style={{ flex: '1 1 220px', cursor: 'pointer' }}>
-          <div style={{ fontSize: 32, marginBottom: 10 }}>🧪</div>
+        <div className="session-type-card" onClick={onTesting} style={{ cursor: 'pointer', padding: '20px 20px' }}>
+          <div style={{ marginBottom: 14 }}><IconCardTesting /></div>
           <h3 style={{ marginBottom: 6 }}>Product Testing</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Run test sessions and view results</p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>Run test sessions and track results</p>
         </div>
-        <div className="session-type-card" onClick={onIssues} style={{ flex: '1 1 220px', cursor: 'pointer' }}>
-          <div style={{ fontSize: 32, marginBottom: 10 }}>🐛</div>
+        <div className="session-type-card" onClick={onIssues} style={{ cursor: 'pointer', padding: '20px 20px' }}>
+          <div style={{ marginBottom: 14 }}><IconCardIssues /></div>
           <h3 style={{ marginBottom: 6 }}>Issues</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>View and track all active issues</p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>View and track all open issues</p>
+        </div>
+        <div className="session-type-card" onClick={onAnalytics} style={{ cursor: 'pointer', padding: '20px 20px' }}>
+          <div style={{ marginBottom: 14 }}><IconCardAnalytics /></div>
+          <h3 style={{ marginBottom: 6 }}>Analytics</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>Pass rates, trends, and team metrics</p>
         </div>
       </div>
     </div>
@@ -250,10 +352,6 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewC
           <h1>Product Testing</h1>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button className="btn btn-ghost" onClick={onBack}>← Back</button>
-          <button className="btn btn-ghost" onClick={onSettings} title="Settings">⚙️</button>
-          <button className="btn btn-ghost" onClick={onAnalytics}>📊 Analytics</button>
-          <button className="btn btn-ghost" onClick={onIssues}>🐛 Issues</button>
           {activeTab === 'evaluation' && (
             <>
               <button className="btn btn-secondary" onClick={onNewExploratory}>
@@ -475,12 +573,24 @@ export default function App() {
         {BUILD_VERSION} · {BUILD_DATE}
       </div>
 
+      <TopNav
+        view={view}
+        onDashboard={() => setView('dashboard')}
+        onCatalog={() => setView('catalog')}
+        onTesting={() => setView('testing')}
+        onIssues={() => setView('issues')}
+        onAnalytics={() => setView('analytics')}
+        onSettings={() => setShowSettings(true)}
+      />
+
+      <div key={view} className="view-content">
+
       {view === 'dashboard' && (
         <HomePage
           onCatalog={() => setView('catalog')}
           onTesting={() => setView('testing')}
           onIssues={() => setView('issues')}
-          onSettings={() => setShowSettings(true)}
+          onAnalytics={() => setView('analytics')}
         />
       )}
 
@@ -690,6 +800,8 @@ export default function App() {
           }}
         />
       )}
+
+      </div>{/* end view-content */}
     </div>
   );
 }
