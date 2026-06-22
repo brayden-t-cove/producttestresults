@@ -69,7 +69,7 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
     <nav className="top-nav">
       <div className="top-nav-brand">
         <span className="top-nav-brand-dot" />
-        QA Platform
+        Product Platform
       </div>
       <div className="top-nav-links">
         <button className={`top-nav-link${active === 'catalog' ? ' active' : ''}`} onClick={onCatalog}>
