@@ -59,7 +59,30 @@ function StatusBadge({ status }) {
   );
 }
 
-function IssueRow({ issue, expanded, onToggle }) {
+function IssueRow({ issue, expanded, onToggle, onTicketSave }) {
+  const [editingTicket, setEditingTicket] = useState(false);
+  const [ticketDraft, setTicketDraft] = useState('');
+
+  function startEditTicket(e) {
+    e.stopPropagation();
+    setTicketDraft(issue.ticketUrl || issue.sourceTicket || '');
+    setEditingTicket(true);
+  }
+
+  function commitTicket(e) {
+    e.stopPropagation();
+    setEditingTicket(false);
+    onTicketSave(ticketDraft.trim());
+  }
+
+  function handleTicketKey(e) {
+    e.stopPropagation();
+    if (e.key === 'Enter') commitTicket(e);
+    if (e.key === 'Escape') setEditingTicket(false);
+  }
+
+  const ticketUrl = issue.ticketUrl || issue.sourceTicket;
+
   return (
     <>
       <tr
@@ -91,12 +114,32 @@ function IssueRow({ issue, expanded, onToggle }) {
         <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
           {issue.reproCount > 0 ? <span title="Times reproduced" style={{ fontWeight: 600, color: 'var(--fail)' }}>×{issue.reproCount}</span> : '—'}
         </td>
-        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle', fontSize: 12 }}>
-          {issue.sourceTicket || issue.ticketUrl
-            ? <a href={issue.sourceTicket || issue.ticketUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }} onClick={e => e.stopPropagation()}>
-                {issue.sourceTicket || 'Link'}
+        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle', fontSize: 12 }} onClick={e => e.stopPropagation()}>
+          {editingTicket ? (
+            <input
+              autoFocus
+              value={ticketDraft}
+              onChange={e => setTicketDraft(e.target.value)}
+              onBlur={commitTicket}
+              onKeyDown={handleTicketKey}
+              placeholder="https://..."
+              style={{ width: 160, fontSize: 12, padding: '3px 6px' }}
+            />
+          ) : ticketUrl ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <a href={ticketUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
+                {ticketUrl.replace(/^https?:\/\//, '').split('/').slice(0, 3).join('/').substring(0, 24) + (ticketUrl.length > 30 ? '…' : '')}
               </a>
-            : '—'}
+              <span title="Edit ticket" onClick={startEditTicket} style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, lineHeight: 1 }}>✎</span>
+            </span>
+          ) : (
+            <button
+              onClick={startEditTicket}
+              style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: 4, padding: '2px 8px', fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer' }}
+            >
+              + Add ticket
+            </button>
+          )}
         </td>
       </tr>
       {expanded && (
@@ -203,6 +246,19 @@ export default function IssuesPage({ onBack }) {
 
     return result;
   }, [issues, search, filterSeverity, filterCategory, filterProduct, filterStatus, sortField, sortDir]);
+
+  async function saveTicket(issue, ticketUrl) {
+    try {
+      await fetch(`/api/sessions/${issue.sessionId}/issues/${issue.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketUrl }),
+      });
+      setIssues(prev => prev.map(i =>
+        i.sessionId === issue.sessionId && i.id === issue.id ? { ...i, ticketUrl } : i
+      ));
+    } catch {}
+  }
 
   function toggleSort(field) {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -332,6 +388,7 @@ export default function IssuesPage({ onBack }) {
                     onToggle={() => setExpandedId(prev =>
                       prev === `${issue.sessionId}-${issue.id}` ? null : `${issue.sessionId}-${issue.id}`
                     )}
+                    onTicketSave={url => saveTicket(issue, url)}
                   />
                 ))}
               </tbody>
