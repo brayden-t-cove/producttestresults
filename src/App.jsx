@@ -463,6 +463,20 @@ export default function App() {
     refreshCatalog();
     getSpecSchema().then(setSpecSchema).catch(() => {});
     getCertSchema().then(setCertSchema).catch(() => {});
+
+    const resumeId = sessionStorage.getItem('activeSessionId');
+    if (resumeId) {
+      import('./lib/api.js').then(({ getSession }) =>
+        getSession(resumeId).then(session => {
+          if (session && session.status !== 'completed') {
+            setCurrentSession(session);
+            setView(session.testPlan === 'exploratory' ? 'exploratoryRunner' : 'runner');
+          } else {
+            sessionStorage.removeItem('activeSessionId');
+          }
+        }).catch(() => sessionStorage.removeItem('activeSessionId'))
+      );
+    }
   }, []);
 
   async function handleOpenSession(id) {
@@ -487,6 +501,7 @@ export default function App() {
   }
 
   function handleExploratoryCreated(session) {
+    sessionStorage.setItem('activeSessionId', session.id);
     setCurrentSession(session);
     setView('exploratoryRunner');
     refreshSessions();
@@ -497,12 +512,14 @@ export default function App() {
   }
 
   function handleExploratoryFinish(session) {
+    sessionStorage.removeItem('activeSessionId');
     setCurrentSession(session || currentSession);
     setView('exploratorySummary');
     refreshSessions();
   }
 
   function handleSessionCreated(session) {
+    sessionStorage.setItem('activeSessionId', session.id);
     setCurrentSession(session);
     setView('runner');
     refreshSessions();
@@ -513,6 +530,7 @@ export default function App() {
   }
 
   function handleEndSession(session) {
+    sessionStorage.removeItem('activeSessionId');
     setCurrentSession(session);
     setView('summary');
     refreshSessions();
