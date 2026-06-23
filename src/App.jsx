@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, getSettings, saveSettings, getSpecSchema, saveSpecSchema, getCertSchema, saveCertSchema } from './lib/api.js';
+import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, deleteSession, getSettings, saveSettings, getSpecSchema, saveSpecSchema, getCertSchema, saveCertSchema } from './lib/api.js';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
@@ -192,8 +192,9 @@ function getSectionFailures(session) {
     .sort((a, b) => a.sectionIndex - b.sectionIndex);
 }
 
-function SessionCard({ s, onOpen }) {
+function SessionCard({ s, onOpen, onDelete }) {
   const [expanded, setExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const sectionFailures = getSectionFailures(s);
 
   return (
@@ -245,6 +246,14 @@ function SessionCard({ s, onOpen }) {
             a.click();
           }}
         >↓ CSV</button>
+        {confirmDelete ? (
+          <span style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+            <button className="btn btn-danger btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={e => { e.stopPropagation(); onDelete(s.id); }}>Confirm</button>
+            <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={e => { e.stopPropagation(); setConfirmDelete(false); }}>Cancel</button>
+          </span>
+        ) : (
+          <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px', color: 'var(--fail)' }} onClick={e => { e.stopPropagation(); setConfirmDelete(true); }} title="Delete session">✕ Delete</button>
+        )}
         <span className={`badge badge-${s.status}`}>{s.status}</span>
         {s.testPlan === 'vendor-eval' && (
           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: '#ede9fe', color: '#6d28d9', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
@@ -334,7 +343,7 @@ function classifySession(s, catalog) {
   return 'production';
 }
 
-function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewComparison, onOpen, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
+function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewComparison, onOpen, onDelete, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
   const [activeTab, setActiveTab] = useState('production');
 
   const productionSessions = sessions.filter(s => classifySession(s, catalog) === 'production');
@@ -415,7 +424,7 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewC
       ) : (
         <div className="sessions-list">
           {tabSessions.map(s => (
-            <SessionCard key={s.id} s={s} onOpen={onOpen} />
+            <SessionCard key={s.id} s={s} onOpen={onOpen} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -529,6 +538,11 @@ export default function App() {
     setCurrentSession(session);
   }
 
+  async function handleDeleteSession(id) {
+    await deleteSession(id);
+    await refreshSessions();
+  }
+
   function handleEndSession(session) {
     sessionStorage.removeItem('activeSessionId');
     setCurrentSession(session);
@@ -628,6 +642,7 @@ export default function App() {
           onNewExploratory={() => setView('exploratoryStart')}
           onNewComparison={() => { setComparisonPreselectedId(null); setCurrentComparison(null); setView('comparisonBuilder'); }}
           onOpen={handleOpenSession}
+          onDelete={handleDeleteSession}
           onCatalog={() => setView('catalog')}
           onSettings={() => setShowSettings(true)}
           onAnalytics={() => setView('analytics')}

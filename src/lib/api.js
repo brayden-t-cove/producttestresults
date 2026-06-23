@@ -32,6 +32,12 @@ export async function updateSession(id, data) {
   return res.json();
 }
 
+export async function deleteSession(id) {
+  const res = await fetch(`${BASE}/sessions/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete session');
+  return res.json();
+}
+
 export async function aiPopulateTests(data) {
   const res = await fetch(`${BASE}/ai/populate-tests`, {
     method: 'POST',

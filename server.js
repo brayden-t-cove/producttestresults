@@ -456,6 +456,16 @@ app.put('/api/sessions/:id', async (req, res) => {
   }
 });
 
+app.delete('/api/sessions/:id', async (req, res) => {
+  try {
+    await sessions.delete(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete session' });
+  }
+});
+
 app.post('/api/sessions/:id/ai-summary', async (req, res) => {
   const client = getAnthropicClient();
   if (!client) return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not set.' });
