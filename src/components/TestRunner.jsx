@@ -551,11 +551,21 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const [showIssueLogger, setShowIssueLogger] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [localTestCases, setLocalTestCases] = useState(session.testCases);
+  const [localTestCases, setLocalTestCases] = useState(session.testCases || []);
   const saveTimerRef = useRef(null);
 
-  // Sync if session changes from outside (e.g. resume after refresh)
-  useEffect(() => { setLocalTestCases(session.testCases); }, [session.id]);
+  // If testCases weren't included (loaded from summary list), fetch the full session
+  useEffect(() => {
+    if (session.testCases?.length) {
+      setLocalTestCases(session.testCases);
+    } else if (!session.testCases || session.testCases.length === 0) {
+      import('../lib/api.js').then(({ getSession }) =>
+        getSession(session.id).then(full => {
+          if (full?.testCases?.length) setLocalTestCases(full.testCases);
+        }).catch(() => {})
+      );
+    }
+  }, [session.id]);
 
   const [showSkipAllModal, setShowSkipAllModal] = useState(false);
   const [skipAllReason, setSkipAllReason] = useState('');
