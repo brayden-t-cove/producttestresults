@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { updateSession, listIssuesForProduct, patchIssue } from '../lib/api.js';
 import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 import IssueLogger from './IssueLogger.jsx';
@@ -540,17 +540,22 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const activeProductCatalogId = activeProduct?.catalogId || null;
 
   const visibleTests = isMultiProduct
-    ? session.testCases.filter(t => t.productCatalogId === activeProductCatalogId)
-    : session.testCases;
+    ? localTestCases.filter(t => t.productCatalogId === activeProductCatalogId)
+    : localTestCases;
   const activeCategory = isMultiProduct ? (activeProduct?.category || session.category) : session.category;
 
   const [selectedTestId, setSelectedTestId] = useState(
-    visibleTests.length > 0 ? visibleTests[0].id : (session.testCases[0]?.id || null)
+    visibleTests.length > 0 ? visibleTests[0].id : (localTestCases[0]?.id || null)
   );
   const [notes, setNotes] = useState({});
   const [showIssueLogger, setShowIssueLogger] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [localTestCases, setLocalTestCases] = useState(session.testCases);
+  const saveTimerRef = useRef(null);
+
+  // Sync if session changes from outside (e.g. resume after refresh)
+  useEffect(() => { setLocalTestCases(session.testCases); }, [session.id]);
 
   const [showSkipAllModal, setShowSkipAllModal] = useState(false);
   const [skipAllReason, setSkipAllReason] = useState('');
@@ -564,11 +569,11 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const [selectedExistingIssueKey, setSelectedExistingIssueKey] = useState('');
   const [loadingIssues, setLoadingIssues] = useState(false);
 
-  const selectedTest = session.testCases.find(t => t.id === selectedTestId);
+  const selectedTest = localTestCases.find(t => t.id === selectedTestId);
 
-  const completed = session.testCases.filter(t => t.status !== 'pending').length;
-  const naCount = session.testCases.filter(t => t.status === 'na').length;
-  const total = session.testCases.length;
+  const completed = localTestCases.filter(t => t.status !== 'pending').length;
+  const naCount = localTestCases.filter(t => t.status === 'na').length;
+  const total = localTestCases.length;
   const progress = total > 0 ? (completed / total) * 100 : 0;
 
   const pendingCount = visibleTests.filter(t => t.status === 'pending').length;
@@ -576,27 +581,33 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const isLastProduct = !isMultiProduct || activeProductIndex >= session.products.length - 1;
   const currentProductDone = pendingCount === 0;
 
-  async function saveTestCases(newTestCases) {
-    try {
-      setSaving(true);
-      const updated = await updateSession(session.id, { testCases: newTestCases });
-      onUpdate(updated);
-    } catch (e) {
-      console.error('Save failed', e);
-    } finally {
-      setSaving(false);
-    }
+  function saveTestCases(newTestCases) {
+    // Update UI immediately
+    setLocalTestCases(newTestCases);
+    // Debounce server write — batch rapid taps into one request
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        setSaving(true);
+        const updated = await updateSession(session.id, { testCases: newTestCases });
+        onUpdate(updated);
+      } catch (e) {
+        console.error('Save failed', e);
+      } finally {
+        setSaving(false);
+      }
+    }, 600);
   }
 
   async function saveTestUpdate(testId, updates) {
-    const newTestCases = session.testCases.map(t =>
+    const newTestCases = localTestCases.map(t =>
       t.id === testId ? { ...t, ...updates } : t
     );
     await saveTestCases(newTestCases);
   }
 
   async function handleDeleteTest(testId) {
-    const remaining = session.testCases.filter(t => t.id !== testId);
+    const remaining = localTestCases.filter(t => t.id !== testId);
     const nextTest = remaining.find(t => t.status === 'pending') || remaining[0] || null;
     setSelectedTestId(nextTest?.id || null);
     setConfirmDeleteId(null);
@@ -604,7 +615,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   }
 
   function advanceToNextTest() {
-    const list = isMultiProduct ? visibleTests : session.testCases;
+    const list = isMultiProduct ? visibleTests : localTestCases;
     const currentIndex = list.findIndex(t => t.id === selectedTestId);
     if (currentIndex >= 0 && currentIndex < list.length - 1) {
       setSelectedTestId(list[currentIndex + 1].id);
@@ -624,7 +635,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   }
 
   function handleFailJustMark() {
-    const testNotes = notes[failPopup.testId] ?? session.testCases.find(t => t.id === failPopup.testId)?.notes ?? '';
+    const testNotes = notes[failPopup.testId] ?? localTestCases.find(t => t.id === failPopup.testId)?.notes ?? '';
     saveTestUpdate(failPopup.testId, { status: 'fail', notes: testNotes });
     setFailPopup(null);
     advanceToNextTest();
@@ -659,7 +670,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
       ...(isRegression ? { regressionFlag: true } : {}),
     });
 
-    const test = session.testCases.find(t => t.id === failPopup.testId);
+    const test = localTestCases.find(t => t.id === failPopup.testId);
     const testNotes = notes[failPopup.testId] ?? test?.notes ?? '';
     await saveTestUpdate(failPopup.testId, {
       status: 'fail',
@@ -736,7 +747,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
 
   async function handleConfirmSkipAll() {
     const reason = skipAllReason.trim();
-    const newTestCases = session.testCases.map(t => {
+    const newTestCases = localTestCases.map(t => {
       if (t.status !== 'pending') return t;
       if (isMultiProduct && t.productCatalogId !== activeProductCatalogId) return t;
       return { ...t, status: 'skip', notes: reason || t.notes };
@@ -749,14 +760,14 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   function handleNextProduct() {
     const nextIndex = activeProductIndex + 1;
     const nextProduct = session.products[nextIndex];
-    const firstTest = session.testCases.find(t => t.productCatalogId === nextProduct?.catalogId);
+    const firstTest = localTestCases.find(t => t.productCatalogId === nextProduct?.catalogId);
     setActiveProductIndex(nextIndex);
     setSelectedTestId(firstTest?.id || null);
     setSkipSectionState(null);
   }
 
   async function handleSkipProduct() {
-    const newTestCases = session.testCases.map(t =>
+    const newTestCases = localTestCases.map(t =>
       t.productCatalogId === activeProductCatalogId && t.status === 'pending'
         ? { ...t, status: 'skip' }
         : t
@@ -768,7 +779,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
 
   async function handleConfirmSkipSection(sectionIndex, reason) {
     const sectionPrefix = String(sectionIndex) + '.';
-    const newTestCases = session.testCases.map(t => {
+    const newTestCases = localTestCases.map(t => {
       const num = t.testNumber || '';
       const inSection = sectionIndex === 0
         ? num.startsWith('0.')
@@ -796,7 +807,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
       {isMultiProduct && (
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', overflowX: 'auto', background: 'var(--surface)', flexShrink: 0 }}>
           {session.products.map((prod, idx) => {
-            const prodTests = session.testCases.filter(t => t.productCatalogId === prod.catalogId);
+            const prodTests = localTestCases.filter(t => t.productCatalogId === prod.catalogId);
             const prodPass = prodTests.filter(t => t.status === 'pass').length;
             const prodFail = prodTests.filter(t => t.status === 'fail').length;
             const prodPending = prodTests.filter(t => t.status === 'pending').length;
@@ -806,7 +817,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
               <button
                 key={prod.catalogId}
                 onClick={() => {
-                  const firstTest = session.testCases.find(t => t.productCatalogId === prod.catalogId);
+                  const firstTest = localTestCases.find(t => t.productCatalogId === prod.catalogId);
                   setActiveProductIndex(idx);
                   setSelectedTestId(firstTest?.id || null);
                   setSkipSectionState(null);
@@ -1014,12 +1025,12 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
             <h3 style={{ marginBottom: 4 }}>Test Failed</h3>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
-              "{session.testCases.find(t => t.id === failPopup.testId)?.title}" — would you like to log or link an issue?
+              "{localTestCases.find(t => t.id === failPopup.testId)?.title}" — would you like to log or link an issue?
             </p>
 
             {failPopupMode === null && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }} onClick={() => { setFailPopup(null); setShowIssueLogger(true); const testNotes = notes[failPopup.testId] ?? session.testCases.find(t => t.id === failPopup.testId)?.notes ?? ''; saveTestUpdate(failPopup.testId, { status: 'fail', notes: testNotes }); advanceToNextTest(); }}>
+                <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }} onClick={() => { setFailPopup(null); setShowIssueLogger(true); const testNotes = notes[failPopup.testId] ?? localTestCases.find(t => t.id === failPopup.testId)?.notes ?? ''; saveTestUpdate(failPopup.testId, { status: 'fail', notes: testNotes }); advanceToNextTest(); }}>
                   🐛 Log as New Issue
                 </button>
                 <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }} onClick={handleFailChooseExisting}>
@@ -1077,7 +1088,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
             <h3 style={{ marginBottom: 8 }}>Remove Test Case?</h3>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
-              "{session.testCases.find(t => t.id === confirmDeleteId)?.title}" will be permanently removed from this session. This cannot be undone.
+              "{localTestCases.find(t => t.id === confirmDeleteId)?.title}" will be permanently removed from this session. This cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn-ghost" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
