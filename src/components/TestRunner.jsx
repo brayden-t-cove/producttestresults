@@ -1,4 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Component } from 'react';
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 32, color: 'var(--fail)' }}>
+          <h3>Something went wrong in the test runner.</h3>
+          <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap', marginTop: 12, color: 'var(--text-muted)' }}>
+            {this.state.error.message}
+          </pre>
+          <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={() => this.setState({ error: null })}>
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { updateSession, listIssuesForProduct, patchIssue } from '../lib/api.js';
 import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 import IssueLogger from './IssueLogger.jsx';
@@ -552,17 +573,21 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const [showVerification, setShowVerification] = useState(false);
   const [saving, setSaving] = useState(false);
   const [localTestCases, setLocalTestCases] = useState(session.testCases || []);
+  const [loadingTestCases, setLoadingTestCases] = useState(!session.testCases?.length);
   const saveTimerRef = useRef(null);
 
   // If testCases weren't included (loaded from summary list), fetch the full session
   useEffect(() => {
     if (session.testCases?.length) {
       setLocalTestCases(session.testCases);
-    } else if (!session.testCases || session.testCases.length === 0) {
+      setLoadingTestCases(false);
+    } else {
+      setLoadingTestCases(true);
       import('../lib/api.js').then(({ getSession }) =>
         getSession(session.id).then(full => {
-          if (full?.testCases?.length) setLocalTestCases(full.testCases);
-        }).catch(() => {})
+          if (full?.testCases) setLocalTestCases(full.testCases);
+          setLoadingTestCases(false);
+        }).catch(() => setLoadingTestCases(false))
       );
     }
   }, [session.id]);
@@ -811,7 +836,16 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
 
   const sectionGroups = groupTestsBySection(visibleTests, activeCategory);
 
+  if (loadingTestCases) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="spinner spinner-lg" />
+      </div>
+    );
+  }
+
   return (
+    <ErrorBoundary>
     <div className="test-runner">
       {/* Multi-product switcher */}
       {isMultiProduct && (
@@ -1221,5 +1255,6 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
         />
       )}
     </div>
+    </ErrorBoundary>
   );
 }
