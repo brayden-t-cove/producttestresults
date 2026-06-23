@@ -306,21 +306,29 @@ function getAnthropicClient() {
 
 app.get('/api/sessions', async (req, res) => {
   try {
-    const all = await sessions.getAll();
-    const result = all.map(s => ({
-      id: s.id,
-      productName: s.productName,
-      date: s.createdAt,
-      status: s.status,
-      issueCount: (s.issues || []).length,
-      testPlan: s.testPlan || 'production',
-      catalogId: s.catalogId || s.productId || null,
-      appConfigName: s.appConfigName || null,
-      testerName: s.testerName || null,
-      products: s.products ? s.products.map(p => ({ catalogId: p.catalogId })) : null,
-      testCases: s.testCases || [],
-      createdAt: s.createdAt,
-    }));
+    const all = await sessions.getAllSummary();
+    const result = all.map(s => {
+      const tc = s.testCases || [];
+      return {
+        id: s.id,
+        productName: s.productName,
+        date: s.createdAt,
+        status: s.status,
+        issueCount: (s.issues || []).length,
+        testPlan: s.testPlan || 'production',
+        catalogId: s.catalogId || s.productId || null,
+        appConfigName: s.appConfigName || null,
+        testerName: s.testerName || null,
+        products: s.products ? s.products.map(p => ({ catalogId: p.catalogId })) : null,
+        createdAt: s.createdAt,
+        completedAt: s.completedAt || null,
+        // Summary counts only — full testCases loaded via GET /api/sessions/:id
+        testCaseCount: tc.length,
+        passCount: tc.filter(t => t.status === 'pass').length,
+        failCount: tc.filter(t => t.status === 'fail').length,
+        skipCount: tc.filter(t => t.status === 'skip' || t.status === 'na').length,
+      };
+    });
     res.json(result);
   } catch (err) {
     console.error(err);

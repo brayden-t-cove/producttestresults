@@ -249,10 +249,10 @@ function TestingResultsTab({ sessions, onOpenSession }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {sessions.map(s => {
-        const testCases = s.testCases || [];
-        const pass = testCases.filter(t => t.status === 'pass').length;
-        const fail = testCases.filter(t => t.status === 'fail').length;
-        const skip = testCases.filter(t => t.status === 'skip').length;
+        const pass = s.passCount ?? 0;
+        const fail = s.failCount ?? 0;
+        const skip = s.skipCount ?? 0;
+        const total = s.testCaseCount ?? 0;
         const duration = formatDuration(s.createdAt, s.completedAt);
         return (
           <div
@@ -268,7 +268,7 @@ function TestingResultsTab({ sessions, onOpenSession }) {
                 {s.appConfigName && <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--text-muted)' }}>{s.appConfigName}</span>}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', gap: 12 }}>
-                {testCases.length > 0 && (
+                {total > 0 && (
                   <>
                     <span style={{ color: 'var(--pass)' }}>✓ {pass} pass</span>
                     <span style={{ color: 'var(--fail)' }}>✗ {fail} fail</span>
