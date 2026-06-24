@@ -388,7 +388,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
             </div>
           ) : (
             <div className="product-picker-grid">
-              {catalog.map(product => {
+              {catalog.filter(p => p.type !== 'competitor').map(product => {
                 const isSelected = selectedProducts.some(p => p.product.id === product.id);
                 return (
                   <div

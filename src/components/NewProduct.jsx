@@ -309,7 +309,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
 
   async function handleSave(e) {
     e.preventDefault();
-    if (!name.trim()) {
+    if (productType !== 'competitor' && !name.trim()) {
       setError('Product name is required.');
       return;
     }
@@ -444,7 +444,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         </div>
 
         <div className="form-group">
-          <label>Manufacturer</label>
+          <label>Manufacturer {productType === 'competitor' && <span style={{ color: 'var(--primary)', fontWeight: 400 }}>(brand identity for competitor products)</span>}</label>
           <input
             type="text"
             placeholder="e.g. Cove Smart"
@@ -509,22 +509,24 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
           </select>
         </div>
 
-        <div className="form-group">
-          <label>Entity <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(select all that apply)</span></label>
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-            {['Cove', 'Luna', 'Alder', 'Instavision'].map(e => (
-              <label key={e} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={entity.includes(e)}
-                  onChange={() => setEntity(prev => prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e])}
-                  style={{ width: 'auto' }}
-                />
-                {e}
-              </label>
-            ))}
+        {productType !== 'competitor' && (
+          <div className="form-group">
+            <label>Entity <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(select all that apply)</span></label>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              {['Cove', 'Luna', 'Alder', 'Instavision'].map(e => (
+                <label key={e} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={entity.includes(e)}
+                    onChange={() => setEntity(prev => prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e])}
+                    style={{ width: 'auto' }}
+                  />
+                  {e}
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="form-group">
           <label>Type</label>
@@ -533,6 +535,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
               { value: 'production', label: 'Production' },
               { value: 'sample', label: 'Sample' },
               { value: 'prototype', label: 'Prototype' },
+              { value: 'competitor', label: 'Competitor' },
             ].map(opt => (
               <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
                 <input

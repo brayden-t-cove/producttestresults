@@ -583,8 +583,13 @@ export default function App() {
     await refreshCatalog();
   }
 
-  function handleStartTestFromCatalog(product) {
-    setView('sessionStart');
+  function handleStartTestFromCatalog(product, mode) {
+    setCurrentProduct(product);
+    if (mode === 'exploratory') {
+      setView('exploratoryStart');
+    } else {
+      setView('sessionStart');
+    }
   }
 
   function handleOpenProduct(product) {

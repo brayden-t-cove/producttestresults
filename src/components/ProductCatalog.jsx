@@ -122,6 +122,9 @@ function isDevelopment(p) {
 function isEvaluation(p) {
   return p.type === 'sample' || p.type === 'prototype';
 }
+function isCompetitor(p) {
+  return p.type === 'competitor';
+}
 
 function CollapsibleStatusGroup({ status, items, defaultOpen, renderCard }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -174,7 +177,9 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
     ? entityFiltered.filter(isProduction)
     : activePage === 'development'
       ? entityFiltered.filter(isDevelopment)
-      : entityFiltered.filter(isEvaluation);
+      : activePage === 'evaluation'
+        ? entityFiltered.filter(isEvaluation)
+        : entityFiltered.filter(isCompetitor);
 
   function groupByStatus(list, primaryStatuses, secondaryStatuses) {
     const allStatuses = [...primaryStatuses, ...secondaryStatuses];
@@ -318,6 +323,12 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
         <button className={`product-tab${activePage === 'evaluation' ? ' active' : ''}`} onClick={() => setActivePage('evaluation')}>
           Evaluation ({products.filter(isEvaluation).length})
         </button>
+        <button
+          className={`product-tab${activePage === 'competitors' ? ' active' : ''}`}
+          onClick={() => setActivePage('competitors')}
+        >
+          Competitors ({products.filter(isCompetitor).length})
+        </button>
       </div>
 
       {products.length === 0 ? (
@@ -336,16 +347,16 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
         <div>
           {(() => {
             function renderCard(product) {
-              const typeBadge = product.type === 'sample' || product.type === 'prototype' ? product.type : null;
+              const typeBadge = product.type === 'competitor' ? 'competitor' : (product.type === 'sample' || product.type === 'prototype' ? product.type : null);
               return (
-                <div key={product.id} className="catalog-card" style={{ borderLeft: `3px solid ${STATUS_COLORS[product.status || 'active']}` }}>
+                <div key={product.id} className="catalog-card" style={{ borderLeft: product.type === 'competitor' ? '3px solid #94a3b8' : `3px solid ${STATUS_COLORS[product.status || 'active']}` }}>
                   <div
                     className="catalog-card-top"
                     style={{ cursor: onView ? 'pointer' : undefined, position: 'relative' }}
                     onClick={onView ? () => onView(product) : undefined}
                   >
                     {typeBadge && (
-                      <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', padding: '2px 7px', borderRadius: 4, background: typeBadge === 'sample' ? '#fef3c7' : '#ede9fe', color: typeBadge === 'sample' ? '#b45309' : '#6d28d9', textTransform: 'uppercase' }}>
+                      <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', padding: '2px 7px', borderRadius: 4, background: typeBadge === 'competitor' ? '#1e293b' : (typeBadge === 'sample' ? '#fef3c7' : '#ede9fe'), color: typeBadge === 'competitor' ? '#94a3b8' : (typeBadge === 'sample' ? '#b45309' : '#6d28d9'), border: typeBadge === 'competitor' ? '1px solid #334155' : 'none', textTransform: 'uppercase' }}>
                         {typeBadge}
                       </span>
                     )}
@@ -437,7 +448,19 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                     Added {formatDate(product.createdAt)}
                   </div>
                   <div className="card-actions">
-                    <button className="btn btn-primary btn-sm" onClick={() => onStartTest(product)}>▶ Start Test</button>
+                    {product.type === 'competitor' ? (
+                      onStartTest && (
+                        <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); onStartTest(product, 'exploratory'); }}>
+                          + Exploratory
+                        </button>
+                      )
+                    ) : (
+                      onStartTest && (
+                        <button className="btn btn-primary btn-sm" onClick={e => { e.stopPropagation(); onStartTest(product); }}>
+                          ▶ Start Test
+                        </button>
+                      )
+                    )}
                     <button className="btn btn-secondary btn-sm" onClick={() => onEdit(product)}>Edit</button>
                     <button className="btn btn-secondary btn-sm" title="Duplicate as new version" onClick={() => onDuplicate(product, incrementVersion(product.version))}>⧉ Duplicate</button>
                     <button
@@ -477,6 +500,19 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
 
             if (activePage === 'development') {
               return renderStatusGroups(pageFiltered, DEV_PRIMARY_STATUSES, DEV_SECONDARY_STATUSES);
+            }
+
+            if (activePage === 'competitors') {
+              return pageFiltered.length === 0 ? (
+                <div className="empty-state">
+                  <h3>No competitor products yet</h3>
+                  <p>Add competitor devices to catalog and compare against your products.</p>
+                </div>
+              ) : (
+                <div className="catalog-grid">
+                  {pageFiltered.map(p => renderCard(p))}
+                </div>
+              );
             }
 
             // Evaluation page — group by type (sample/prototype) then status
