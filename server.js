@@ -98,7 +98,7 @@ app.get('/api/debug', async (req, res) => {
     checks.catalog = { ok: false, error: e.message };
   }
   checks.server = { ok: true, port: PORT, uptime: Math.round(process.uptime()) + 's', nodeVersion: process.version };
-  checks.env = { anthropicKeySet: !!process.env.ANTHROPIC_API_KEY, databaseUrl: !!process.env.DATABASE_URL };
+  checks.env = { anthropicKeySet: !!process.env.ANTHROPIC_API_KEY, databaseUrl: !!process.env.DATABASE_URL, storageMode: process.env.DATABASE_URL ? 'postgres' : 'files' };
   const allOk = Object.values(checks).every(c => c.ok);
   res.status(allOk ? 200 : 500).json({ status: allOk ? 'ok' : 'degraded', checks });
 });

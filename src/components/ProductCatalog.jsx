@@ -103,7 +103,7 @@ const STATUS_COLORS = {
 // Production: type=production, status is live/shipped
 // Development: type=production, status=in-development
 // Evaluation: type=sample or prototype
-const PRODUCTION_STATUSES = ['active', 'in-testing', 'eol', 'discontinued', 'on-hold'];
+const PRODUCTION_STATUSES = ['active', 'in-testing', 'eol', 'discontinued', 'on-hold', 'under-evaluation'];
 const PRIMARY_STATUSES = ['active', 'in-testing'];
 const SECONDARY_STATUSES = ['eol', 'discontinued', 'on-hold', 'under-evaluation', 'rejected'];
 const DEV_PRIMARY_STATUSES = ['in-development'];
@@ -374,9 +374,11 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                           </span>
                         )}
                       </div>
+                      {product.modelNumber && (
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>
                         {product.name}
                       </div>
+                      )}
                       <div className="catalog-card-meta">
                         {product.manufacturer || CATEGORY_LABELS[product.category] || product.category}
                         {product.subclass && (

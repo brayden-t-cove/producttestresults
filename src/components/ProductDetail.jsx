@@ -529,7 +529,7 @@ function ProjectDocsTab({ product, onProductUpdate }) {
 }
 
 const SEVERITY_COLORS = { critical: '#dc2626', high: '#ea580c', medium: '#d97706', low: '#16a34a' };
-const STATUS_COLORS_ISSUE = { open: 'var(--fail)', investigating: '#f59e0b', resolved: 'var(--pass)', wont_fix: 'var(--text-muted)' };
+const STATUS_COLORS_ISSUE = { Open: 'var(--fail)', investigating: '#f59e0b', Fixed: 'var(--pass)', 'Cannot Reproduce': 'var(--text-muted)' };
 
 function KnownIssuesTab({ product, onOpenSession }) {
   const [issues, setIssues] = useState([]);
@@ -561,8 +561,8 @@ function KnownIssuesTab({ product, onOpenSession }) {
     );
   }
 
-  const open = issues.filter(i => i.derivedStatus !== 'resolved' && i.derivedStatus !== 'wont_fix');
-  const closed = issues.filter(i => i.derivedStatus === 'resolved' || i.derivedStatus === 'wont_fix');
+  const open = issues.filter(i => i.derivedStatus !== 'Fixed' && i.derivedStatus !== 'Cannot Reproduce');
+  const closed = issues.filter(i => i.derivedStatus === 'Fixed' || i.derivedStatus === 'Cannot Reproduce');
 
   function renderIssue(issue) {
     const key = `${issue.sessionId}-${issue.id}`;

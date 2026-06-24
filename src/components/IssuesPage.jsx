@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 const SEVERITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
 const SEVERITY_COLORS = {
@@ -41,7 +41,7 @@ function StatusBadge({ status }) {
     Fixed: { bg: 'var(--pass-dim)', color: 'var(--pass)' },
     'Cannot Reproduce': { bg: 'var(--skip-dim)', color: 'var(--skip)' },
   };
-  const style = map[status] || map.Open;
+  const style = map[status] || { bg: 'var(--surface)', color: 'var(--text-muted)' };
   return (
     <span style={{
       display: 'inline-flex',
@@ -62,6 +62,7 @@ function StatusBadge({ status }) {
 function IssueRow({ issue, expanded, onToggle, onTicketSave }) {
   const [editingTicket, setEditingTicket] = useState(false);
   const [ticketDraft, setTicketDraft] = useState('');
+  const cancelledRef = useRef(false);
 
   function startEditTicket(e) {
     e.stopPropagation();
@@ -71,6 +72,7 @@ function IssueRow({ issue, expanded, onToggle, onTicketSave }) {
 
   function commitTicket(e) {
     e.stopPropagation();
+    if (cancelledRef.current) { cancelledRef.current = false; return; }
     setEditingTicket(false);
     onTicketSave(ticketDraft.trim());
   }
@@ -78,7 +80,7 @@ function IssueRow({ issue, expanded, onToggle, onTicketSave }) {
   function handleTicketKey(e) {
     e.stopPropagation();
     if (e.key === 'Enter') commitTicket(e);
-    if (e.key === 'Escape') setEditingTicket(false);
+    if (e.key === 'Escape') { cancelledRef.current = true; setEditingTicket(false); }
   }
 
   const ticketUrl = issue.ticketUrl || issue.sourceTicket;
@@ -128,7 +130,7 @@ function IssueRow({ issue, expanded, onToggle, onTicketSave }) {
           ) : ticketUrl ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <a href={ticketUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
-                {ticketUrl.replace(/^https?:\/\//, '').split('/').slice(0, 3).join('/').substring(0, 24) + (ticketUrl.length > 30 ? '…' : '')}
+                {(() => { const d = ticketUrl.replace(/^https?:\/\//, '').split('/').slice(0, 3).join('/'); return d.length > 24 ? d.substring(0, 24) + '…' : d; })()}
               </a>
               <span title="Edit ticket" onClick={startEditTicket} style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, lineHeight: 1 }}>✎</span>
             </span>
@@ -249,15 +251,18 @@ export default function IssuesPage({ onBack }) {
 
   async function saveTicket(issue, ticketUrl) {
     try {
-      await fetch(`/api/sessions/${issue.sessionId}/issues/${issue.id}`, {
+      const res = await fetch(`/api/sessions/${issue.sessionId}/issues/${issue.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketUrl }),
       });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
       setIssues(prev => prev.map(i =>
         i.sessionId === issue.sessionId && i.id === issue.id ? { ...i, ticketUrl } : i
       ));
-    } catch {}
+    } catch (e) {
+      console.error('Failed to save ticket:', e);
+    }
   }
 
   function toggleSort(field) {

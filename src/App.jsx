@@ -33,7 +33,7 @@ const IconTesting = () => (
 );
 const IconIssues = () => (
   <svg className="top-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><dot cx="12" cy="16" r="1"/>
+    <circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/>
     <circle cx="12" cy="16" r="0.5" fill="currentColor" stroke="none"/>
   </svg>
 );
@@ -72,6 +72,9 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
         Product Platform
       </div>
       <div className="top-nav-links">
+        <button className={`top-nav-link${active === 'dashboard' ? ' active' : ''}`} onClick={onDashboard}>
+          Home
+        </button>
         <button className={`top-nav-link${active === 'catalog' ? ' active' : ''}`} onClick={onCatalog}>
           <IconCatalog /> Catalog
         </button>
@@ -557,16 +560,17 @@ export default function App() {
   }
 
   async function handleSaveProduct(productData) {
+    let savedId = productData.id;
     if (productData.id) {
       await updateCatalogEntry(productData.id, productData);
     } else {
-      await createCatalogEntry(productData);
+      const created = await createCatalogEntry(productData);
+      savedId = created.id;
     }
-    // If this product replaces another, stamp supersededBy on the old one
     if (productData.replacesProductId) {
       const oldProduct = catalog.find(p => p.id === productData.replacesProductId);
-      if (oldProduct && oldProduct.supersededBy !== productData.id) {
-        await updateCatalogEntry(productData.replacesProductId, { ...oldProduct, supersededBy: productData.id });
+      if (oldProduct && oldProduct.supersededBy !== savedId) {
+        await updateCatalogEntry(productData.replacesProductId, { ...oldProduct, supersededBy: savedId });
       }
     }
     await refreshCatalog();

@@ -560,6 +560,9 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const activeProduct = isMultiProduct ? (session.products[activeProductIndex] || session.products[0]) : null;
   const activeProductCatalogId = activeProduct?.catalogId || null;
 
+  const [localTestCases, setLocalTestCases] = useState(session.testCases || []);
+  const [loadingTestCases, setLoadingTestCases] = useState(!session.testCases?.length);
+
   const visibleTests = isMultiProduct
     ? localTestCases.filter(t => t.productCatalogId === activeProductCatalogId)
     : localTestCases;
@@ -572,8 +575,6 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const [showIssueLogger, setShowIssueLogger] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [localTestCases, setLocalTestCases] = useState(session.testCases || []);
-  const [loadingTestCases, setLoadingTestCases] = useState(!session.testCases?.length);
   const saveTimerRef = useRef(null);
 
   // If testCases weren't included (loaded from summary list), fetch the full session
