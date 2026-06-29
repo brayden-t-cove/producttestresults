@@ -513,7 +513,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
           <div className="form-group">
             <label>Entity <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(select all that apply)</span></label>
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-              {['Cove', 'Luna', 'Alder', 'Instavision'].map(e => (
+              {['Cove', 'Luna', 'Alder', 'InstaVision'].map(e => (
                 <label key={e} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
                   <input
                     type="checkbox"

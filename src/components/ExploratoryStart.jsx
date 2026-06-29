@@ -247,7 +247,7 @@ export default function ExploratoryStart({ catalog, onCreated, onBack }) {
                 <label>App Name</label>
                 <input
                   type="text"
-                  placeholder="e.g. Instavision, Cove App"
+                  placeholder="e.g. InstaVision, Cove App"
                   value={env.appName}
                   onChange={e => setEnvField('appName', e.target.value)}
                 />

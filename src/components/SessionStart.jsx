@@ -661,7 +661,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label>App Name <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)', textTransform: 'none' }}>(as found in App Store)</span></label>
-                <input type="text" placeholder="e.g. Cove Security, Instavision" value={testEnv.appName} onChange={e => setTestEnv(p => ({ ...p, appName: e.target.value }))} />
+                <input type="text" placeholder="e.g. Cove Security, InstaVision" value={testEnv.appName} onChange={e => setTestEnv(p => ({ ...p, appName: e.target.value }))} />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label>Phone / Device Type</label>
