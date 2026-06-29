@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
 import QRCode from 'qrcode';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
-import { initDb, catalog, sessions, comparisons, devices, firmwares, config } from './lib/storage.js';
+import { initDb, catalog, sessions, comparisons, devices, firmwares, config, vendors } from './lib/storage.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '.env') });
@@ -54,6 +54,8 @@ if (!process.env.DATABASE_URL) {
   }
   if (!existsSync(DEVICES_FILE)) await writeFile(DEVICES_FILE, '[]');
   if (!existsSync(FIRMWARES_FILE)) await writeFile(FIRMWARES_FILE, '[]');
+  const VENDORS_FILE = join(DATA_BASE, 'vendors.json');
+  if (!existsSync(VENDORS_FILE)) await writeFile(VENDORS_FILE, '[]');
   if (!existsSync(SPEC_SCHEMA_FILE)) await writeFile(SPEC_SCHEMA_FILE, JSON.stringify(SPEC_SCHEMA, null, 2));
   if (!existsSync(CERT_SCHEMA_FILE)) await writeFile(CERT_SCHEMA_FILE, JSON.stringify(CERT_SCHEMA, null, 2));
 } else {
@@ -295,6 +297,56 @@ app.post('/api/devices', async (req, res) => {
     await devices.create(device);
     res.status(201).json(device);
   } catch { res.status(500).json({ error: 'Failed to save device' }); }
+});
+
+// ── Vendors ───────────────────────────────────────────────────────────────────
+
+app.get('/api/vendors', async (req, res) => {
+  try { res.json(await vendors.getAll()); }
+  catch { res.status(500).json({ error: 'Failed to list vendors' }); }
+});
+
+app.get('/api/vendors/:id', async (req, res) => {
+  try {
+    const v = await vendors.getById(req.params.id);
+    if (!v) return res.status(404).json({ error: 'Vendor not found' });
+    res.json(v);
+  } catch { res.status(500).json({ error: 'Failed to get vendor' }); }
+});
+
+app.post('/api/vendors', async (req, res) => {
+  try {
+    const { name, website, relationshipStatus, industry, notes, contacts, catalogs } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'name is required' });
+    const vendor = {
+      id: uuidv4(),
+      name: name.trim(),
+      website: website || '',
+      relationshipStatus: relationshipStatus || 'Prospect',
+      industry: industry || '',
+      notes: notes || '',
+      contacts: contacts || [],
+      catalogs: catalogs || [],
+      createdAt: new Date().toISOString(),
+    };
+    await vendors.create(vendor);
+    res.status(201).json(vendor);
+  } catch { res.status(500).json({ error: 'Failed to create vendor' }); }
+});
+
+app.put('/api/vendors/:id', async (req, res) => {
+  try {
+    const updated = await vendors.update(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Vendor not found' });
+    res.json(updated);
+  } catch { res.status(500).json({ error: 'Failed to update vendor' }); }
+});
+
+app.delete('/api/vendors/:id', async (req, res) => {
+  try {
+    await vendors.delete(req.params.id);
+    res.json({ ok: true });
+  } catch { res.status(500).json({ error: 'Failed to delete vendor' }); }
 });
 
 // ── Sessions ──────────────────────────────────────────────────────────────────

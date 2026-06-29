@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, deleteSession, getSettings, saveSettings, getSpecSchema, saveSpecSchema, getCertSchema, saveCertSchema } from './lib/api.js';
+import VendorLibrary from './components/VendorLibrary.jsx';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
@@ -37,6 +38,12 @@ const IconIssues = () => (
     <circle cx="12" cy="16" r="0.5" fill="currentColor" stroke="none"/>
   </svg>
 );
+const IconVendors = () => (
+  <svg className="top-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+);
 const IconAnalytics = () => (
   <svg className="top-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/>
@@ -61,9 +68,10 @@ const TOP_LEVEL_VIEWS = {
   comparisonBuilder: 'testing', comparisonView: 'testing',
   issues: 'issues',
   analytics: 'analytics',
+  vendors: 'vendors',
 };
 
-function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onSettings }) {
+function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onSettings }) {
   const active = TOP_LEVEL_VIEWS[view] || 'dashboard';
   return (
     <nav className="top-nav">
@@ -80,6 +88,9 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
         </button>
         <button className={`top-nav-link${active === 'testing' ? ' active' : ''}`} onClick={onTesting}>
           <IconTesting /> Testing
+        </button>
+        <button className={`top-nav-link${active === 'vendors' ? ' active' : ''}`} onClick={onVendors}>
+          <IconVendors /> Vendors
         </button>
         <button className={`top-nav-link${active === 'issues' ? ' active' : ''}`} onClick={onIssues}>
           <IconIssues /> Issues
@@ -302,7 +313,14 @@ const IconCardAnalytics = () => (
   </svg>
 );
 
-function HomePage({ onCatalog, onTesting, onIssues, onAnalytics }) {
+const IconCardVendors = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary)' }}>
+    <path d="M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+);
+
+function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors }) {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -321,6 +339,11 @@ function HomePage({ onCatalog, onTesting, onIssues, onAnalytics }) {
           <div style={{ marginBottom: 14 }}><IconCardTesting /></div>
           <h3 style={{ marginBottom: 6 }}>Product Testing</h3>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>Run test sessions and track results</p>
+        </div>
+        <div className="session-type-card" onClick={onVendors} style={{ cursor: 'pointer', padding: '20px 20px' }}>
+          <div style={{ marginBottom: 14 }}><IconCardVendors /></div>
+          <h3 style={{ marginBottom: 6 }}>Vendor Library</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>Track companies, catalog links, and contacts</p>
         </div>
         <div className="session-type-card" onClick={onIssues} style={{ cursor: 'pointer', padding: '20px 20px' }}>
           <div style={{ marginBottom: 14 }}><IconCardIssues /></div>
@@ -626,6 +649,7 @@ export default function App() {
         onDashboard={() => setView('dashboard')}
         onCatalog={() => setView('catalog')}
         onTesting={() => setView('testing')}
+        onVendors={() => setView('vendors')}
         onIssues={() => setView('issues')}
         onAnalytics={() => setView('analytics')}
         onSettings={() => setShowSettings(true)}
@@ -637,6 +661,7 @@ export default function App() {
         <HomePage
           onCatalog={() => setView('catalog')}
           onTesting={() => setView('testing')}
+          onVendors={() => setView('vendors')}
           onIssues={() => setView('issues')}
           onAnalytics={() => setView('analytics')}
         />
@@ -793,6 +818,13 @@ export default function App() {
       {view === 'issues' && (
         <IssuesPage
           onBack={() => setView('testing')}
+        />
+      )}
+
+      {view === 'vendors' && (
+        <VendorLibrary
+          catalog={catalog}
+          onBack={() => setView('dashboard')}
         />
       )}
 

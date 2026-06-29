@@ -351,6 +351,46 @@ export async function listIssuesForProduct(catalogId) {
   return res.json();
 }
 
+// ── Vendors ──────────────────────────────────────────────────────────────────
+
+export async function listVendors() {
+  const res = await fetch(`${BASE}/vendors`);
+  if (!res.ok) throw new Error('Failed to list vendors');
+  return res.json();
+}
+
+export async function getVendor(id) {
+  const res = await fetch(`${BASE}/vendors/${id}`);
+  if (!res.ok) throw new Error('Failed to get vendor');
+  return res.json();
+}
+
+export async function createVendor(data) {
+  const res = await fetch(`${BASE}/vendors`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create vendor');
+  return res.json();
+}
+
+export async function updateVendor(id, data) {
+  const res = await fetch(`${BASE}/vendors/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update vendor');
+  return res.json();
+}
+
+export async function deleteVendor(id) {
+  const res = await fetch(`${BASE}/vendors/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete vendor');
+  return res.json();
+}
+
 export async function patchIssue(sessionId, issueId, data) {
   const res = await fetch(`${BASE}/sessions/${sessionId}/issues/${issueId}`, {
     method: 'PATCH',
