@@ -77,6 +77,36 @@ function parseCsvLine(line) {
   return fields;
 }
 
+// ── Normalization maps ────────────────────────────────────────────────────────
+
+const CATEGORY_MAP = {
+  hub: 'hub', hubs: 'hub', 'security hub': 'hub', 'camera hub': 'hub',
+  touchpad: 'touchpad', touchpads: 'touchpad', keypad: 'touchpad', keypads: 'touchpad',
+  camera: 'camera', cameras: 'camera', cam: 'camera',
+  sensor: 'sensor', sensors: 'sensor',
+  app: 'app', application: 'app', software: 'app',
+};
+
+const TYPE_MAP = {
+  production: 'production', prod: 'production',
+  sample: 'sample', samples: 'sample', eval: 'sample', evaluation: 'sample',
+  prototype: 'prototype', proto: 'prototype',
+  competitor: 'competitor', competitive: 'competitor', comp: 'competitor', '3rd party': 'competitor', 'third party': 'competitor',
+};
+
+const STATUS_MAP = {
+  active: 'active', current: 'active', available: 'active', live: 'active',
+  discontinued: 'discontinued', eol: 'discontinued', 'end of life': 'discontinued', retired: 'discontinued', legacy: 'discontinued',
+  'under-evaluation': 'under-evaluation', 'under evaluation': 'under-evaluation', evaluation: 'under-evaluation', evaluating: 'under-evaluation',
+  'in-development': 'in-development', 'in development': 'in-development', development: 'in-development', dev: 'in-development', wip: 'in-development',
+};
+
+function normalize(value, map) {
+  if (!value) return null;
+  const key = value.trim().toLowerCase();
+  return map[key] ?? null;
+}
+
 function parseCsv(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'));
   if (lines.length < 2) return { headers: [], rows: [] };
@@ -90,22 +120,57 @@ function parseCsv(text) {
   return { headers, rows };
 }
 
-function validateRow(row, idx) {
-  const errors = [];
-  if (!row.modelNumber?.trim()) errors.push('modelNumber is required');
-  if (row.category && !['hub', 'touchpad', 'camera', 'sensor', 'app'].includes(row.category)) {
-    errors.push(`category "${row.category}" is not valid — use: hub, touchpad, camera, sensor, app`);
+// Returns { normalized: {...row with normalized fields}, errors: [], warnings: [] }
+// errors = row will be skipped; warnings = row imports with a note
+function validateAndNormalize(row) {
+  const errors = [], warnings = [];
+  const normalized = { ...row };
+
+  // Hard error — model number required
+  if (!row.modelNumber?.trim()) {
+    errors.push('modelNumber is required');
+    return { normalized, errors, warnings };
   }
-  if (row.productType && !['production', 'sample', 'prototype', 'competitor'].includes(row.productType)) {
-    errors.push(`productType "${row.productType}" is not valid`);
+
+  // category — normalize, warn if unrecognized
+  if (row.category) {
+    const mapped = normalize(row.category, CATEGORY_MAP);
+    if (mapped) {
+      normalized.category = mapped;
+    } else {
+      warnings.push(`category "${row.category}" not recognized — will import as-is`);
+    }
   }
-  if (row.status && !['active', 'discontinued', 'under-evaluation', 'in-development'].includes(row.status)) {
-    errors.push(`status "${row.status}" is not valid`);
+
+  // productType — normalize, warn if unrecognized
+  if (row.productType) {
+    const mapped = normalize(row.productType, TYPE_MAP);
+    if (mapped) {
+      normalized.productType = mapped;
+    } else {
+      warnings.push(`productType "${row.productType}" not recognized — will default to "production"`);
+      normalized.productType = 'production';
+    }
   }
+
+  // status — normalize, warn if unrecognized
+  if (row.status) {
+    const mapped = normalize(row.status, STATUS_MAP);
+    if (mapped) {
+      normalized.status = mapped;
+    } else {
+      warnings.push(`status "${row.status}" not recognized — will default to "active"`);
+      normalized.status = 'active';
+    }
+  }
+
+  // msrp — soft: just clear it if unparseable
   if (row.msrp && isNaN(parseFloat(row.msrp))) {
-    errors.push(`msrp "${row.msrp}" must be a number`);
+    warnings.push(`msrp "${row.msrp}" is not a number — will be ignored`);
+    normalized.msrp = '';
   }
-  return errors;
+
+  return { normalized, errors, warnings };
 }
 
 // ── Preview table ─────────────────────────────────────────────────────────────
@@ -133,7 +198,7 @@ const STATUS_DOT = {
   'in-development': '#6366f1',
 };
 
-function PreviewTable({ parsed, errors }) {
+function PreviewTable({ results }) {
   const displayCols = Object.keys(COL_DISPLAY);
   return (
     <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
@@ -146,17 +211,18 @@ function PreviewTable({ parsed, errors }) {
                 {COL_DISPLAY[c]}
               </th>
             ))}
-            <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Issues</th>
+            <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Status</th>
           </tr>
         </thead>
         <tbody>
-          {parsed.map((row, i) => {
-            const rowErrors = errors[i] || [];
-            const hasError = rowErrors.length > 0;
+          {results.map(({ normalized: row, errors, warnings }, i) => {
+            const hasError = errors.length > 0;
+            const hasWarning = !hasError && warnings.length > 0;
             const typeStyle = TYPE_COLORS[row.productType] || TYPE_COLORS.production;
             const dotColor = STATUS_DOT[row.status] || STATUS_DOT.active;
+            const rowBg = hasError ? 'rgba(239,68,68,0.04)' : hasWarning ? 'rgba(245,158,11,0.04)' : 'transparent';
             return (
-              <tr key={i} style={{ borderBottom: '1px solid var(--border)', background: hasError ? 'rgba(239,68,68,0.04)' : 'transparent' }}>
+              <tr key={i} style={{ borderBottom: '1px solid var(--border)', background: rowBg }}>
                 <td style={{ padding: '7px 10px', color: 'var(--text-muted)', fontSize: 12 }}>{i + 1}</td>
                 {displayCols.map(c => (
                   <td key={c} style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
@@ -174,11 +240,13 @@ function PreviewTable({ parsed, errors }) {
                     )}
                   </td>
                 ))}
-                <td style={{ padding: '7px 10px' }}>
+                <td style={{ padding: '7px 10px', maxWidth: 260 }}>
                   {hasError ? (
-                    <span style={{ color: 'var(--fail)', fontSize: 12 }}>{rowErrors.join('; ')}</span>
+                    <span style={{ color: 'var(--fail)', fontSize: 12 }}>✕ Skipped: {errors.join('; ')}</span>
+                  ) : hasWarning ? (
+                    <span style={{ color: '#d97706', fontSize: 12 }}>⚠ {warnings.join('; ')}</span>
                   ) : (
-                    <span style={{ color: 'var(--pass)', fontSize: 12 }}>✓</span>
+                    <span style={{ color: 'var(--pass)', fontSize: 12 }}>✓ Ready</span>
                   )}
                 </td>
               </tr>
@@ -194,13 +262,14 @@ function PreviewTable({ parsed, errors }) {
 
 export default function CatalogImport({ onBack, onImported }) {
   const [step, setStep] = useState('upload'); // upload | preview | done
-  const [parsed, setParsed] = useState([]);
-  const [rowErrors, setRowErrors] = useState([]);
+  const [results, setResults] = useState([]); // [{ normalized, errors, warnings }]
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
+
+  function reset() { setResults([]); setFileName(''); setStep('upload'); }
 
   function downloadTemplate() {
     const csv = generateCsv();
@@ -218,29 +287,20 @@ export default function CatalogImport({ onBack, onImported }) {
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = e => {
-      const text = e.target.result;
-      const { rows } = parseCsv(text);
+      const { rows } = parseCsv(e.target.result);
       if (rows.length === 0) return;
-      const errors = rows.map((row, i) => validateRow(row, i));
-      setParsed(rows);
-      setRowErrors(errors);
+      setResults(rows.map(validateAndNormalize));
       setStep('preview');
     };
     reader.readAsText(file);
   }
 
-  function handleFile(e) {
-    processFile(e.target.files?.[0]);
-  }
+  function handleFile(e) { processFile(e.target.files?.[0]); }
+  function handleDrop(e) { e.preventDefault(); setDragOver(false); processFile(e.dataTransfer.files?.[0]); }
 
-  function handleDrop(e) {
-    e.preventDefault();
-    setDragOver(false);
-    processFile(e.dataTransfer.files?.[0]);
-  }
-
-  const validRows = parsed.filter((_, i) => rowErrors[i]?.length === 0);
-  const errorRows = parsed.filter((_, i) => rowErrors[i]?.length > 0);
+  const importableRows = results.filter(r => r.errors.length === 0).map(r => r.normalized);
+  const errorCount = results.filter(r => r.errors.length > 0).length;
+  const warningCount = results.filter(r => r.errors.length === 0 && r.warnings.length > 0).length;
 
   async function handleImport() {
     setImporting(true);
@@ -248,7 +308,7 @@ export default function CatalogImport({ onBack, onImported }) {
       const res = await fetch('/api/catalog/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: validRows }),
+        body: JSON.stringify({ rows: importableRows }),
       });
       const data = await res.json();
       setImportResult(data);
@@ -271,12 +331,12 @@ export default function CatalogImport({ onBack, onImported }) {
             <p style={{ color: 'var(--fail)' }}>{importResult.error}</p>
           ) : (
             <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
-              {importResult?.imported ?? validRows.length} product{(importResult?.imported ?? validRows.length) !== 1 ? 's' : ''} added to the catalog.
+              {importResult?.imported ?? importableRows.length} product{(importResult?.imported ?? importableRows.length) !== 1 ? 's' : ''} added to the catalog.
               {importResult?.skipped > 0 && ` ${importResult.skipped} skipped (duplicate model numbers).`}
             </p>
           )}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 24 }}>
-            <button className="btn btn-ghost" onClick={() => { setStep('upload'); setParsed([]); setRowErrors([]); setFileName(''); }}>Import Another File</button>
+            <button className="btn btn-ghost" onClick={reset}>Import Another File</button>
             <button className="btn btn-primary" onClick={onBack}>Go to Catalog</button>
           </div>
         </div>
@@ -292,35 +352,41 @@ export default function CatalogImport({ onBack, onImported }) {
             <button className="btn btn-ghost btn-sm" onClick={() => setStep('upload')} style={{ marginBottom: 8 }}>← Back</button>
             <h1>Review Import</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>
-              {fileName} · {parsed.length} row{parsed.length !== 1 ? 's' : ''}
-              {errorRows.length > 0 && <span style={{ color: 'var(--fail)', marginLeft: 8 }}>· {errorRows.length} with errors (will be skipped)</span>}
-              {validRows.length > 0 && <span style={{ color: 'var(--pass)', marginLeft: 8 }}>· {validRows.length} ready to import</span>}
+              {fileName} · {results.length} row{results.length !== 1 ? 's' : ''}
+              {errorCount > 0 && <span style={{ color: 'var(--fail)', marginLeft: 8 }}>· {errorCount} skipped (missing model #)</span>}
+              {warningCount > 0 && <span style={{ color: '#d97706', marginLeft: 8 }}>· {warningCount} with warnings (will import)</span>}
+              {importableRows.length > 0 && <span style={{ color: 'var(--pass)', marginLeft: 8 }}>· {importableRows.length} ready</span>}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <button className="btn btn-ghost" onClick={() => { setStep('upload'); setParsed([]); setRowErrors([]); }}>Start Over</button>
+            <button className="btn btn-ghost" onClick={reset}>Start Over</button>
             <button
               className="btn btn-primary"
-              disabled={validRows.length === 0 || importing}
+              disabled={importableRows.length === 0 || importing}
               onClick={handleImport}
             >
-              {importing ? 'Importing...' : `Import ${validRows.length} Product${validRows.length !== 1 ? 's' : ''}`}
+              {importing ? 'Importing...' : `Import ${importableRows.length} Product${importableRows.length !== 1 ? 's' : ''}`}
             </button>
           </div>
         </div>
 
-        {errorRows.length > 0 && validRows.length > 0 && (
-          <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
-            {errorRows.length} row{errorRows.length !== 1 ? 's' : ''} have validation errors and will be skipped. Fix them in your CSV and re-upload, or proceed to import the {validRows.length} valid row{validRows.length !== 1 ? 's' : ''}.
+        {errorCount > 0 && importableRows.length > 0 && (
+          <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--fail)' }}>
+            {errorCount} row{errorCount !== 1 ? 's' : ''} are missing a model number and will be skipped. All other rows will import.
           </div>
         )}
-        {validRows.length === 0 && (
-          <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--fail)' }}>
-            All rows have errors. Please fix your CSV and re-upload.
+        {warningCount > 0 && (
+          <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#92400e' }}>
+            {warningCount} row{warningCount !== 1 ? 's' : ''} had unrecognized values that were auto-corrected or defaulted. Review the ⚠ rows below before importing.
+          </div>
+        )}
+        {importableRows.length === 0 && (
+          <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--fail)' }}>
+            No rows have a model number. Please check your CSV and re-upload.
           </div>
         )}
 
-        <PreviewTable parsed={parsed} errors={rowErrors} />
+        <PreviewTable results={results} />
       </div>
     );
   }
