@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
+import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 
 // ── CSV template definition ───────────────────────────────────────────────────
 
@@ -261,17 +262,19 @@ function PreviewTable({ results }) {
 
 // ── Field reference document generator ───────────────────────────────────────
 
-function generateFieldReference(category) {
-  const schema = SPEC_SCHEMA[category];
-  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
-
-  const fieldList = TEMPLATE_HEADERS.map(h => {
-    const hint = TEMPLATE_HINTS[h] || '';
-    const req = h === 'modelNumber' ? ' [REQUIRED]' : '';
-    return `  ${h.padEnd(18)}${req}\n    ${hint}`;
+function buildCapabilitiesSection(category) {
+  const groups = CAPABILITY_GROUPS[category];
+  if (!groups) return '';
+  return groups.map(g => {
+    const caps = g.capabilities.map(c => `    ${c.id.padEnd(36)}${c.label}`).join('\n');
+    return `  ── ${g.label} ──\n${caps}`;
   }).join('\n\n');
+}
 
-  const specsSection = !schema ? '' : schema.map(group => {
+function buildSpecsSection(category) {
+  const schema = SPEC_SCHEMA[category];
+  if (!schema) return '';
+  return schema.map(group => {
     if (group.type === 'lens-array') {
       const fields = group.lensFields.map(f => {
         const valHint = f.type === 'select' ? `Options: ${f.options.join(' | ')}` :
@@ -288,58 +291,83 @@ function generateFieldReference(category) {
     }).join('\n');
     return `  ── ${group.label} ──\n${fields}`;
   }).join('\n\n');
+}
+
+function buildPrompt(category) {
+  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
+  return `I'm going to give you a product listing for a ${categoryLabel} and a field reference document.
+Please do this in two steps:
+
+STEP 1 — Analysis (do NOT output JSON yet):
+- Search the internet for the exact model number/name to supplement what's in the listing
+- Go through every field in the reference document and tell me:
+    • What value you found and where (listing, manufacturer site, review, etc.)
+    • What you couldn't find or are uncertain about
+    • Your best guess for anything ambiguous, and your reasoning
+- For capabilities: use the listing AND common-sense reasoning based on the product type.
+  For example, a doorbell camera should have "doorbell" placement checked but NOT "lightbulb".
+  A bullet/dome outdoor camera should NOT have "doorbell-button". Apply this kind of logic
+  to every capability — mark something only if you're reasonably confident it applies.
+- List every capability ID you believe applies, and briefly note why for any that aren't obvious.
+
+Wait for me to confirm or correct your findings before moving to Step 2.
+
+STEP 2 — JSON output (only after I confirm):
+Output a single JSON object using the exact field names from the reference.
+Include only fields with actual values. Omit anything blank or unknown.
+
+JSON format:
+{
+  "modelNumber": "...",
+  "name": "...",
+  "manufacturer": "...",
+  "category": "${category}",
+  "subclass": "...",
+  "productType": "competitor",
+  "status": "active",
+  "msrp": 0.00,
+  "description": "...",
+  "notes": "...",
+  "capabilities": ["id-one", "id-two"],
+  "specs": {
+    "fieldId": "value"${category === 'camera' ? `,
+    "lensCount": "1",
+    "lenses": [
+      { "videoResolution": "1080p", "horizontalFov": "130", "colorNightVision": "yes" }
+    ]` : ''}
+  }
+}`;
+}
+
+function generateFieldReference(category) {
+  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
+
+  const fieldList = TEMPLATE_HEADERS.map(h => {
+    const hint = TEMPLATE_HINTS[h] || '';
+    const req = h === 'modelNumber' ? ' [REQUIRED]' : '';
+    return `  ${h.padEnd(18)}${req}\n    ${hint}`;
+  }).join('\n\n');
+
+  const specsSection = buildSpecsSection(category);
+  const capsSection = buildCapabilitiesSection(category);
+  const prompt = buildPrompt(category);
 
   return `PRODUCT CATALOG — ${categoryLabel.toUpperCase()} FIELD REFERENCE
 Generated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-HOW TO USE THIS DOCUMENT WITH CLAUDE CHAT
+HOW TO USE WITH CLAUDE CHAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Paste this document into Claude chat
-2. Paste the product listing (Amazon URL, page text, or both)
-3. Use the prompt below
-4. Review Claude's analysis and correct anything before it generates output
-5. Paste the final JSON (single item) or CSV (multiple items) into the import page
+1. Copy the prompt below and paste it into Claude chat
+2. Attach or paste the product listing (Amazon link, page text, spec sheet, etc.)
+3. Also paste this entire reference document into the chat
+4. Review Claude's Step 1 analysis — correct anything before confirming
+5. Paste the final JSON into the Import Products page (Single Item tab)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SUGGESTED PROMPT (copy and paste this)
+PROMPT (copy everything below this line)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-I've attached a product field reference document and a product listing below.
-Please do this in two steps:
-
-STEP 1 — Analysis:
-Go through each field in the reference and tell me:
-- What value you found (and where in the listing you found it)
-- What you're uncertain about or couldn't find
-- Your best guess for anything ambiguous, and why
-
-Wait for me to confirm or correct your findings before moving to Step 2.
-
-STEP 2 — Output (only after I confirm):
-For a single product: output a JSON object using the exact field names from the
-reference. For multiple products: output a CSV with a header row using exact
-field names.
-
-Single item JSON format example (include "specs" if tech spec fields were found):
-{
-  "modelNumber": "WCO3ML",
-  "name": "Outdoor Cam Pro",
-  "manufacturer": "Wyze",
-  "category": "camera",
-  "subclass": "Outdoor Stationary",
-  "productType": "competitor",
-  "status": "active",
-  "msrp": 39.99,
-  "description": "1080p outdoor Wi-Fi camera",
-  "notes": "Prime Day purchase",
-  "specs": {
-    "lensCount": "1",
-    "connectivity": "Wi-Fi",
-    "videoResolution": "1080p"
-  }
-}
-
-Only include keys that have actual values — omit fields that are blank or unknown.
+${prompt}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CATALOG ENTRY FIELDS
@@ -359,19 +387,20 @@ ACCEPTED VALUES FOR DROPDOWN FIELDS
                  → prototype   = pre-production / internal build
   status       : active | discontinued | under-evaluation | in-development
   msrp         : number only, no $ symbol (e.g. 49.99)
-${specsSection ? `
+${capsSection ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TECH SPEC FIELDS  (include in "specs": { } in your JSON output)
+CAPABILITY IDs  (use exact IDs in "capabilities": [ ] array)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-These go inside a "specs" key in the JSON object. Only include fields that have
-a value — omit anything that is blank or not mentioned in the listing.
-For lens-array fields (per-lens optics), use a "lenses" array inside specs:
-  "specs": {
-    "lensCount": "1",
-    "lenses": [
-      { "videoResolution": "1080p", "horizontalFov": "130", "colorNightVision": "yes" }
-    ]
-  }
+Only include capabilities that actually apply. Use common-sense reasoning —
+a doorbell camera is not a lightbulb; a bullet/dome camera has no doorbell button.
+If uncertain, search the manufacturer site or reviews for confirmation.
+
+${capsSection}` : ''}${specsSection ? `
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TECH SPEC FIELDS  (use exact field IDs in "specs": { })
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Only include fields with actual values. Omit anything blank or unknown.
 
 ${specsSection}` : ''}`;
 }
@@ -400,8 +429,9 @@ function parseJsonInput(text) {
   const normalized = {};
   Object.entries(obj).forEach(([k, v]) => {
     if (k.toLowerCase() === 'specs' && typeof v === 'object' && v !== null) {
-      // Preserve specs object as-is for tech specs passthrough
       normalized.specs = v;
+    } else if (k.toLowerCase() === 'capabilities' && Array.isArray(v)) {
+      normalized.capabilities = v.map(String);
     } else {
       const mapped = keyMap[k.toLowerCase()] || k;
       normalized[mapped] = v !== null && v !== undefined ? String(v) : '';
@@ -423,7 +453,16 @@ export default function CatalogImport({ onBack, onImported }) {
   const [importResult, setImportResult] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [refCategory, setRefCategory] = useState('camera');
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const fileRef = useRef();
+
+  function copyPrompt() {
+    navigator.clipboard.writeText(buildPrompt(refCategory)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   function reset() {
     setResults([]); setFileName(''); setJsonInput('');
@@ -575,26 +614,57 @@ export default function CatalogImport({ onBack, onImported }) {
       {/* Field reference downloads — always visible */}
       <div className="spec-card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>Field Reference &amp; Templates</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Field Reference &amp; Claude Prompt</div>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              Download the field reference, paste it into Claude chat with an Amazon listing, and follow
-              the included prompt. Claude will analyze the listing, confirm findings with you, then output
-              JSON (single item) or CSV (multiple items) to paste below.
+              Select a category, copy the prompt into Claude chat, paste the product listing, and attach the
+              field reference. Claude will search for the model, analyze all fields and capabilities, confirm
+              findings with you, then output JSON to paste below.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <select value={refCategory} onChange={e => setRefCategory(e.target.value)} style={{ fontSize: 13, padding: '5px 8px' }}>
-                {Object.keys(SPEC_SCHEMA).map(cat => (
-                  <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-                ))}
-              </select>
-              <button className="btn btn-secondary" onClick={() => downloadFieldReference(refCategory)}>↓ Field Reference</button>
-            </div>
-            <button className="btn btn-secondary" onClick={downloadTemplate}>↓ CSV Template</button>
+            <select value={refCategory} onChange={e => { setRefCategory(e.target.value); setPromptOpen(false); }} style={{ fontSize: 13, padding: '5px 8px' }}>
+              {Object.keys(SPEC_SCHEMA).map(cat => (
+                <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+              ))}
+            </select>
+            <button className="btn btn-primary" onClick={copyPrompt} style={{ minWidth: 110 }}>
+              {copied ? '✓ Copied!' : '⎘ Copy Prompt'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setPromptOpen(o => !o)}>
+              {promptOpen ? 'Hide Prompt' : 'View Prompt'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => downloadFieldReference(refCategory)}>↓ Field Reference</button>
+            <button className="btn btn-ghost" onClick={downloadTemplate}>↓ CSV Template</button>
           </div>
         </div>
+
+        {promptOpen && (
+          <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Claude Chat Prompt — {refCategory.charAt(0).toUpperCase() + refCategory.slice(1)}
+              </span>
+              <button className="btn btn-sm btn-primary" onClick={copyPrompt}>{copied ? '✓ Copied!' : '⎘ Copy'}</button>
+            </div>
+            <pre style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '14px 16px',
+              fontSize: 12,
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              margin: 0,
+              color: 'var(--text)',
+              maxHeight: 400,
+              overflowY: 'auto',
+            }}>
+              {buildPrompt(refCategory)}
+            </pre>
+          </div>
+        )}
       </div>
 
       {/* Mode tabs */}

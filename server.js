@@ -171,7 +171,7 @@ app.post('/api/catalog/import', async (req, res) => {
         upc: row.upc || '',
         website: row.website || '',
         notes: row.notes || '',
-        capabilities: [],
+        capabilities: Array.isArray(row.capabilities) ? row.capabilities : [],
         specs: (row.specs && typeof row.specs === 'object') ? row.specs : {},
         createdAt: new Date().toISOString(),
       };
