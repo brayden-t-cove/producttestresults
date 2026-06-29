@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { SPEC_SCHEMA } from '../data/productSpecs.js';
 
 // ── CSV template definition ───────────────────────────────────────────────────
 
@@ -258,6 +259,97 @@ function PreviewTable({ results }) {
   );
 }
 
+// ── Field reference document generator ───────────────────────────────────────
+
+function generateFieldReference(category) {
+  const schema = SPEC_SCHEMA[category];
+  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
+
+  const csvSection = `PRODUCT CATALOG — ${categoryLabel.toUpperCase()} FIELD REFERENCE
+Generated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+For use with Claude chat to populate the bulk import CSV template.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INSTRUCTIONS FOR CLAUDE CHAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Paste this document along with an Amazon listing (URL or page text). Ask Claude
+to return one CSV row per product using the exact column names and accepted values
+below. The output row can be pasted directly into the import template spreadsheet.
+
+Example prompt:
+  "Using the field reference below, fill out one CSV row for this Amazon listing.
+   Return only the CSV row with a header line, no explanation. Use 'competitor'
+   for productType since this is a 3rd-party camera."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CSV IMPORT COLUMNS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+These fields create the catalog entry. Fill them in the CSV template.
+
+${TEMPLATE_HEADERS.map(h => {
+    const hint = TEMPLATE_HINTS[h] || '';
+    const req = h === 'modelNumber' ? ' [REQUIRED]' : '';
+    return `  ${h.padEnd(18)}${req}\n    ${hint}`;
+  }).join('\n\n')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QUICK REFERENCE — ACCEPTED VALUES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  category     : hub | touchpad | camera | sensor | app
+  subclass     : Indoor Stationary | Indoor P/T | Outdoor Stationary |
+                 Outdoor P/T | Doorbell | Lightbulb | Window | Pet
+  productType  : production | sample | prototype | competitor
+                 → competitor  = 3rd-party brand (Wyze, Arlo, Reolink, etc.)
+                 → sample      = unit ordered for hands-on evaluation
+                 → production  = your own shipping product
+                 → prototype   = pre-production / internal build
+  status       : active | discontinued | under-evaluation | in-development
+  msrp         : number only, no $ symbol (e.g. 49.99)`;
+
+  if (!schema) return csvSection;
+
+  const specsSection = schema.map(group => {
+    if (group.type === 'lens-array') {
+      const fields = group.lensFields.map(f => {
+        const valHint = f.type === 'select' ? `Options: ${f.options.join(' | ')}` :
+          f.type === 'boolean' ? 'yes | no | na | unknown' : 'Text value';
+        return `    ${f.id.padEnd(24)}${valHint}`;
+      }).join('\n');
+      return `  ── ${group.label} (per lens — fill separately for each lens) ──\n${fields}`;
+    }
+    const fields = (group.fields || []).map(f => {
+      const valHint = f.type === 'select' ? `Options: ${f.options.join(' | ')}` :
+        f.type === 'boolean' ? 'yes | no | na | unknown' :
+        f.type === 'textarea' ? 'Multi-line text' : 'Text value';
+      return `    ${f.id.padEnd(24)}${valHint}`;
+    }).join('\n');
+    return `  ── ${group.label} ──\n${fields}`;
+  }).join('\n\n');
+
+  return `${csvSection}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TECH SPEC FIELDS (fill after import via product detail page)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+These are not part of the CSV. After import, open the product in the catalog
+and fill these in via the Tech Specs tab. Include them in your Claude chat
+prompt so Claude can identify values — you can copy them into the form manually
+or paste the Claude output as a reference while filling in the form.
+
+${specsSection}`;
+}
+
+function downloadFieldReference(category) {
+  const content = generateFieldReference(category);
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `field-reference-${category}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function CatalogImport({ onBack, onImported }) {
@@ -267,6 +359,7 @@ export default function CatalogImport({ onBack, onImported }) {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [refCategory, setRefCategory] = useState('camera');
   const fileRef = useRef();
 
   function reset() { setResults([]); setFileName(''); setStep('upload'); }
@@ -408,15 +501,31 @@ export default function CatalogImport({ onBack, onImported }) {
       <div className="spec-card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>Step 1 — Download Template</div>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Step 1 — Download Template &amp; Field Reference</div>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              The CSV includes example rows and field hints. Open it in Excel, Google Sheets, or any spreadsheet app.
-              Lines starting with <code>#</code> are ignored.
+              The CSV template has example rows and field hints. The field reference document is for use
+              with Claude chat — paste it alongside an Amazon listing to get a pre-filled CSV row back.
             </p>
           </div>
-          <button className="btn btn-secondary" onClick={downloadTemplate} style={{ flexShrink: 0 }}>
-            ↓ Download Template
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button className="btn btn-secondary" onClick={downloadTemplate}>
+              ↓ CSV Template
+            </button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <select
+                value={refCategory}
+                onChange={e => setRefCategory(e.target.value)}
+                style={{ fontSize: 13, padding: '5px 8px' }}
+              >
+                {Object.keys(SPEC_SCHEMA).map(cat => (
+                  <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                ))}
+              </select>
+              <button className="btn btn-secondary" onClick={() => downloadFieldReference(refCategory)}>
+                ↓ Field Reference
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Field reference */}
