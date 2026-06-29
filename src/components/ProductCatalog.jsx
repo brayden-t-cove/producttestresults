@@ -171,7 +171,7 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
       })
     : sorted;
   const filtered = activeFilter === 'all' ? searched : searched.filter(p => p.category === activeFilter);
-  const entityTabs = ['all', ...ENTITIES.filter(e => products.some(p => (p.entity || []).includes(e)))];
+  const entityTabs = ['all', ...ENTITIES];
   const entityFiltered = activeEntity === 'all' ? filtered : filtered.filter(p => (p.entity || []).includes(activeEntity));
   const pageFiltered = activePage === 'production'
     ? entityFiltered.filter(isProduction)
