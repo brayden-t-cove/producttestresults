@@ -114,6 +114,96 @@ function SpecField({ field, value, onChange }) {
   }
 }
 
+function LensArrayGroup({ group, values, notes, onChange, onNoteChange }) {
+  const [open, setOpen] = useState(false);
+  const [activeLens, setActiveLens] = useState(0);
+  const lensCount = parseInt(values.lensCount || '1', 10) || 1;
+  const lenses = values.lenses || [];
+
+  function handleLensChange(lensIdx, fieldId, val) {
+    const updated = [...lenses];
+    while (updated.length <= lensIdx) updated.push({});
+    updated[lensIdx] = { ...updated[lensIdx], [fieldId]: val };
+    onChange('lenses', updated);
+  }
+
+  function handleLensNoteChange(lensIdx, fieldId, val) {
+    const noteKey = `lenses_${lensIdx}_${fieldId}`;
+    onNoteChange(noteKey, val);
+  }
+
+  const totalFilled = lenses.reduce((sum, lens) =>
+    sum + group.lensFields.filter(f => lens[f.id] !== undefined && lens[f.id] !== '' && lens[f.id] !== null).length, 0);
+
+  return (
+    <div className="spec-group">
+      <button type="button" className="spec-group-header" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <span className="spec-group-arrow">{open ? '▾' : '▸'}</span>
+        <span className="spec-group-label">{group.label.toUpperCase()}</span>
+        <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>
+          {lensCount} lens{lensCount !== 1 ? 'es' : ''}
+        </span>
+        <span className="spec-group-counter" style={{
+          marginLeft: 'auto', fontSize: 11, fontWeight: 600,
+          color: totalFilled > 0 ? 'var(--primary)' : 'var(--text-muted)',
+          background: totalFilled > 0 ? 'rgba(99,102,241,0.12)' : 'transparent',
+          borderRadius: 10, padding: '1px 8px',
+        }}>
+          {totalFilled} filled
+        </span>
+      </button>
+
+      {open && (
+        <div className="spec-group-body">
+          {lensCount === 1 ? null : (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14, borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+              {Array.from({ length: lensCount }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`product-tab${activeLens === i ? ' active' : ''}`}
+                  style={{ fontSize: 12, padding: '4px 12px' }}
+                  onClick={() => setActiveLens(i)}
+                >
+                  {lenses[i]?.lensLabel || `Lens ${i + 1}`}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="spec-fields-grid">
+            {group.lensFields.map(field => {
+              const lensVals = lenses[activeLens] || {};
+              const noteKey = `lenses_${activeLens}_${field.id}`;
+              const hasNote = !!(notes?.[noteKey]);
+              return (
+                <div key={field.id} className="spec-field-row" style={field.type === 'textarea' ? { gridColumn: '1 / -1' } : {}}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                    <label className="spec-field-label">{field.label}</label>
+                  </div>
+                  <SpecField
+                    field={field}
+                    value={lensVals[field.id]}
+                    onChange={val => handleLensChange(activeLens, field.id, val)}
+                  />
+                  {hasNote && (
+                    <input
+                      type="text"
+                      placeholder="Note..."
+                      value={notes?.[noteKey] || ''}
+                      onChange={e => handleLensNoteChange(activeLens, field.id, e.target.value)}
+                      style={{ marginTop: 4, width: '100%', fontSize: 12, color: 'var(--primary)', borderColor: 'rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.05)' }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SpecGroup({ group, values, notes, onChange, onNoteChange }) {
   const [open, setOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState({});
@@ -205,14 +295,25 @@ export default function SpecsForm({ schema, values, notes, onChange, onNoteChang
   return (
     <div className="specs-form">
       {schema.map(group => (
-        <SpecGroup
-          key={group.label}
-          group={group}
-          values={values}
-          notes={notes}
-          onChange={onChange}
-          onNoteChange={onNoteChange}
-        />
+        group.type === 'lens-array' ? (
+          <LensArrayGroup
+            key={group.label}
+            group={group}
+            values={values}
+            notes={notes}
+            onChange={onChange}
+            onNoteChange={onNoteChange}
+          />
+        ) : (
+          <SpecGroup
+            key={group.label}
+            group={group}
+            values={values}
+            notes={notes}
+            onChange={onChange}
+            onNoteChange={onNoteChange}
+          />
+        )
       ))}
     </div>
   );

@@ -34,46 +34,90 @@ function SpecSheet({ product }) {
   const specs = product.specs || {};
   if (!schema) return <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No spec schema for this category.</p>;
 
-  const filledGroups = schema
-    .map(group => ({
-      ...group,
-      filledFields: group.fields.filter(f => {
-        const v = specs[f.id];
-        return v !== undefined && v !== '' && v !== null;
-      }),
-    }))
-    .filter(g => g.filledFields.length > 0);
+  const hasAnySpecs = schema.some(group => {
+    if (group.type === 'lens-array') {
+      return (specs.lenses || []).some(lens => group.lensFields.some(f => lens[f.id] !== undefined && lens[f.id] !== '' && lens[f.id] !== null));
+    }
+    return (group.fields || []).some(f => specs[f.id] !== undefined && specs[f.id] !== '' && specs[f.id] !== null);
+  });
 
-  if (filledGroups.length === 0) {
+  if (!hasAnySpecs) {
     return <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No specifications recorded yet.</p>;
   }
 
   return (
     <div className="spec-sheet">
-      {filledGroups.map(group => (
-        <div key={group.label} className="spec-sheet-group">
-          <div className="spec-sheet-group-label">{group.label.toUpperCase()}</div>
-          <div className="spec-sheet-fields">
-            {group.filledFields.map(field => {
-              const val = specs[field.id];
-              const isBool = field.type === 'boolean';
-              const boolInfo = isBool ? boolDisplay(val) : null;
-              return (
-                <div key={field.id} className="spec-sheet-row">
-                  <span className="spec-sheet-key">{field.label}</span>
-                  <span className="spec-sheet-val">
-                    {isBool && boolInfo ? (
-                      <span style={{ color: boolInfo.color, fontWeight: 700 }}>{boolInfo.symbol}</span>
-                    ) : (
-                      String(val)
+      {schema.map(group => {
+        if (group.type === 'lens-array') {
+          const lenses = specs.lenses || [];
+          const filledLenses = lenses.filter(lens =>
+            group.lensFields.some(f => lens[f.id] !== undefined && lens[f.id] !== '' && lens[f.id] !== null)
+          );
+          if (filledLenses.length === 0) return null;
+          return (
+            <div key={group.label} className="spec-sheet-group">
+              <div className="spec-sheet-group-label">{group.label.toUpperCase()}</div>
+              {filledLenses.map((lens, i) => {
+                const filledFields = group.lensFields.filter(f => lens[f.id] !== undefined && lens[f.id] !== '' && lens[f.id] !== null);
+                return (
+                  <div key={i}>
+                    {filledLenses.length > 1 && (
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '8px 0 4px' }}>
+                        {lens.lensLabel || `Lens ${i + 1}`}
+                      </div>
                     )}
-                  </span>
-                </div>
-              );
-            })}
+                    <div className="spec-sheet-fields">
+                      {filledFields.filter(f => f.id !== 'lensLabel').map(field => {
+                        const val = lens[field.id];
+                        const isBool = field.type === 'boolean';
+                        const boolInfo = isBool ? boolDisplay(val) : null;
+                        return (
+                          <div key={field.id} className="spec-sheet-row">
+                            <span className="spec-sheet-key">{field.label}</span>
+                            <span className="spec-sheet-val">
+                              {isBool && boolInfo ? (
+                                <span style={{ color: boolInfo.color, fontWeight: 700 }}>{boolInfo.symbol}</span>
+                              ) : String(val)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
+
+        const filledFields = (group.fields || []).filter(f => {
+          const v = specs[f.id];
+          return v !== undefined && v !== '' && v !== null;
+        });
+        if (filledFields.length === 0) return null;
+        return (
+          <div key={group.label} className="spec-sheet-group">
+            <div className="spec-sheet-group-label">{group.label.toUpperCase()}</div>
+            <div className="spec-sheet-fields">
+              {filledFields.map(field => {
+                const val = specs[field.id];
+                const isBool = field.type === 'boolean';
+                const boolInfo = isBool ? boolDisplay(val) : null;
+                return (
+                  <div key={field.id} className="spec-sheet-row">
+                    <span className="spec-sheet-key">{field.label}</span>
+                    <span className="spec-sheet-val">
+                      {isBool && boolInfo ? (
+                        <span style={{ color: boolInfo.color, fontWeight: 700 }}>{boolInfo.symbol}</span>
+                      ) : String(val)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
