@@ -144,6 +144,48 @@ app.get('/api/catalog', async (req, res) => {
   catch { res.json([]); }
 });
 
+app.post('/api/catalog/import', async (req, res) => {
+  try {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'No rows provided' });
+    const existing = await catalog.getAll();
+    const existingModels = new Set(existing.map(e => (e.modelNumber || '').toLowerCase()));
+    let imported = 0, skipped = 0;
+    for (const row of rows) {
+      const model = (row.modelNumber || '').trim();
+      if (!model) { skipped++; continue; }
+      if (existingModels.has(model.toLowerCase())) { skipped++; continue; }
+      const entry = {
+        id: uuidv4(),
+        modelNumber: model,
+        name: row.name || model,
+        manufacturer: row.manufacturer || '',
+        category: row.category || '',
+        subclass: row.subclass || '',
+        type: row.productType || 'production',
+        status: row.status || 'active',
+        version: row.version || '',
+        revision: row.revision || '',
+        description: row.description || '',
+        msrp: row.msrp ? parseFloat(row.msrp) : undefined,
+        upc: row.upc || '',
+        website: row.website || '',
+        notes: row.notes || '',
+        capabilities: [],
+        specs: {},
+        createdAt: new Date().toISOString(),
+      };
+      await catalog.create(entry);
+      existingModels.add(model.toLowerCase());
+      imported++;
+    }
+    res.json({ imported, skipped });
+  } catch (err) {
+    console.error('Catalog import error:', err);
+    res.status(500).json({ error: 'Import failed' });
+  }
+});
+
 app.get('/api/catalog/export/csv', async (req, res) => {
   try {
     const data = await catalog.getAll();

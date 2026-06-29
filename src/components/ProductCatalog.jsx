@@ -150,7 +150,7 @@ function CollapsibleStatusGroup({ status, items, defaultOpen, renderCard }) {
   );
 }
 
-export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView }) {
+export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView, onImport }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [openSpecsId, setOpenSpecsId] = useState(null);
   const [showExport, setShowExport] = useState(false);
@@ -234,6 +234,11 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
           <button className="btn btn-secondary btn-sm" onClick={() => setShowExport(true)}>
             ↓ Export
           </button>
+          {onImport && (
+            <button className="btn btn-secondary btn-sm" onClick={onImport}>
+              ↑ Bulk Import
+            </button>
+          )}
           <button className="btn btn-primary btn-lg" onClick={onAdd}>
             + Add Product
           </button>

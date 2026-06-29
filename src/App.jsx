@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, deleteSession, getSettings, saveSettings, getSpecSchema, saveSpecSchema, getCertSchema, saveCertSchema } from './lib/api.js';
 import VendorLibrary from './components/VendorLibrary.jsx';
+import CatalogImport from './components/CatalogImport.jsx';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
 import SessionStart from './components/SessionStart.jsx';
@@ -62,7 +63,7 @@ const IconSettings = () => (
 const TOP_LEVEL_VIEWS = {
   dashboard: 'dashboard',
   catalog: 'catalog', productDetail: 'catalog', newProduct: 'catalog', editProduct: 'catalog',
-  schemaEditor: 'catalog', certEditor: 'catalog',
+  schemaEditor: 'catalog', certEditor: 'catalog', catalogImport: 'catalog',
   testing: 'testing', sessionStart: 'testing', runner: 'testing', summary: 'testing',
   exploratoryStart: 'testing', exploratoryRunner: 'testing', exploratorySummary: 'testing',
   comparisonBuilder: 'testing', comparisonView: 'testing',
@@ -696,8 +697,16 @@ export default function App() {
             onDuplicate={handleDuplicateProduct}
             onBack={() => setView('dashboard')}
             onView={handleOpenProduct}
+            onImport={() => setView('catalogImport')}
           />
         </div>
+      )}
+
+      {view === 'catalogImport' && (
+        <CatalogImport
+          onBack={() => setView('catalog')}
+          onImported={refreshCatalog}
+        />
       )}
 
       {view === 'productDetail' && currentProduct && (
