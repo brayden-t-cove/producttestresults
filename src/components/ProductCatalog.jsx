@@ -111,7 +111,7 @@ const DEV_SECONDARY_STATUSES = ['on-hold', 'rejected'];
 const EVAL_PRIMARY_STATUSES = ['under-evaluation', 'in-development'];
 const EVAL_SECONDARY_STATUSES = ['on-hold', 'rejected'];
 
-const ENTITIES = ['Cove', 'Luna', 'Alder'];
+const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
 
 function isProduction(p) {
   return (!p.type || p.type === 'production') && PRODUCTION_STATUSES.includes(p.status || 'active');
