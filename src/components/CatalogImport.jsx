@@ -265,57 +265,20 @@ function generateFieldReference(category) {
   const schema = SPEC_SCHEMA[category];
   const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
 
-  const csvSection = `PRODUCT CATALOG — ${categoryLabel.toUpperCase()} FIELD REFERENCE
-Generated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-For use with Claude chat to populate the bulk import CSV template.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-INSTRUCTIONS FOR CLAUDE CHAT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Paste this document along with an Amazon listing (URL or page text). Ask Claude
-to return one CSV row per product using the exact column names and accepted values
-below. The output row can be pasted directly into the import template spreadsheet.
-
-Example prompt:
-  "Using the field reference below, fill out one CSV row for this Amazon listing.
-   Return only the CSV row with a header line, no explanation. Use 'competitor'
-   for productType since this is a 3rd-party camera."
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CSV IMPORT COLUMNS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-These fields create the catalog entry. Fill them in the CSV template.
-
-${TEMPLATE_HEADERS.map(h => {
+  const fieldList = TEMPLATE_HEADERS.map(h => {
     const hint = TEMPLATE_HINTS[h] || '';
     const req = h === 'modelNumber' ? ' [REQUIRED]' : '';
     return `  ${h.padEnd(18)}${req}\n    ${hint}`;
-  }).join('\n\n')}
+  }).join('\n\n');
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-QUICK REFERENCE — ACCEPTED VALUES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  category     : hub | touchpad | camera | sensor | app
-  subclass     : Indoor Stationary | Indoor P/T | Outdoor Stationary |
-                 Outdoor P/T | Doorbell | Lightbulb | Window | Pet
-  productType  : production | sample | prototype | competitor
-                 → competitor  = 3rd-party brand (Wyze, Arlo, Reolink, etc.)
-                 → sample      = unit ordered for hands-on evaluation
-                 → production  = your own shipping product
-                 → prototype   = pre-production / internal build
-  status       : active | discontinued | under-evaluation | in-development
-  msrp         : number only, no $ symbol (e.g. 49.99)`;
-
-  if (!schema) return csvSection;
-
-  const specsSection = schema.map(group => {
+  const specsSection = !schema ? '' : schema.map(group => {
     if (group.type === 'lens-array') {
       const fields = group.lensFields.map(f => {
         const valHint = f.type === 'select' ? `Options: ${f.options.join(' | ')}` :
           f.type === 'boolean' ? 'yes | no | na | unknown' : 'Text value';
         return `    ${f.id.padEnd(24)}${valHint}`;
       }).join('\n');
-      return `  ── ${group.label} (per lens — fill separately for each lens) ──\n${fields}`;
+      return `  ── ${group.label} (per lens) ──\n${fields}`;
     }
     const fields = (group.fields || []).map(f => {
       const valHint = f.type === 'select' ? `Options: ${f.options.join(' | ')}` :
@@ -326,17 +289,78 @@ QUICK REFERENCE — ACCEPTED VALUES
     return `  ── ${group.label} ──\n${fields}`;
   }).join('\n\n');
 
-  return `${csvSection}
+  return `PRODUCT CATALOG — ${categoryLabel.toUpperCase()} FIELD REFERENCE
+Generated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TECH SPEC FIELDS (fill after import via product detail page)
+HOW TO USE THIS DOCUMENT WITH CLAUDE CHAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-These are not part of the CSV. After import, open the product in the catalog
-and fill these in via the Tech Specs tab. Include them in your Claude chat
-prompt so Claude can identify values — you can copy them into the form manually
-or paste the Claude output as a reference while filling in the form.
+1. Paste this document into Claude chat
+2. Paste the product listing (Amazon URL, page text, or both)
+3. Use the prompt below
+4. Review Claude's analysis and correct anything before it generates output
+5. Paste the final JSON (single item) or CSV (multiple items) into the import page
 
-${specsSection}`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUGGESTED PROMPT (copy and paste this)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+I've attached a product field reference document and a product listing below.
+Please do this in two steps:
+
+STEP 1 — Analysis:
+Go through each field in the reference and tell me:
+- What value you found (and where in the listing you found it)
+- What you're uncertain about or couldn't find
+- Your best guess for anything ambiguous, and why
+
+Wait for me to confirm or correct your findings before moving to Step 2.
+
+STEP 2 — Output (only after I confirm):
+For a single product: output a JSON object using the exact field names from the
+reference. For multiple products: output a CSV with a header row using exact
+field names.
+
+Single item JSON format example:
+{
+  "modelNumber": "WCO3ML",
+  "name": "Outdoor Cam Pro",
+  "manufacturer": "Wyze",
+  "category": "camera",
+  "subclass": "Outdoor Stationary",
+  "productType": "competitor",
+  "status": "active",
+  "msrp": 39.99,
+  "description": "1080p outdoor Wi-Fi camera",
+  "notes": "Prime Day purchase"
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATALOG ENTRY FIELDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${fieldList}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ACCEPTED VALUES FOR DROPDOWN FIELDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  category     : hub | touchpad | camera | sensor | app
+  subclass     : Indoor Stationary | Indoor P/T | Outdoor Stationary |
+                 Outdoor P/T | Doorbell | Lightbulb | Window | Pet
+  productType  : production | sample | prototype | competitor
+                 → competitor  = 3rd-party brand (Wyze, Arlo, Reolink, etc.)
+                 → sample      = unit ordered for hands-on evaluation
+                 → production  = your own shipping product
+                 → prototype   = pre-production / internal build
+  status       : active | discontinued | under-evaluation | in-development
+  msrp         : number only, no $ symbol (e.g. 49.99)
+${specsSection ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TECH SPEC FIELDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+These are not part of the import. After import, open the product in the catalog
+and fill these in via the Tech Specs tab. Ask Claude to extract these too during
+Step 1 — use the output as a reference while filling in the form.
+
+${specsSection}` : ''}`;
 }
 
 function downloadFieldReference(category) {
@@ -350,19 +374,43 @@ function downloadFieldReference(category) {
   URL.revokeObjectURL(url);
 }
 
+// ── Single item JSON parser ───────────────────────────────────────────────────
+
+function parseJsonInput(text) {
+  const trimmed = text.trim();
+  // Strip markdown code fences if present
+  const stripped = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const obj = JSON.parse(stripped);
+  // Normalize keys to match our field names (case-insensitive match)
+  const keyMap = {};
+  TEMPLATE_HEADERS.forEach(h => { keyMap[h.toLowerCase()] = h; });
+  const normalized = {};
+  Object.entries(obj).forEach(([k, v]) => {
+    const mapped = keyMap[k.toLowerCase()] || k;
+    normalized[mapped] = v !== null && v !== undefined ? String(v) : '';
+  });
+  return normalized;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function CatalogImport({ onBack, onImported }) {
-  const [step, setStep] = useState('upload'); // upload | preview | done
-  const [results, setResults] = useState([]); // [{ normalized, errors, warnings }]
+  const [mode, setMode] = useState('single'); // single | bulk
+  const [step, setStep] = useState('input'); // input | preview | done
+  const [results, setResults] = useState([]);
   const [fileName, setFileName] = useState('');
+  const [jsonInput, setJsonInput] = useState('');
+  const [jsonError, setJsonError] = useState('');
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [refCategory, setRefCategory] = useState('camera');
   const fileRef = useRef();
 
-  function reset() { setResults([]); setFileName(''); setStep('upload'); }
+  function reset() {
+    setResults([]); setFileName(''); setJsonInput('');
+    setJsonError(''); setStep('input'); setImportResult(null);
+  }
 
   function downloadTemplate() {
     const csv = generateCsv();
@@ -373,6 +421,18 @@ export default function CatalogImport({ onBack, onImported }) {
     a.download = 'catalog-import-template.csv';
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function handleJsonPreview() {
+    setJsonError('');
+    try {
+      const row = parseJsonInput(jsonInput);
+      const result = validateAndNormalize(row);
+      setResults([result]);
+      setStep('preview');
+    } catch {
+      setJsonError('Could not parse JSON — make sure it\'s a valid JSON object. Code fences (``` ```) are fine to include.');
+    }
   }
 
   function processFile(file) {
@@ -414,6 +474,7 @@ export default function CatalogImport({ onBack, onImported }) {
     }
   }
 
+  // ── Done ──────────────────────────────────────────────────────────────────
   if (step === 'done') {
     return (
       <div className="dashboard">
@@ -429,7 +490,7 @@ export default function CatalogImport({ onBack, onImported }) {
             </p>
           )}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 24 }}>
-            <button className="btn btn-ghost" onClick={reset}>Import Another File</button>
+            <button className="btn btn-ghost" onClick={reset}>Import Another</button>
             <button className="btn btn-primary" onClick={onBack}>Go to Catalog</button>
           </div>
         </div>
@@ -437,15 +498,16 @@ export default function CatalogImport({ onBack, onImported }) {
     );
   }
 
+  // ── Preview ───────────────────────────────────────────────────────────────
   if (step === 'preview') {
     return (
       <div className="dashboard">
         <div className="dashboard-header">
           <div>
-            <button className="btn btn-ghost btn-sm" onClick={() => setStep('upload')} style={{ marginBottom: 8 }}>← Back</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setStep('input')} style={{ marginBottom: 8 }}>← Back</button>
             <h1>Review Import</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>
-              {fileName} · {results.length} row{results.length !== 1 ? 's' : ''}
+              {fileName || (mode === 'single' ? 'Single item' : '')} · {results.length} product{results.length !== 1 ? 's' : ''}
               {errorCount > 0 && <span style={{ color: 'var(--fail)', marginLeft: 8 }}>· {errorCount} skipped (missing model #)</span>}
               {warningCount > 0 && <span style={{ color: '#d97706', marginLeft: 8 }}>· {warningCount} with warnings (will import)</span>}
               {importableRows.length > 0 && <span style={{ color: 'var(--pass)', marginLeft: 8 }}>· {importableRows.length} ready</span>}
@@ -453,11 +515,7 @@ export default function CatalogImport({ onBack, onImported }) {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             <button className="btn btn-ghost" onClick={reset}>Start Over</button>
-            <button
-              className="btn btn-primary"
-              disabled={importableRows.length === 0 || importing}
-              onClick={handleImport}
-            >
+            <button className="btn btn-primary" disabled={importableRows.length === 0 || importing} onClick={handleImport}>
               {importing ? 'Importing...' : `Import ${importableRows.length} Product${importableRows.length !== 1 ? 's' : ''}`}
             </button>
           </div>
@@ -465,107 +523,116 @@ export default function CatalogImport({ onBack, onImported }) {
 
         {errorCount > 0 && importableRows.length > 0 && (
           <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--fail)' }}>
-            {errorCount} row{errorCount !== 1 ? 's' : ''} are missing a model number and will be skipped. All other rows will import.
+            {errorCount} row{errorCount !== 1 ? 's' : ''} are missing a model number and will be skipped.
           </div>
         )}
         {warningCount > 0 && (
           <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#92400e' }}>
-            {warningCount} row{warningCount !== 1 ? 's' : ''} had unrecognized values that were auto-corrected or defaulted. Review the ⚠ rows below before importing.
+            {warningCount} row{warningCount !== 1 ? 's' : ''} had unrecognized values that were auto-corrected or defaulted — review ⚠ rows below.
           </div>
         )}
         {importableRows.length === 0 && (
           <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--fail)' }}>
-            No rows have a model number. Please check your CSV and re-upload.
+            No importable rows found. Go back and check your input.
           </div>
         )}
-
         <PreviewTable results={results} />
       </div>
     );
   }
 
-  // Upload step
+  // ── Input step ────────────────────────────────────────────────────────────
   return (
     <div className="dashboard">
       <div className="dashboard-header">
         <div>
           <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 8 }}>← Back to Catalog</button>
-          <h1>Bulk Catalog Import</h1>
+          <h1>Import Products</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>
-            Download the template, fill it out, and re-upload to add products in bulk.
+            Add a single product from Claude chat output, or bulk import from a CSV file.
           </p>
         </div>
       </div>
 
-      {/* Step 1 — download template */}
+      {/* Field reference downloads — always visible */}
       <div className="spec-card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>Step 1 — Download Template &amp; Field Reference</div>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Field Reference &amp; Templates</div>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              The CSV template has example rows and field hints. The field reference document is for use
-              with Claude chat — paste it alongside an Amazon listing to get a pre-filled CSV row back.
+              Download the field reference, paste it into Claude chat with an Amazon listing, and follow
+              the included prompt. Claude will analyze the listing, confirm findings with you, then output
+              JSON (single item) or CSV (multiple items) to paste below.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', alignItems: 'center' }}>
-            <button className="btn btn-secondary" onClick={downloadTemplate}>
-              ↓ CSV Template
-            </button>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <select
-                value={refCategory}
-                onChange={e => setRefCategory(e.target.value)}
-                style={{ fontSize: 13, padding: '5px 8px' }}
-              >
+              <select value={refCategory} onChange={e => setRefCategory(e.target.value)} style={{ fontSize: 13, padding: '5px 8px' }}>
                 {Object.keys(SPEC_SCHEMA).map(cat => (
                   <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
                 ))}
               </select>
-              <button className="btn btn-secondary" onClick={() => downloadFieldReference(refCategory)}>
-                ↓ Field Reference
-              </button>
+              <button className="btn btn-secondary" onClick={() => downloadFieldReference(refCategory)}>↓ Field Reference</button>
             </div>
-          </div>
-        </div>
-
-        {/* Field reference */}
-        <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-          <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Field Reference</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 6 }}>
-            {TEMPLATE_HEADERS.map(h => (
-              <div key={h} style={{ fontSize: 12, display: 'flex', gap: 6 }}>
-                <code style={{ fontWeight: 600, color: 'var(--primary)', flexShrink: 0 }}>{h}</code>
-                <span style={{ color: 'var(--text-muted)' }}>{TEMPLATE_HINTS[h]}</span>
-              </div>
-            ))}
+            <button className="btn btn-secondary" onClick={downloadTemplate}>↓ CSV Template</button>
           </div>
         </div>
       </div>
 
-      {/* Step 2 — upload */}
-      <div className="spec-card">
-        <div style={{ fontWeight: 700, marginBottom: 12 }}>Step 2 — Upload Your CSV</div>
-        <div
-          style={{
-            border: `2px dashed ${dragOver ? 'var(--primary)' : 'var(--border)'}`,
-            borderRadius: 10,
-            padding: '40px 24px',
-            textAlign: 'center',
-            cursor: 'pointer',
-            transition: 'border-color 0.15s, background 0.15s',
-            background: dragOver ? 'rgba(99,102,241,0.04)' : 'transparent',
-          }}
-          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          onClick={() => fileRef.current?.click()}
-        >
-          <div style={{ fontSize: 32, marginBottom: 10 }}>📂</div>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Drop your CSV here or click to browse</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>.csv files only</div>
-          <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleFile} />
-        </div>
+      {/* Mode tabs */}
+      <div className="product-tabs" style={{ marginBottom: 16 }}>
+        <button className={`product-tab${mode === 'single' ? ' active' : ''}`} onClick={() => { setMode('single'); reset(); }}>
+          Single Item (JSON)
+        </button>
+        <button className={`product-tab${mode === 'bulk' ? ' active' : ''}`} onClick={() => { setMode('bulk'); reset(); }}>
+          Bulk Import (CSV)
+        </button>
       </div>
+
+      {mode === 'single' && (
+        <div className="spec-card">
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Paste Claude's JSON Output</div>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
+            After Claude confirms its findings, ask it to output a JSON object. Paste it here — code fences are fine to include.
+          </p>
+          <textarea
+            value={jsonInput}
+            onChange={e => { setJsonInput(e.target.value); setJsonError(''); }}
+            placeholder={`{\n  "modelNumber": "WCO3ML",\n  "name": "Outdoor Cam Pro",\n  "manufacturer": "Wyze",\n  "category": "camera",\n  "productType": "competitor",\n  "msrp": 39.99\n}`}
+            rows={12}
+            style={{ width: '100%', fontFamily: 'monospace', fontSize: 13, resize: 'vertical' }}
+          />
+          {jsonError && <div style={{ color: 'var(--fail)', fontSize: 13, marginTop: 8 }}>{jsonError}</div>}
+          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn btn-primary" disabled={!jsonInput.trim()} onClick={handleJsonPreview}>
+              Preview →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'bulk' && (
+        <div className="spec-card">
+          <div style={{ fontWeight: 700, marginBottom: 12 }}>Upload CSV File</div>
+          <div
+            style={{
+              border: `2px dashed ${dragOver ? 'var(--primary)' : 'var(--border)'}`,
+              borderRadius: 10, padding: '40px 24px', textAlign: 'center', cursor: 'pointer',
+              transition: 'border-color 0.15s, background 0.15s',
+              background: dragOver ? 'rgba(99,102,241,0.04)' : 'transparent',
+            }}
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => fileRef.current?.click()}
+          >
+            <div style={{ fontSize: 32, marginBottom: 10 }}>📂</div>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Drop your CSV here or click to browse</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>.csv files only · use the CSV Template above as your starting point</div>
+            <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleFile} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
