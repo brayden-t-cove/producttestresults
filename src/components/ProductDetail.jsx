@@ -39,17 +39,26 @@ function TechSpecsTab({ product }) {
     );
   }
 
-  const filledGroups = schema
+  // Separate lens-array groups from regular groups
+  const lensArrayGroups = schema.filter(g => g.type === 'lens-array');
+  const regularGroups = schema.filter(g => g.type !== 'lens-array');
+
+  const filledRegularGroups = regularGroups
     .map(group => ({
       ...group,
-      filledFields: group.fields.filter(f => {
+      filledFields: (group.fields || []).filter(f => {
         const v = specs[f.id];
         return v !== undefined && v !== '' && v !== null;
       }),
     }))
     .filter(g => g.filledFields.length > 0);
 
-  if (filledGroups.length === 0) {
+  const filledLensGroups = lensArrayGroups.filter(group => {
+    const lenses = specs.lenses || [];
+    return lenses.some(lens => group.lensFields.some(f => lens[f.id] !== undefined && lens[f.id] !== '' && lens[f.id] !== null));
+  });
+
+  if (filledRegularGroups.length === 0 && filledLensGroups.length === 0) {
     return (
       <div className="empty-state" style={{ padding: '40px 0' }}>
         <p>No specs recorded yet. Edit this product to add technical specifications.</p>
@@ -59,7 +68,49 @@ function TechSpecsTab({ product }) {
 
   return (
     <div className="spec-sheet">
-      {filledGroups.map(group => (
+      {filledLensGroups.map(group => {
+        const lenses = specs.lenses || [];
+        const filledLenses = lenses.filter(lens =>
+          group.lensFields.some(f => lens[f.id] !== undefined && lens[f.id] !== '' && lens[f.id] !== null)
+        );
+        return (
+          <div key={group.label} className="spec-sheet-group">
+            <div className="spec-sheet-group-label">{group.label.toUpperCase()}</div>
+            {filledLenses.map((lens, i) => {
+              const filledFields = group.lensFields.filter(f => lens[f.id] !== undefined && lens[f.id] !== '' && lens[f.id] !== null);
+              return (
+                <div key={i}>
+                  {filledLenses.length > 1 && (
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '8px 0 4px' }}>
+                      {lens.lensLabel || `Lens ${i + 1}`}
+                    </div>
+                  )}
+                  <div className="spec-sheet-fields">
+                    {filledFields.filter(f => f.id !== 'lensLabel').map(field => {
+                      const val = lens[field.id];
+                      const isBool = field.type === 'boolean';
+                      const boolInfo = isBool ? boolDisplay(val) : null;
+                      return (
+                        <div key={field.id} className="spec-sheet-row" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                            <span className="spec-sheet-key">{field.label}</span>
+                            <span className="spec-sheet-val">
+                              {isBool && boolInfo ? (
+                                <span style={{ color: boolInfo.color, fontWeight: 700 }}>{boolInfo.symbol}</span>
+                              ) : String(val)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+      {filledRegularGroups.map(group => (
         <div key={group.label} className="spec-sheet-group">
           <div className="spec-sheet-group-label">{group.label.toUpperCase()}</div>
           <div className="spec-sheet-fields">

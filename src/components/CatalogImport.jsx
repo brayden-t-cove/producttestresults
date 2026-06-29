@@ -320,7 +320,7 @@ For a single product: output a JSON object using the exact field names from the
 reference. For multiple products: output a CSV with a header row using exact
 field names.
 
-Single item JSON format example:
+Single item JSON format example (include "specs" if tech spec fields were found):
 {
   "modelNumber": "WCO3ML",
   "name": "Outdoor Cam Pro",
@@ -331,8 +331,15 @@ Single item JSON format example:
   "status": "active",
   "msrp": 39.99,
   "description": "1080p outdoor Wi-Fi camera",
-  "notes": "Prime Day purchase"
+  "notes": "Prime Day purchase",
+  "specs": {
+    "lensCount": "1",
+    "connectivity": "Wi-Fi",
+    "videoResolution": "1080p"
+  }
 }
+
+Only include keys that have actual values — omit fields that are blank or unknown.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CATALOG ENTRY FIELDS
@@ -354,11 +361,17 @@ ACCEPTED VALUES FOR DROPDOWN FIELDS
   msrp         : number only, no $ symbol (e.g. 49.99)
 ${specsSection ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TECH SPEC FIELDS
+TECH SPEC FIELDS  (include in "specs": { } in your JSON output)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-These are not part of the import. After import, open the product in the catalog
-and fill these in via the Tech Specs tab. Ask Claude to extract these too during
-Step 1 — use the output as a reference while filling in the form.
+These go inside a "specs" key in the JSON object. Only include fields that have
+a value — omit anything that is blank or not mentioned in the listing.
+For lens-array fields (per-lens optics), use a "lenses" array inside specs:
+  "specs": {
+    "lensCount": "1",
+    "lenses": [
+      { "videoResolution": "1080p", "horizontalFov": "130", "colorNightVision": "yes" }
+    ]
+  }
 
 ${specsSection}` : ''}`;
 }
@@ -381,13 +394,18 @@ function parseJsonInput(text) {
   // Strip markdown code fences if present
   const stripped = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   const obj = JSON.parse(stripped);
-  // Normalize keys to match our field names (case-insensitive match)
+  // Normalize top-level keys to match our field names (case-insensitive match)
   const keyMap = {};
   TEMPLATE_HEADERS.forEach(h => { keyMap[h.toLowerCase()] = h; });
   const normalized = {};
   Object.entries(obj).forEach(([k, v]) => {
-    const mapped = keyMap[k.toLowerCase()] || k;
-    normalized[mapped] = v !== null && v !== undefined ? String(v) : '';
+    if (k.toLowerCase() === 'specs' && typeof v === 'object' && v !== null) {
+      // Preserve specs object as-is for tech specs passthrough
+      normalized.specs = v;
+    } else {
+      const mapped = keyMap[k.toLowerCase()] || k;
+      normalized[mapped] = v !== null && v !== undefined ? String(v) : '';
+    }
   });
   return normalized;
 }

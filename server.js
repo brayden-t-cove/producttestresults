@@ -172,7 +172,7 @@ app.post('/api/catalog/import', async (req, res) => {
         website: row.website || '',
         notes: row.notes || '',
         capabilities: [],
-        specs: {},
+        specs: (row.specs && typeof row.specs === 'object') ? row.specs : {},
         createdAt: new Date().toISOString(),
       };
       await catalog.create(entry);
