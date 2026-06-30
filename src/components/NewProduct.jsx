@@ -12,9 +12,6 @@ const CATEGORY_ICONS = {
   app: '📱',
 };
 
-// Show app configs for all categories except sensor and touchpad
-const SHOW_APP_CONFIGS_FOR = ['hub', 'camera', 'app'];
-
 const SUBCLASS_OPTIONS = {
   camera: [
     'Indoor Stationary',
@@ -46,7 +43,6 @@ const SUBCLASS_OPTIONS = {
   ],
 };
 
-// Default capabilities pre-checked per subclass
 const SUBCLASS_PRESETS = {
   camera: {
     'Indoor Stationary':  ['indoor','wifi-2_4','motion-detection','person-detection','ir-night-vision','two-way-audio','cloud-recording','event-only-recording','cam-set-motion-sensitivity','cam-set-night-vision','cam-set-notif-cooldown'],
@@ -78,7 +74,6 @@ const SUBCLASS_PRESETS = {
   },
 };
 
-// Helper: look up capability label by ID
 function getCapabilityLabel(capId) {
   for (const groupList of Object.values(CAPABILITY_GROUPS)) {
     for (const group of groupList) {
@@ -89,198 +84,460 @@ function getCapabilityLabel(capId) {
   return capId;
 }
 
-function platformLabel(platform) {
-  if (platform === 'ios') return 'iOS';
-  if (platform === 'android') return 'Android';
-  return 'iOS/Android';
+// ─── Wizard step definitions ──────────────────────────────────────────────────
+
+const STEPS = [
+  { id: 'basics',       label: 'Basic Info' },
+  { id: 'specs',        label: 'Tech Specs' },
+  { id: 'capabilities', label: 'Capabilities' },
+];
+
+// ─── Step indicator bar ───────────────────────────────────────────────────────
+
+function StepBar({ steps, current, onGoto, maxReached }) {
+  return (
+    <div className="wizard-step-bar">
+      {steps.map((step, i) => {
+        const done = i < current;
+        const active = i === current;
+        const reachable = i <= maxReached;
+        return (
+          <button
+            key={step.id}
+            type="button"
+            className={`wizard-step-btn ${active ? 'active' : ''} ${done ? 'done' : ''}`}
+            disabled={!reachable}
+            onClick={() => reachable && onGoto(i)}
+          >
+            <span className="wizard-step-num">{done ? '✓' : i + 1}</span>
+            <span className="wizard-step-label">{step.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
-function AppConfigForm({ capabilities, initialData, onSave, onCancel, catalogApps }) {
-  const [appName, setAppName] = useState(initialData?.appName || '');
-  const [platform, setPlatform] = useState(initialData?.platform || 'both');
-  const [unavailable, setUnavailable] = useState(new Set(initialData?.unavailableCapabilities || []));
+// ─── Tab bar (edit mode) ──────────────────────────────────────────────────────
 
-  function handleSelectCatalogApp(app) {
-    if (!app) return;
-    setAppName(app.name);
-    // prefill platform from app category capabilities
-    const hasiOS = (app.capabilities || []).includes('ios');
-    const hasAndroid = (app.capabilities || []).includes('android');
-    if (hasiOS && hasAndroid) setPlatform('both');
-    else if (hasiOS) setPlatform('ios');
-    else if (hasAndroid) setPlatform('android');
-    else setPlatform('both');
-    // start with nothing unavailable — user unchecks what's hidden
-    setUnavailable(new Set());
-  }
-  function toggleUnavailable(capId) {
-    setUnavailable(prev => {
-      const next = new Set(prev);
-      if (next.has(capId)) next.delete(capId);
-      else next.add(capId);
-      return next;
-    });
-  }
-
-  function handleSave() {
-    if (!appName.trim()) return;
-    onSave({
-      id: initialData?.id || crypto.randomUUID(),
-      appName: appName.trim(),
-      platform,
-      unavailableCapabilities: Array.from(unavailable),
-    });
-  }
-
-  const capList = Array.from(capabilities);
-
+function TabBar({ steps, current, onChange }) {
   return (
-    <div className="app-config-form">
-      {catalogApps && catalogApps.length > 0 && (
-        <div className="form-group" style={{ marginBottom: 12 }}>
-          <label>Pick from catalog <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(prefills name & platform)</span></label>
-          <select onChange={e => handleSelectCatalogApp(catalogApps.find(a => a.id === e.target.value))} defaultValue="">
-            <option value="">— Select an app —</option>
-            {catalogApps.map(a => (
-              <option key={a.id} value={a.id}>{a.name}{a.version ? ` ${a.version}` : ''}</option>
-            ))}
-          </select>
-        </div>
-      )}
-      <div className="form-group" style={{ marginBottom: 12 }}>
-        <label>App Name</label>
-        <input
-          type="text"
-          placeholder="e.g. InstaVision, Alula, Wyze App"
-          value={appName}
-          onChange={e => setAppName(e.target.value)}
-        />
-      </div>
+    <div className="wizard-tab-bar">
+      {steps.map((step, i) => (
+        <button
+          key={step.id}
+          type="button"
+          className={`wizard-tab-btn ${i === current ? 'active' : ''}`}
+          onClick={() => onChange(i)}
+        >
+          {step.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-      <div className="form-group" style={{ marginBottom: 12 }}>
-        <label>Platform</label>
-        <div className="platform-toggle">
+// ─── Step 1: Basic Info ───────────────────────────────────────────────────────
+
+function StepBasics({ state, set, catalog, product, isEdit, onImageUpload, onImageRemove, uploadingImage }) {
+  return (
+    <div className="wizard-step-content">
+
+      {/* Type */}
+      <div className="form-group">
+        <label>Type</label>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
           {[
-            { id: 'ios', label: 'iOS' },
-            { id: 'android', label: 'Android' },
-            { id: 'both', label: 'Both' },
+            { value: 'production', label: 'Production' },
+            { value: 'sample',     label: 'Sample' },
+            { value: 'prototype',  label: 'Prototype' },
+            { value: 'competitor', label: 'Competitor' },
           ].map(opt => (
-            <button
-              key={opt.id}
-              type="button"
-              className={platform === opt.id ? 'active' : ''}
-              onClick={() => setPlatform(opt.id)}
-            >
+            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="productType"
+                value={opt.value}
+                checked={state.productType === opt.value}
+                onChange={() => set('productType', opt.value)}
+                style={{ width: 'auto' }}
+              />
               {opt.label}
-            </button>
+            </label>
           ))}
         </div>
       </div>
 
-      {capList.length > 0 && (
-        <div className="form-group" style={{ marginBottom: 12 }}>
-          <label>Check features that are NOT available in this app</label>
-          <div className="capability-checkboxes" style={{ background: 'var(--bg)', borderRadius: 4, padding: 8 }}>
-            {capList.map(capId => (
-              <label key={capId} className="capability-checkbox-item">
+      {/* Category */}
+      <div className="form-group">
+        <label>Category <span style={{ color: 'var(--fail)', fontWeight: 700 }}>*</span></label>
+        <div className="session-type-cards">
+          {CATEGORIES.map(cat => (
+            <div
+              key={cat}
+              className={`session-type-card ${state.category === cat ? 'selected' : ''}`}
+              onClick={() => set('category', cat)}
+            >
+              <span className="session-type-icon">{CATEGORY_ICONS[cat]}</span>
+              <span className="session-type-label">{CATEGORY_LABELS[cat]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Subclass — immediately follows category */}
+      {SUBCLASS_OPTIONS[state.category] && (
+        <div className="form-group">
+          <label>Subclass <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}>(optional)</span></label>
+          <select
+            value={state.subclass}
+            onChange={e => {
+              const val = e.target.value;
+              set('subclass', val);
+              if (!isEdit && val && SUBCLASS_PRESETS[state.category]?.[val]) {
+                set('capabilities', new Set(SUBCLASS_PRESETS[state.category][val]));
+              }
+            }}
+          >
+            <option value="">— Select subclass —</option>
+            {SUBCLASS_OPTIONS[state.category].map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          {state.subclass && SUBCLASS_PRESETS[state.category]?.[state.subclass] && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+              Capabilities will be pre-filled based on subclass — adjust on the Capabilities step.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Manufacturer */}
+      <div className="form-group">
+        <label>
+          Manufacturer
+          {state.productType === 'competitor' && (
+            <span style={{ color: 'var(--primary)', fontWeight: 400, marginLeft: 6 }}>(brand identity for competitor products)</span>
+          )}
+        </label>
+        <input
+          type="text"
+          placeholder="e.g. Cove Smart"
+          value={state.manufacturer}
+          onChange={e => set('manufacturer', e.target.value)}
+        />
+      </div>
+
+      {/* Model Number */}
+      <div className="form-group">
+        <label>Model Number</label>
+        <input
+          type="text"
+          placeholder="e.g. CVH-300"
+          value={state.modelNumber}
+          onChange={e => set('modelNumber', e.target.value)}
+        />
+      </div>
+
+      {/* Product Name */}
+      <div className="form-group">
+        <label>
+          Product Name
+          {state.productType !== 'competitor' && <span style={{ color: 'var(--fail)', fontWeight: 700, marginLeft: 4 }}>*</span>}
+        </label>
+        <input
+          type="text"
+          placeholder="e.g. Cove Security Hub Gen 3"
+          value={state.name}
+          onChange={e => set('name', e.target.value)}
+        />
+      </div>
+
+      {/* Version + Hardware Revision side-by-side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label>Version <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+          <input
+            type="text"
+            placeholder="e.g. V1, V2"
+            value={state.version}
+            onChange={e => set('version', e.target.value)}
+          />
+        </div>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label>Hardware Revision <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+          <input
+            type="text"
+            placeholder="e.g. Rev A, PCB-2"
+            value={state.revision}
+            onChange={e => set('revision', e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Status */}
+      <div className="form-group" style={{ marginTop: 16 }}>
+        <label>Status</label>
+        <select value={state.status} onChange={e => set('status', e.target.value)}>
+          <option value="active">Active</option>
+          <option value="in-development">In Development</option>
+          <option value="in-testing">In Testing</option>
+          <option value="eol">EOL</option>
+          <option value="discontinued">Discontinued</option>
+          <option value="on-hold">On Hold</option>
+          <option value="under-evaluation">Under Evaluation</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+
+      {/* Entity — hidden for competitor */}
+      {state.productType !== 'competitor' && (
+        <div className="form-group">
+          <label>Entity <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(select all that apply)</span></label>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            {['Cove', 'Luna', 'Alder', 'InstaVision'].map(e => (
+              <label key={e} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
                 <input
                   type="checkbox"
-                  checked={unavailable.has(capId)}
-                  onChange={() => toggleUnavailable(capId)}
-                  style={{ width: 'auto', marginRight: 8 }}
+                  checked={state.entity.includes(e)}
+                  onChange={() => {
+                    const next = state.entity.includes(e)
+                      ? state.entity.filter(x => x !== e)
+                      : [...state.entity, e];
+                    set('entity', next);
+                  }}
+                  style={{ width: 'auto' }}
                 />
-                {getCapabilityLabel(capId)}
+                {e}
               </label>
             ))}
           </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          onClick={handleSave}
-          disabled={!appName.trim()}
-        >
-          {initialData ? 'Save Changes' : 'Add App'}
-        </button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
-          Cancel
-        </button>
+      {/* Hub/NVR/DVR — cameras only */}
+      {state.category === 'camera' && (
+        <div className="form-group">
+          <label>Hub / NVR / DVR Connection</label>
+          <select value={state.hubConnectionType} onChange={e => set('hubConnectionType', e.target.value)}>
+            <option value="standalone">Standalone (no hub required)</option>
+            <option value="hub">Connects to Hub / Chime</option>
+            <option value="nvr-dvr">Connects to NVR / DVR</option>
+            <option value="proprietary-base">Connects to Proprietary Base Station</option>
+          </select>
+        </div>
+      )}
+
+      {/* Replaces Product */}
+      <div className="form-group">
+        <label>Replaces Product <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — for hardware revisions)</span></label>
+        <select value={state.replacesProductId} onChange={e => set('replacesProductId', e.target.value)}>
+          <option value="">— None —</option>
+          {(catalog || []).filter(p => p.id !== product?.id).map(p => (
+            <option key={p.id} value={p.id}>
+              {p.modelNumber || p.name}{p.revision ? ` (${p.revision})` : ''}{p.version ? ` ${p.version}` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Product Image — edit mode only */}
+      {isEdit && (
+        <div className="form-group">
+          <label>Product Image</label>
+          <div className="product-image-upload">
+            {state.imageUrl ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <img src={state.imageUrl} alt="Product" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
+                    Change Image
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={onImageUpload} />
+                  </label>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={onImageRemove} disabled={uploadingImage}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="image-upload-dropzone" style={{ cursor: 'pointer' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Upload product image</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>PNG, JPG, WEBP up to 5MB</div>
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={onImageUpload} />
+                {uploadingImage && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--primary)' }}>Uploading...</div>}
+              </label>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Step 2: Tech Specs ───────────────────────────────────────────────────────
+
+function StepSpecs({ state, set, specSchemaProp }) {
+  const effectiveSchema = specSchemaProp || SPEC_SCHEMA;
+  const specSchema = state.category ? (effectiveSchema[state.category] || null) : null;
+
+  if (!specSchema) {
+    return (
+      <div className="wizard-step-content">
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>
+          Select a category on the Basic Info step to unlock tech specs.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="wizard-step-content">
+      <SpecsForm
+        schema={specSchema}
+        values={state.specs}
+        notes={state.specNotes}
+        onChange={(id, val) => set('specs', { ...state.specs, [id]: val })}
+        onNoteChange={(id, val) => set('specNotes', { ...state.specNotes, [id]: val })}
+      />
+    </div>
+  );
+}
+
+// ─── Step 3: Capabilities ─────────────────────────────────────────────────────
+
+function StepCapabilities({ state, set }) {
+  const groups = state.category ? (CAPABILITY_GROUPS[state.category] || []) : [];
+
+  function toggleCapability(id) {
+    const next = new Set(state.capabilities);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    set('capabilities', next);
+  }
+
+  function selectAllInGroup(groupCapabilities) {
+    const allIds = groupCapabilities.map(c => c.id);
+    const allSelected = allIds.every(id => state.capabilities.has(id));
+    const next = new Set(state.capabilities);
+    if (allSelected) allIds.forEach(id => next.delete(id));
+    else allIds.forEach(id => next.add(id));
+    set('capabilities', next);
+  }
+
+  if (groups.length === 0) {
+    return (
+      <div className="wizard-step-content">
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>
+          Select a category on the Basic Info step to unlock capabilities.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="wizard-step-content">
+      <div className="capability-groups">
+        {groups.map(group => {
+          const allSelected = group.capabilities.every(c => state.capabilities.has(c.id));
+          return (
+            <div key={group.label} className="capability-group">
+              <div className="capability-group-header">
+                <span>{group.label.toUpperCase()}</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: 11, padding: '2px 8px' }}
+                  onClick={() => selectAllInGroup(group.capabilities)}
+                >
+                  {allSelected ? 'Deselect all' : 'Select all'}
+                </button>
+              </div>
+              <div className="capability-checkboxes">
+                {group.capabilities.map(cap => (
+                  <label key={cap.id} className="capability-checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={state.capabilities.has(cap.id)}
+                      onChange={() => toggleCapability(cap.id)}
+                      style={{ width: 'auto', marginRight: 8 }}
+                    />
+                    {cap.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>
+        <span className="capability-count-badge">{state.capabilities.size} capabilities selected</span>
       </div>
     </div>
   );
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function NewProduct({ product, onSave, onBack, catalog, specSchema: specSchemaProp }) {
   const isEdit = !!product;
-  const [name, setName] = useState(product?.name || '');
-  const [manufacturer, setManufacturer] = useState(product?.manufacturer || '');
-  const [modelNumber, setModelNumber] = useState(product?.modelNumber || '');
-  const [version, setVersion] = useState(product?.version || '');
-  const [revision, setRevision] = useState(product?.revision || '');
-  const [replacesProductId, setReplacesProductId] = useState(product?.replacesProductId || '');
-  const [status, setStatus] = useState(product?.status || 'active');
-  const [category, setCategory] = useState(product?.category || '');
-  const [capabilities, setCapabilities] = useState(new Set(product?.capabilities || []));
-  const [appConfigs, setAppConfigs] = useState(product?.appConfigs || []);
-  const [specs, setSpecs] = useState(product?.specs || {});
-  const [specNotes, setSpecNotes] = useState(product?.specNotes || {});
-  const [compatibleWith, setCompatibleWith] = useState(product?.compatibleWith || []);
-  const [hubConnectionType, setHubConnectionType] = useState(product?.hubConnectionType || 'standalone');
-  const [subclass, setSubclass] = useState(product?.subclass || '');
-  const [entity, setEntity] = useState(product?.entity || []);
-  const [productType, setProductType] = useState(product?.type || 'production');
-  const [showAddAppForm, setShowAddAppForm] = useState(false);
-  const [editingConfigId, setEditingConfigId] = useState(null);
-  const [imageUrl, setImageUrl] = useState(product?.imageUrl || null);
-  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // All form state in one object for easy prop-drilling
+  const [state, setState] = useState({
+    name:              product?.name || '',
+    manufacturer:      product?.manufacturer || '',
+    modelNumber:       product?.modelNumber || '',
+    version:           product?.version || '',
+    revision:          product?.revision || '',
+    replacesProductId: product?.replacesProductId || '',
+    status:            product?.status || 'active',
+    category:          product?.category || '',
+    capabilities:      new Set(product?.capabilities || []),
+    specs:             product?.specs || {},
+    specNotes:         product?.specNotes || {},
+    compatibleWith:    product?.compatibleWith || [],
+    hubConnectionType: product?.hubConnectionType || 'standalone',
+    subclass:          product?.subclass || '',
+    entity:            product?.entity || [],
+    productType:       product?.type || 'production',
+    imageUrl:          product?.imageUrl || null,
+  });
+
+  function set(key, value) {
+    setState(prev => ({ ...prev, [key]: value }));
+  }
+
+  // When category changes on new product, reset capabilities
+  const prevCategory = useState(state.category)[0];
+  useEffect(() => {
+    if (!isEdit) {
+      setState(prev => ({ ...prev, capabilities: new Set() }));
+    }
+  }, [state.category]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [step, setStep] = useState(0);
+  const [maxReached, setMaxReached] = useState(isEdit ? STEPS.length - 1 : 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [debugInfo, setDebugInfo] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
-  useEffect(() => {
-    if (!isEdit) {
-      setCapabilities(new Set());
+  function goTo(i) {
+    setStep(i);
+    setMaxReached(prev => Math.max(prev, i));
+  }
+
+  function handleNext() {
+    if (step === 0) {
+      if (!state.category) { setError('Please select a category.'); return; }
+      if (state.productType !== 'competitor' && !state.name.trim()) { setError('Product name is required.'); return; }
     }
-  }, [category]);
-
-  function toggleCapability(id) {
-    setCapabilities(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setError('');
+    goTo(step + 1);
   }
 
-  function selectAllInGroup(groupCapabilities) {
-    const allIds = groupCapabilities.map(c => c.id);
-    const allSelected = allIds.every(id => capabilities.has(id));
-    setCapabilities(prev => {
-      const next = new Set(prev);
-      if (allSelected) {
-        allIds.forEach(id => next.delete(id));
-      } else {
-        allIds.forEach(id => next.add(id));
-      }
-      return next;
-    });
-  }
-
-  function handleAddAppConfig(config) {
-    setAppConfigs(prev => [...prev, config]);
-    setShowAddAppForm(false);
-  }
-
-  function handleEditAppConfig(config) {
-    setAppConfigs(prev => prev.map(ac => ac.id === config.id ? config : ac));
-    setEditingConfigId(null);
-  }
-
-  function handleRemoveAppConfig(id) {
-    setAppConfigs(prev => prev.filter(ac => ac.id !== id));
+  function handleBack() {
+    if (step === 0) onBack();
+    else setStep(s => s - 1);
   }
 
   async function handleImageUpload(e) {
@@ -289,7 +546,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
     setUploadingImage(true);
     try {
       const result = await uploadProductImage(product.id, file);
-      setImageUrl(result.imageUrl);
+      set('imageUrl', result.imageUrl);
     } catch (err) {
       setError('Failed to upload image: ' + err.message);
     } finally {
@@ -301,7 +558,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
     if (!product?.id) return;
     try {
       await deleteProductImage(product.id);
-      setImageUrl(null);
+      set('imageUrl', null);
     } catch (err) {
       setError('Failed to remove image: ' + err.message);
     }
@@ -309,11 +566,11 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
 
   async function handleSave(e) {
     e.preventDefault();
-    if (productType !== 'competitor' && !name.trim()) {
+    if (state.productType !== 'competitor' && !state.name.trim()) {
       setError('Product name is required.');
       return;
     }
-    if (!category) {
+    if (!state.category) {
       setError('Please select a category.');
       return;
     }
@@ -322,24 +579,23 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
     try {
       await onSave({
         ...(product || {}),
-        name: name.trim(),
-        manufacturer: manufacturer.trim(),
-        modelNumber: modelNumber.trim(),
-        version: version.trim(),
-        revision: revision.trim() || undefined,
-        replacesProductId: replacesProductId || undefined,
-        status,
-        category,
-        capabilities: Array.from(capabilities),
-        appConfigs,
-        specs,
-        specNotes: Object.keys(specNotes).length > 0 ? specNotes : undefined,
-        compatibleWith,
-        hubConnectionType: category === 'camera' ? hubConnectionType : undefined,
-        subclass: SUBCLASS_OPTIONS[category] ? subclass : undefined,
-        imageUrl,
-        entity,
-        type: productType,
+        name:             state.name.trim(),
+        manufacturer:     state.manufacturer.trim(),
+        modelNumber:      state.modelNumber.trim(),
+        version:          state.version.trim(),
+        revision:         state.revision.trim() || undefined,
+        replacesProductId: state.replacesProductId || undefined,
+        status:           state.status,
+        category:         state.category,
+        capabilities:     Array.from(state.capabilities),
+        specs:            state.specs,
+        specNotes:        Object.keys(state.specNotes).length > 0 ? state.specNotes : undefined,
+        compatibleWith:   state.compatibleWith,
+        hubConnectionType: state.category === 'camera' ? state.hubConnectionType : undefined,
+        subclass:         SUBCLASS_OPTIONS[state.category] ? state.subclass : undefined,
+        imageUrl:         state.imageUrl,
+        entity:           state.entity,
+        type:             state.productType,
       });
     } catch (err) {
       setError(err.message || 'Failed to save product.');
@@ -348,468 +604,108 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
     }
   }
 
-  const groups = category ? (CAPABILITY_GROUPS[category] || []) : [];
-  const showAppConfigs = SHOW_APP_CONFIGS_FOR.includes(category) && capabilities.size > 0;
-  const effectiveSchema = specSchemaProp || SPEC_SCHEMA;
-  const specSchema = category ? (effectiveSchema[category] || null) : null;
-  const [specsOpen, setSpecsOpen] = useState(false);
+  const isLastStep = step === STEPS.length - 1;
 
   return (
     <div className="new-product-page">
       <div className="new-product-header">
-        <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>
-          ← Back
+        <button className="btn btn-ghost btn-sm" onClick={handleBack} style={{ marginBottom: 12 }}>
+          ← {step === 0 ? 'Back' : 'Previous'}
         </button>
         <h1>{isEdit ? 'Edit Product' : 'New Product'}</h1>
       </div>
 
-      <form onSubmit={handleSave}>
-        {error && (
-          <div>
-            <div className="error-msg">{error}</div>
-            {debugInfo && (
-              <div style={{ marginTop: 8, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: 12, fontSize: 12, fontFamily: 'monospace' }}>
-                <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text-muted)' }}>
-                  DEBUG INFO
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ marginLeft: 8, fontSize: 11, padding: '1px 6px' }}
-                    onClick={() => navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2))}
-                  >
-                    Copy
-                  </button>
-                </div>
-                <div style={{ color: debugInfo.status === 'ok' ? 'var(--pass)' : 'var(--fail)', marginBottom: 4 }}>
-                  Server status: {debugInfo.status ?? 'unknown'}
-                </div>
-                {debugInfo.checks && Object.entries(debugInfo.checks).map(([key, val]) => (
-                  <div key={key} style={{ marginBottom: 2 }}>
-                    <span style={{ color: val.ok ? 'var(--pass)' : 'var(--fail)' }}>{val.ok ? '✓' : '✗'}</span>
-                    {' '}{key}
-                    {val.error && <span style={{ color: 'var(--fail)' }}> — {val.error}</span>}
-                    {val.entries != null && <span style={{ color: 'var(--text-muted)' }}> ({val.entries} entries)</span>}
-                    {val.uptime && <span style={{ color: 'var(--text-muted)' }}> uptime {val.uptime}</span>}
-                  </div>
-                ))}
-                {debugInfo.error && <div style={{ color: 'var(--fail)' }}>{debugInfo.error}</div>}
+      {/* Step indicator (create) or tab bar (edit) */}
+      {isEdit ? (
+        <TabBar steps={STEPS} current={step} onChange={goTo} />
+      ) : (
+        <StepBar steps={STEPS} current={step} onGoto={goTo} maxReached={maxReached} />
+      )}
+
+      {error && (
+        <div style={{ marginTop: 12 }}>
+          <div className="error-msg">{error}</div>
+          {debugInfo && (
+            <div style={{ marginTop: 8, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: 12, fontSize: 12, fontFamily: 'monospace' }}>
+              <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text-muted)' }}>
+                DEBUG INFO
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ marginLeft: 8, fontSize: 11, padding: '1px 6px' }}
+                  onClick={() => navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2))}
+                >
+                  Copy
+                </button>
               </div>
-            )}
-          </div>
-        )}
-
-        <div className="form-group">
-          <label>Product Name <span style={{ color: 'var(--fail)', fontWeight: 700 }}>*</span></label>
-          <input
-            type="text"
-            placeholder="e.g. Cove Security Hub Gen 3"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Product Image</label>
-          {isEdit ? (
-            <div className="product-image-upload">
-              {imageUrl ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <img src={imageUrl} alt="Product" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
-                      Change Image
-                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
-                    </label>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={handleImageRemove} disabled={uploadingImage}>
-                      Remove
-                    </button>
-                  </div>
+              <div style={{ color: debugInfo.status === 'ok' ? 'var(--pass)' : 'var(--fail)', marginBottom: 4 }}>
+                Server status: {debugInfo.status ?? 'unknown'}
+              </div>
+              {debugInfo.checks && Object.entries(debugInfo.checks).map(([key, val]) => (
+                <div key={key} style={{ marginBottom: 2 }}>
+                  <span style={{ color: val.ok ? 'var(--pass)' : 'var(--fail)' }}>{val.ok ? '✓' : '✗'}</span>
+                  {' '}{key}
+                  {val.error && <span style={{ color: 'var(--fail)' }}> — {val.error}</span>}
+                  {val.entries != null && <span style={{ color: 'var(--text-muted)' }}> ({val.entries} entries)</span>}
+                  {val.uptime && <span style={{ color: 'var(--text-muted)' }}> uptime {val.uptime}</span>}
                 </div>
-              ) : (
-                <label className="image-upload-dropzone" style={{ cursor: 'pointer' }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>Upload product image</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>PNG, JPG, WEBP up to 5MB</div>
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
-                  {uploadingImage && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--primary)' }}>Uploading...</div>}
-                </label>
-              )}
-            </div>
-          ) : (
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '8px 0' }}>
-              Save the product first, then edit it to add an image.
+              ))}
+              {debugInfo.error && <div style={{ color: 'var(--fail)' }}>{debugInfo.error}</div>}
             </div>
           )}
         </div>
+      )}
 
-        <div className="form-group">
-          <label>Manufacturer {productType === 'competitor' && <span style={{ color: 'var(--primary)', fontWeight: 400 }}>(brand identity for competitor products)</span>}</label>
-          <input
-            type="text"
-            placeholder="e.g. Cove Smart"
-            value={manufacturer}
-            onChange={e => setManufacturer(e.target.value)}
+      <form onSubmit={handleSave}>
+        {step === 0 && (
+          <StepBasics
+            state={state}
+            set={set}
+            catalog={catalog}
+            product={product}
+            isEdit={isEdit}
+            onImageUpload={handleImageUpload}
+            onImageRemove={handleImageRemove}
+            uploadingImage={uploadingImage}
           />
-        </div>
-
-        <div className="form-group">
-          <label>Model Number</label>
-          <input
-            type="text"
-            placeholder="e.g. CVH-300"
-            value={modelNumber}
-            onChange={e => setModelNumber(e.target.value)}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Version <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-          <input
-            type="text"
-            placeholder="e.g. V1, V2, Rev B"
-            value={version}
-            onChange={e => setVersion(e.target.value)}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Hardware Revision <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-          <input
-            type="text"
-            placeholder="e.g. Rev A, Rev B, PCB-2"
-            value={revision}
-            onChange={e => setRevision(e.target.value)}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Status</label>
-          <select value={status} onChange={e => setStatus(e.target.value)}>
-            <option value="active">Active</option>
-            <option value="in-development">In Development</option>
-            <option value="in-testing">In Testing</option>
-            <option value="eol">EOL</option>
-            <option value="discontinued">Discontinued</option>
-            <option value="on-hold">On Hold</option>
-            <option value="under-evaluation">Under Evaluation</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Replaces Product <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — for hardware revisions)</span></label>
-          <select value={replacesProductId} onChange={e => setReplacesProductId(e.target.value)}>
-            <option value="">— None —</option>
-            {(catalog || []).filter(p => p.id !== product?.id).map(p => (
-              <option key={p.id} value={p.id}>
-                {p.modelNumber || p.name}{p.revision ? ` (${p.revision})` : ''}{p.version ? ` ${p.version}` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {productType !== 'competitor' && (
-          <div className="form-group">
-            <label>Entity <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(select all that apply)</span></label>
-            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-              {['Cove', 'Luna', 'Alder', 'InstaVision'].map(e => (
-                <label key={e} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={entity.includes(e)}
-                    onChange={() => setEntity(prev => prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e])}
-                    style={{ width: 'auto' }}
-                  />
-                  {e}
-                </label>
-              ))}
-            </div>
-          </div>
+        )}
+        {step === 1 && (
+          <StepSpecs state={state} set={set} specSchemaProp={specSchemaProp} />
+        )}
+        {step === 2 && (
+          <StepCapabilities state={state} set={set} />
         )}
 
-        <div className="form-group">
-          <label>Type</label>
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-            {[
-              { value: 'production', label: 'Production' },
-              { value: 'sample', label: 'Sample' },
-              { value: 'prototype', label: 'Prototype' },
-              { value: 'competitor', label: 'Competitor' },
-            ].map(opt => (
-              <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="productType"
-                  value={opt.value}
-                  checked={productType === opt.value}
-                  onChange={() => setProductType(opt.value)}
-                  style={{ width: 'auto' }}
-                />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label>Category</label>
-          <div className="session-type-cards">
-            {CATEGORIES.map(cat => (
-              <div
-                key={cat}
-                className={`session-type-card ${category === cat ? 'selected' : ''}`}
-                onClick={() => setCategory(cat)}
-              >
-                <span className="session-type-icon">{CATEGORY_ICONS[cat]}</span>
-                <span className="session-type-label">{CATEGORY_LABELS[cat]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Subclass — shown when category has defined subclasses */}
-        {SUBCLASS_OPTIONS[category] && (
-          <div className="form-group">
-            <label>Subclass <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 12, color: 'var(--text-muted)' }}>(optional)</span></label>
-            <select value={subclass} onChange={e => {
-              const val = e.target.value;
-              setSubclass(val);
-              if (!isEdit && val && SUBCLASS_PRESETS[category]?.[val]) {
-                setCapabilities(new Set(SUBCLASS_PRESETS[category][val]));
-              }
-            }}>
-              <option value="">— Select subclass —</option>
-              {SUBCLASS_OPTIONS[category].map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            {subclass && SUBCLASS_PRESETS[category]?.[subclass] && (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                Capabilities pre-filled based on subclass — adjust below as needed.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Camera: Hub/NVR/DVR Connection Type */}
-        {category === 'camera' && (
-          <div className="form-group">
-            <label>Hub / NVR / DVR Connection</label>
-            <select value={hubConnectionType} onChange={e => setHubConnectionType(e.target.value)}>
-              <option value="standalone">Standalone (no hub required)</option>
-              <option value="hub">Connects to Hub / Chime</option>
-              <option value="nvr-dvr">Connects to NVR / DVR</option>
-              <option value="proprietary-base">Connects to Proprietary Base Station</option>
-            </select>
-          </div>
-        )}
-
-        {/* Technical Specifications Section */}
-        {specSchema && (
-          <div className="app-config-section" style={{ marginBottom: 16 }}>
+        <div className="wizard-footer">
+          {isEdit ? (
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg"
+              style={{ minWidth: 160 }}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          ) : isLastStep ? (
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg"
+              style={{ minWidth: 160 }}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Create Product'}
+            </button>
+          ) : (
             <button
               type="button"
-              className="spec-group-header"
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--border)' }}
-              onClick={() => setSpecsOpen(o => !o)}
-              aria-expanded={specsOpen}
+              className="btn btn-primary btn-lg"
+              style={{ minWidth: 160 }}
+              onClick={handleNext}
             >
-              <span style={{ fontWeight: 700, fontSize: 15 }}>
-                {specsOpen ? '▾' : '▸'} Technical Specifications
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>
-                Optional — for internal records and QA reference.
-              </span>
+              Next: {STEPS[step + 1].label} →
             </button>
-            {specsOpen && (
-              <div style={{ marginTop: 12 }}>
-                <SpecsForm
-                  schema={specSchema}
-                  values={specs}
-                  notes={specNotes}
-                  onChange={(id, val) => setSpecs(prev => ({ ...prev, [id]: val }))}
-                  onNoteChange={(id, val) => setSpecNotes(prev => ({ ...prev, [id]: val }))}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {category && groups.length > 0 && (
-          <div className="form-group">
-            <label>Capabilities</label>
-            <div className="capability-groups">
-              {groups.map(group => {
-                const allSelected = group.capabilities.every(c => capabilities.has(c.id));
-                return (
-                  <div key={group.label} className="capability-group">
-                    <div className="capability-group-header">
-                      <span>{group.label.toUpperCase()}</span>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        style={{ fontSize: 11, padding: '2px 8px' }}
-                        onClick={() => selectAllInGroup(group.capabilities)}
-                      >
-                        {allSelected ? 'Deselect all' : 'Select all'}
-                      </button>
-                    </div>
-                    <div className="capability-checkboxes">
-                      {group.capabilities.map(cap => (
-                        <label key={cap.id} className="capability-checkbox-item">
-                          <input
-                            type="checkbox"
-                            checked={capabilities.has(cap.id)}
-                            onChange={() => toggleCapability(cap.id)}
-                            style={{ width: 'auto', marginRight: 8 }}
-                          />
-                          {cap.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>
-              <span className="capability-count-badge">{capabilities.size} capabilities selected</span>
-            </div>
-          </div>
-        )}
-
-        {/* Compatible Apps / Compatible With Section */}
-        {category && (() => {
-          const compatCats = {
-            sensor: ['hub'],
-            touchpad: ['hub'],
-            camera: ['app'],
-            hub: ['app'],
-            app: ['hub', 'camera'],
-          }[category] || [];
-          const compatOptions = (catalog || []).filter(p => compatCats.includes(p.category) && p.id !== product?.id);
-          if (compatOptions.length === 0) return null;
-          const labelText = category === 'camera' ? 'Compatible Apps' : 'Compatible with';
-          function toggleCompat(id) {
-            setCompatibleWith(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-          }
-          return (
-            <div className="form-group">
-              <label>{labelText}</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {compatOptions.map(p => (
-                  <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={compatibleWith.includes(p.id)}
-                      onChange={() => toggleCompat(p.id)}
-                      style={{ width: 'auto' }}
-                    />
-                    <span>{p.name}{p.version ? ` ${p.version}` : ''}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.category}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* App Configurations Section */}
-        {showAppConfigs && (
-          <div className="app-config-section">
-            <div style={{ marginBottom: 12 }}>
-              <h3 style={{ marginBottom: 4 }}>App Configurations</h3>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                Define which apps control this device and which features each app supports.
-              </p>
-            </div>
-
-            {appConfigs.length > 0 && (
-              <div className="app-config-list">
-                {appConfigs.map(ac => (
-                  <div key={ac.id}>
-                    {editingConfigId === ac.id ? (
-                      <AppConfigForm
-                        capabilities={capabilities}
-                        initialData={ac}
-                        onSave={handleEditAppConfig}
-                        onCancel={() => setEditingConfigId(null)}
-                        catalogApps={catalog?.filter(p => p.category === 'app') || []}
-                      />
-                    ) : (
-                      <div className="app-config-item">
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ fontWeight: 600, fontSize: 14 }}>{ac.appName}</span>
-                          <span
-                            className="badge"
-                            style={{ marginLeft: 8, background: 'var(--primary-dim)', color: 'var(--primary)' }}
-                          >
-                            {platformLabel(ac.platform)}
-                          </span>
-                          <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--text-muted)' }}>
-                            {ac.unavailableCapabilities.length > 0
-                              ? `${ac.unavailableCapabilities.length} feature${ac.unavailableCapabilities.length !== 1 ? 's' : ''} hidden`
-                              : 'All features available'}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => {
-                              setEditingConfigId(ac.id);
-                              setShowAddAppForm(false);
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-danger btn-sm"
-                            onClick={() => handleRemoveAppConfig(ac.id)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {showAddAppForm ? (
-              <AppConfigForm
-                capabilities={capabilities}
-                initialData={null}
-                onSave={handleAddAppConfig}
-                onCancel={() => setShowAddAppForm(false)}
-                catalogApps={catalog?.filter(p => p.category === 'app') || []}
-              />
-            ) : (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                style={{ marginTop: appConfigs.length > 0 ? 10 : 0 }}
-                onClick={() => {
-                  setShowAddAppForm(true);
-                  setEditingConfigId(null);
-                }}
-              >
-                + Add App
-              </button>
-            )}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          className="btn btn-primary btn-lg"
-          style={{ width: '100%', marginTop: 16 }}
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Product'}
-        </button>
+          )}
+        </div>
       </form>
     </div>
   );

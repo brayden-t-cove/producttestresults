@@ -1193,7 +1193,90 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 }
 
 .new-product-header {
+  margin-bottom: 20px;
+}
+
+/* ─── Wizard step bar (create flow) ─── */
+.wizard-step-bar {
+  display: flex;
+  gap: 0;
   margin-bottom: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.wizard-step-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.wizard-step-btn:last-child { border-right: none; }
+.wizard-step-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.wizard-step-btn:not(:disabled):hover { background: var(--card-hover); color: var(--text); }
+.wizard-step-btn.active { background: var(--primary-dim); color: var(--primary); font-weight: 700; }
+.wizard-step-btn.done { color: var(--pass); }
+
+.wizard-step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.wizard-step-btn.active .wizard-step-num { background: var(--primary); color: #fff; }
+.wizard-step-btn.done .wizard-step-num { background: var(--pass); color: #fff; }
+
+.wizard-step-label { font-size: 13px; }
+
+/* ─── Tab bar (edit flow) ─── */
+.wizard-tab-bar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 28px;
+  border-bottom: 2px solid var(--border);
+}
+
+.wizard-tab-btn {
+  padding: 8px 20px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+.wizard-tab-btn:hover { color: var(--text); }
+.wizard-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+
+/* ─── Wizard step content + footer ─── */
+.wizard-step-content { padding-bottom: 8px; }
+
+.wizard-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 20px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
 }
 
 .capability-groups {
