@@ -173,6 +173,7 @@ app.post('/api/catalog/import', async (req, res) => {
         notes: row.notes || '',
         capabilities: Array.isArray(row.capabilities) ? row.capabilities : [],
         specs: (row.specs && typeof row.specs === 'object') ? row.specs : {},
+        specNotes: (row.specNotes && typeof row.specNotes === 'object') ? row.specNotes : undefined,
         createdAt: new Date().toISOString(),
       };
       await catalog.create(entry);

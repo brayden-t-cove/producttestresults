@@ -335,8 +335,14 @@ JSON format:
     "lenses": [
       { "videoResolution": "1080p", "horizontalFov": "130", "colorNightVision": "yes" }
     ]` : ''}
+  },
+  "specNotes": {
+    "fieldId": "note about this field — e.g. vendor claims X, listing says Y, actual may differ"
   }
-}`;
+}
+
+Only include a specNotes entry when you have something worth flagging — a discrepancy,
+a caveat, a source conflict, or a value you're guessing at. Leave it out otherwise.`;
 }
 
 function generateFieldReference(category) {
@@ -432,6 +438,8 @@ function parseJsonInput(text) {
       normalized.specs = v;
     } else if (k.toLowerCase() === 'capabilities' && Array.isArray(v)) {
       normalized.capabilities = v.map(String);
+    } else if (k.toLowerCase() === 'specnotes' && typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      normalized.specNotes = v;
     } else {
       const mapped = keyMap[k.toLowerCase()] || k;
       normalized[mapped] = v !== null && v !== undefined ? String(v) : '';
