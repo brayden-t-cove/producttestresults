@@ -354,9 +354,9 @@ export default function SessionSummary({ session, onBack }) {
                 const sSkip = sec.tests.filter(t => t.status === 'skip').length;
                 const sNa = sec.tests.filter(t => t.status === 'na').length;
                 const allPass = sFail === 0 && sSkip === 0;
-                const failSkipTests = sec.tests.filter(t => t.status === 'fail' || t.status === 'skip');
+                const nonPassTests = sec.tests.filter(t => t.status !== 'pass' && t.status !== 'pending');
                 const passTests = sec.tests.filter(t => t.status === 'pass');
-                const shownTests = includePassed ? [...failSkipTests, ...passTests] : failSkipTests;
+                const shownTests = includePassed ? [...nonPassTests, ...passTests] : nonPassTests;
                 return (
                   <div key={sec.sectionLabel} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -377,8 +377,18 @@ export default function SessionSummary({ session, onBack }) {
                         {shownTests.map(t => (
                           <div key={t.id} style={{ paddingLeft: 10, borderLeft: '2px solid var(--border)', fontSize: 12 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                              <span className={`badge ${t.status === 'fail' ? 'badge-fail' : 'badge-skip'}`} style={{ flexShrink: 0 }}>
-                                {t.status === 'fail' ? 'Fail' : 'Skip'}
+                              <span className={`badge ${
+                                t.status === 'fail' ? 'badge-fail' :
+                                t.status === 'pass' ? 'badge-pass' :
+                                t.status === 'blocked' ? 'badge-blocked' :
+                                t.status === 'na' ? 'badge-na' :
+                                'badge-skip'
+                              }`} style={{ flexShrink: 0 }}>
+                                {t.status === 'fail' ? 'Fail' :
+                                 t.status === 'pass' ? 'Pass' :
+                                 t.status === 'blocked' ? 'Blocked' :
+                                 t.status === 'na' ? 'N/A' :
+                                 'Skip'}
                               </span>
                               {t.testNumber && <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)' }}>[{t.testNumber}]</span>}
                               <span style={{ fontWeight: 500 }}>{t.title}</span>
