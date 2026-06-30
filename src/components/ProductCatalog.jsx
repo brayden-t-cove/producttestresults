@@ -428,6 +428,11 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                             {product.revision}
                           </span>
                         )}
+                        {typeBadge && (
+                          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', padding: '2px 7px', borderRadius: 4, background: typeBadge === 'competitor' ? '#1e293b' : (typeBadge === 'sample' ? '#fef3c7' : '#ede9fe'), color: typeBadge === 'competitor' ? '#94a3b8' : (typeBadge === 'sample' ? '#b45309' : '#6d28d9'), border: typeBadge === 'competitor' ? '1px solid #334155' : 'none', textTransform: 'uppercase', verticalAlign: 'middle' }}>
+                            {typeBadge}
+                          </span>
+                        )}
                       </div>
                       {product.modelNumber && (
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>
@@ -451,11 +456,6 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                       )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                      {typeBadge && (
-                        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', padding: '2px 7px', borderRadius: 4, background: typeBadge === 'competitor' ? '#1e293b' : (typeBadge === 'sample' ? '#fef3c7' : '#ede9fe'), color: typeBadge === 'competitor' ? '#94a3b8' : (typeBadge === 'sample' ? '#b45309' : '#6d28d9'), border: typeBadge === 'competitor' ? '1px solid #334155' : 'none', textTransform: 'uppercase' }}>
-                          {typeBadge}
-                        </span>
-                      )}
                       <span className="capability-count-badge">
                         {(product.capabilities || []).length} capabilities
                       </span>
