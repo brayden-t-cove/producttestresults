@@ -1449,7 +1449,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
    ============================================================ */
 @media print {
   body { background: white !important; color: black !important; }
-  .app-layout > *:not(.session-summary-wrapper):not(.product-detail-wrapper) { display: none !important; }
+  /* Hide nav and version stamp; show only the view-content wrapper */
+  .app-layout > *:not(.view-content) { display: none !important; }
+  /* Within view-content, hide everything except the summary or product detail */
+  .view-content > *:not(.session-summary-wrapper):not(.product-detail-wrapper) { display: none !important; }
   .summary-actions { display: none !important; }
   .build-version { display: none !important; }
   .session-summary { box-shadow: none !important; background: white !important; color: black !important; max-width: 100% !important; }
