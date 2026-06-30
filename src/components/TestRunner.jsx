@@ -874,7 +874,8 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                   display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
                 }}
               >
-                <span>{prod.name}</span>
+                <span>{prod.modelNumber || prod.name}</span>
+                {prod.modelNumber && <span style={{ fontSize: 10, color: isActive ? 'var(--primary)' : 'var(--text-dim)', fontWeight: 400 }}>{prod.name}</span>}
                 <span style={{ fontSize: 11, display: 'flex', gap: 4 }}>
                   {prodDone
                     ? <span style={{ color: 'var(--pass)' }}>✓</span>
@@ -891,7 +892,10 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
 
       {/* Header */}
       <div className="test-runner-header">
-        <h2>{isMultiProduct ? activeProduct?.name : session.productName}</h2>
+        <h2>{isMultiProduct ? (activeProduct?.modelNumber || activeProduct?.name) : session.productName}</h2>
+        {isMultiProduct && activeProduct?.modelNumber && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{activeProduct.name}</span>
+        )}
         {!isMultiProduct && session.firmware && (
           <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>
             fw {session.firmware}

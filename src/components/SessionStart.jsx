@@ -252,6 +252,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
       const products = selectedProducts.map(({ product, appConfig }, i) => ({
         catalogId: product.id,
         name: product.name,
+        modelNumber: product.modelNumber || '',
         category: product.category,
         firmware: isMulti ? (firmwarePerProduct[product.id] || '') : firmware,
         appConfigId: appConfig?.id || null,
@@ -387,32 +388,51 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
               </button>
             </div>
           ) : (
-            <div className="product-picker-grid">
-              {catalog.filter(p => p.type !== 'competitor').map(product => {
-                const isSelected = selectedProducts.some(p => p.product.id === product.id);
-                return (
-                  <div
-                    key={product.id}
-                    className={`product-picker-card ${isSelected ? 'selected' : ''}`}
-                    onClick={() => toggleProduct(product)}
-                  >
-                    <span style={{ fontSize: 22, lineHeight: 1 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{product.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {CATEGORY_LABELS[product.category] || product.category}
-                        {product.manufacturer ? ` · ${product.manufacturer}` : ''}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-                        {(product.capabilities || []).length} capabilities → {countTests(product)} test cases
-                      </div>
+            <div>
+              {(() => {
+                const eligible = catalog.filter(p => p.type !== 'competitor');
+                const categoryOrder = ['hub', 'touchpad', 'camera', 'sensor', 'app'];
+                const grouped = categoryOrder
+                  .map(cat => ({ cat, items: eligible.filter(p => p.category === cat) }))
+                  .concat([{ cat: 'other', items: eligible.filter(p => !categoryOrder.includes(p.category)) }])
+                  .filter(g => g.items.length > 0);
+                return grouped.map(({ cat, items }) => (
+                  <div key={cat} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{CATEGORY_ICONS[cat] || '📦'}</span>
+                      <span>{CATEGORY_LABELS[cat] || cat}</span>
                     </div>
-                    {isSelected && (
-                      <span style={{ fontSize: 16, color: 'var(--primary)', flexShrink: 0 }}>✓</span>
-                    )}
+                    <div className="product-picker-grid">
+                      {items.map(product => {
+                        const isSelected = selectedProducts.some(p => p.product.id === product.id);
+                        return (
+                          <div
+                            key={product.id}
+                            className={`product-picker-card ${isSelected ? 'selected' : ''}`}
+                            onClick={() => toggleProduct(product)}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', letterSpacing: '0.02em' }}>
+                                {product.modelNumber || product.name}
+                              </div>
+                              {product.modelNumber && (
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{product.name}</div>
+                              )}
+                              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>
+                                {product.manufacturer ? `${product.manufacturer} · ` : ''}
+                                {(product.capabilities || []).length} cap · {countTests(product)} tests
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <span style={{ fontSize: 16, color: 'var(--primary)', flexShrink: 0 }}>✓</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                );
-              })}
+                ));
+              })()}
             </div>
           )}
         </div>
@@ -426,7 +446,10 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
                 <div key={product.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 18 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
-                    <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>{product.name}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{product.modelNumber || product.name}</div>
+                      {product.modelNumber && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{product.name}</div>}
+                    </div>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button
                         type="button"
