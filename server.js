@@ -190,8 +190,17 @@ app.post('/api/catalog/import', async (req, res) => {
 app.get('/api/catalog/export/csv', async (req, res) => {
   try {
     const data = await catalog.getAll();
-    const headers = ['id', 'name', 'manufacturer', 'modelNumber', 'version', 'category', 'createdAt'];
-    const rows = data.map(p => headers.map(h => `"${String(p[h] ?? '').replace(/"/g, '""')}"`).join(','));
+    const headers = [
+      'id', 'modelNumber', 'name', 'manufacturer', 'category', 'subclass',
+      'type', 'status', 'version', 'revision', 'description', 'msrp', 'upc',
+      'website', 'notes', 'entity', 'capabilities', 'specs', 'specNotes', 'createdAt',
+    ];
+    function csvCell(val) {
+      if (val === null || val === undefined) return '""';
+      if (typeof val === 'object') return `"${JSON.stringify(val).replace(/"/g, '""')}"`;
+      return `"${String(val).replace(/"/g, '""')}"`;
+    }
+    const rows = data.map(p => headers.map(h => csvCell(p[h])).join(','));
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="catalog-export.csv"');
     res.send([headers.join(','), ...rows].join('\n'));
