@@ -137,6 +137,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   // Per-product firmware for multi-product list (keyed by catalogId)
   const [firmwarePerProduct, setFirmwarePerProduct] = useState({});
 
+  const [sessionName, setSessionName] = useState('');
   const [notes, setNotes] = useState('');
   const [testerName, setTesterName] = useState('');
   const [testEnvOpen, setTestEnvOpen] = useState(false);
@@ -279,6 +280,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         category: firstProduct.category,
         catalogId: firstProduct.id,
         firmware: isMulti ? (firmwarePerProduct[firstProduct.id] || '') : firmware,
+        sessionName: sessionName.trim() || undefined,
         notes,
         testerName: testerName.trim() || undefined,
         type: sessionType,
@@ -646,6 +648,17 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
             )}
           </div>
         )}
+
+        {/* Session Name */}
+        <div className="form-group">
+          <label>Test Name <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)', textTransform: 'none' }}>(optional — displayed as the session title on the card)</span></label>
+          <input
+            type="text"
+            placeholder="e.g. App v4.2 Regression, Prime Day Camera Eval, Doorbell Range Test..."
+            value={sessionName}
+            onChange={e => setSessionName(e.target.value)}
+          />
+        </div>
 
         {/* Tester Name */}
         <div className="form-group">

@@ -173,7 +173,7 @@ export default function SessionSummary({ session, onBack }) {
     <div className="session-summary-wrapper">
     <div className="session-summary">
       <div className="summary-header">
-        <h1>Session Complete</h1>
+        <h1>{session.sessionName || 'Session Complete'}</h1>
         <p>{session.productName} — {formatDate(session.createdAt)}</p>
       </div>
 

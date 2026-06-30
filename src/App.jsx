@@ -215,7 +215,10 @@ function SessionCard({ s, onOpen, onDelete }) {
   return (
     <div className="session-card" onClick={() => onOpen(s.id)}>
       <div className="session-card-info">
-        <h3>{s.productName}</h3>
+        <h3>{s.sessionName || s.productName}</h3>
+        {s.sessionName && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{s.productName}</div>
+        )}
         {s.appConfigName && (
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{s.appConfigName}</div>
         )}
