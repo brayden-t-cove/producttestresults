@@ -22,8 +22,8 @@ const DATA_BASE = process.env.DATA_DIR || join(__dirname, 'data');
 const IMAGES_DIR = join(DATA_BASE, 'images');
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/images', express.static(IMAGES_DIR));
 
 // ── Startup: init DB or file dirs ─────────────────────────────────────────────
