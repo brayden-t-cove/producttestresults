@@ -121,6 +121,11 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   const [selectedProducts, setSelectedProducts] = useState([]);
   // each item: { product, appConfig, firmware }
 
+  const [productSearch, setProductSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef(null);
+  const dropdownRef = useRef(null);
+
   // Derived for backward compat with firmware loading logic
   const selectedProduct = selectedProducts[0]?.product || null;
 
@@ -166,6 +171,35 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   useEffect(() => {
     if (addingFirmware) newFirmwareInputRef.current?.focus();
   }, [addingFirmware]);
+
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (
+        searchRef.current && !searchRef.current.contains(e.target) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target)
+      ) {
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const eligibleProducts = catalog.filter(p => p.type !== 'competitor');
+
+  const searchResults = productSearch.trim().length === 0
+    ? eligibleProducts
+    : eligibleProducts.filter(p => {
+        const q = productSearch.toLowerCase();
+        return (
+          (p.modelNumber || '').toLowerCase().includes(q) ||
+          (p.name || '').toLowerCase().includes(q) ||
+          (p.manufacturer || '').toLowerCase().includes(q) ||
+          (p.subclass || '').toLowerCase().includes(q) ||
+          (CATEGORY_LABELS[p.category] || '').toLowerCase().includes(q)
+        );
+      });
 
   async function handleAddFirmware() {
     const version = newFirmwareVersion.trim();
@@ -375,74 +409,111 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
       <form onSubmit={handleSubmit}>
         {error && <div className="error-msg">{error}</div>}
 
-        {/* Product Picker */}
+        {/* Product Search Picker */}
         <div className="form-group">
-          <label>Select Product{isMultiProduct ? 's' : ''}</label>
+          <label>Add Products to Session</label>
           {catalog.length === 0 ? (
             <div className="error-msg" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               No products in catalog.{' '}
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={onGoToCatalog}
-              >
+              <button type="button" className="btn btn-primary btn-sm" onClick={onGoToCatalog}>
                 Add a product first
               </button>
             </div>
           ) : (
-            <div>
-              {(() => {
-                const eligible = catalog.filter(p => p.type !== 'competitor');
-                const categoryOrder = ['hub', 'touchpad', 'camera', 'sensor', 'app'];
-                const grouped = categoryOrder
-                  .map(cat => ({ cat, items: eligible.filter(p => p.category === cat) }))
-                  .concat([{ cat: 'other', items: eligible.filter(p => !categoryOrder.includes(p.category)) }])
-                  .filter(g => g.items.length > 0);
-                return grouped.map(({ cat, items }) => (
-                  <div key={cat} style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>{CATEGORY_ICONS[cat] || '📦'}</span>
-                      <span>{CATEGORY_LABELS[cat] || cat}</span>
+            <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  ref={searchRef}
+                  type="text"
+                  placeholder="Search by model number, name, manufacturer, or category…"
+                  value={productSearch}
+                  onChange={e => { setProductSearch(e.target.value); setSearchOpen(true); }}
+                  onFocus={() => setSearchOpen(true)}
+                  style={{ paddingLeft: 36 }}
+                />
+                <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-muted)', pointerEvents: 'none' }}>
+                  🔍
+                </span>
+                {productSearch && (
+                  <button
+                    type="button"
+                    onClick={() => { setProductSearch(''); searchRef.current?.focus(); }}
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {searchOpen && (
+                <div ref={dropdownRef} className="product-search-dropdown">
+                  {searchResults.length === 0 ? (
+                    <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-muted)' }}>
+                      No products match "{productSearch}"
                     </div>
-                    <div className="product-picker-grid">
-                      {items.map(product => {
-                        const isSelected = selectedProducts.some(p => p.product.id === product.id);
-                        return (
-                          <div
-                            key={product.id}
-                            className={`product-picker-card ${isSelected ? 'selected' : ''}`}
-                            onClick={() => toggleProduct(product)}
-                          >
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', letterSpacing: '0.02em' }}>
-                                {product.modelNumber || product.name}
+                  ) : (() => {
+                    const categoryOrder = ['hub', 'touchpad', 'camera', 'sensor', 'app'];
+                    const grouped = categoryOrder
+                      .map(cat => ({ cat, items: searchResults.filter(p => p.category === cat) }))
+                      .concat([{ cat: 'other', items: searchResults.filter(p => !categoryOrder.includes(p.category)) }])
+                      .filter(g => g.items.length > 0);
+                    return grouped.map(({ cat, items }) => (
+                      <div key={cat}>
+                        <div className="product-search-category-header">
+                          <span>{CATEGORY_ICONS[cat] || '📦'}</span>
+                          <span>{CATEGORY_LABELS[cat] || cat}</span>
+                        </div>
+                        {items.map(product => {
+                          const isSelected = selectedProducts.some(p => p.product.id === product.id);
+                          return (
+                            <button
+                              key={product.id}
+                              type="button"
+                              className={`product-search-result ${isSelected ? 'selected' : ''}`}
+                              onClick={() => {
+                                toggleProduct(product);
+                                if (!isSelected) {
+                                  setProductSearch('');
+                                  setSearchOpen(false);
+                                }
+                              }}
+                            >
+                              <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                                <div style={{ fontWeight: 700, fontSize: 13 }}>
+                                  {product.modelNumber || product.name}
+                                </div>
+                                {product.modelNumber && (
+                                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{product.name}</div>
+                                )}
+                                {product.manufacturer && (
+                                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1 }}>{product.manufacturer}</div>
+                                )}
                               </div>
-                              {product.modelNumber && (
-                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{product.name}</div>
-                              )}
-                              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>
-                                {product.manufacturer ? `${product.manufacturer} · ` : ''}
-                                {(product.capabilities || []).length} cap · {countTests(product)} tests
+                              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{countTests(product)} tests</span>
+                                {isSelected && <span style={{ color: 'var(--primary)', fontSize: 15 }}>✓</span>}
                               </div>
-                            </div>
-                            {isSelected && (
-                              <span style={{ fontSize: 16, color: 'var(--primary)', flexShrink: 0 }}>✓</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ));
-              })()}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Selected Products List (multi-product) */}
+        {/* Selected Products — Test Environment */}
         {selectedProducts.length > 0 && (
           <div className="form-group">
-            <label>Selected Products ({selectedProducts.length})</label>
+            <label>
+              Test Environment
+              <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
+                {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
+              </span>
+            </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {selectedProducts.map(({ product, appConfig }, index) => (
                 <div key={product.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px 14px' }}>

@@ -1368,6 +1368,54 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   background: var(--primary-dim);
 }
 
+/* ─── Product search dropdown ─── */
+.product-search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.product-search-category-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+
+.product-search-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.product-search-result:last-child { border-bottom: none; }
+.product-search-result:hover { background: var(--card-hover); }
+.product-search-result.selected { background: var(--primary-dim); }
+
 /* ============================================================
    APP CONFIGURATIONS
    ============================================================ */
