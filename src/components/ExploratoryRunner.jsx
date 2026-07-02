@@ -100,6 +100,19 @@ export default function ExploratoryRunner({ session, onUpdate, onFinish, onBack 
     }
   }
 
+  async function handleSaveAndExit() {
+    setSaving(true);
+    try {
+      const updated = await updateSession(session.id, { categories, status: 'active' });
+      onUpdate(updated);
+    } catch (e) {
+      console.error('Save failed', e);
+    } finally {
+      setSaving(false);
+    }
+    onBack();
+  }
+
   async function handleGoToSummary() {
     setSaving(true);
     try {
@@ -176,9 +189,9 @@ export default function ExploratoryRunner({ session, onUpdate, onFinish, onBack 
           <button
             className="btn btn-ghost btn-sm"
             style={{ width: '100%', textAlign: 'left', fontSize: 12, marginTop: 4, color: 'var(--text-muted)' }}
-            onClick={onBack}
+            onClick={handleSaveAndExit}
           >
-            ← Back to Sessions
+            ← Save &amp; Exit
           </button>
         </div>
       </div>
@@ -280,14 +293,21 @@ export default function ExploratoryRunner({ session, onUpdate, onFinish, onBack 
               </label>
             </div>
 
-            {/* Prev / Next */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            {/* Prev / Next / Save & Exit */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 28, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
               <button
                 className="btn btn-ghost"
                 onClick={handlePrev}
                 disabled={activeCatIndex === 0 || saving}
               >
                 ← Prev
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={handleSaveAndExit}
+                disabled={saving}
+              >
+                Save &amp; Exit
               </button>
               <button
                 className="btn btn-primary"
