@@ -47,14 +47,8 @@ export const SPEC_SCHEMA = {
       lensFields: [
         { id: 'lensLabel', label: 'Lens Label / Role', type: 'text', placeholder: 'e.g. Wide, Telephoto, Macro' },
         { id: 'imageSensor', label: 'Image Sensor', type: 'text' },
-        {
-          id: 'videoResolution',
-          label: 'Max Video Resolution',
-          type: 'select',
-          options: ['720p', '1080p', '2K (2560×1440)', '4K (3840×2160)', 'Other'],
-        },
-        { id: 'resolutionHorizontal', label: 'Resolution — Horizontal (px)', type: 'text' },
-        { id: 'resolutionVertical', label: 'Resolution — Vertical (px)', type: 'text' },
+        { id: 'resolutionHorizontal', label: 'Max Resolution — Horizontal (px)', type: 'text', placeholder: 'e.g. 1920' },
+        { id: 'resolutionVertical', label: 'Max Resolution — Vertical (px)', type: 'text', placeholder: 'e.g. 1080' },
         { id: 'horizontalFov', label: 'Horizontal FOV (°)', type: 'text' },
         { id: 'verticalFov', label: 'Vertical FOV (°)', type: 'text' },
         { id: 'diagonalFov', label: 'Diagonal FOV (°)', type: 'text' },
