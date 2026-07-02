@@ -10,9 +10,14 @@ const OBSERVATION_FIELDS = [
   { key: 'otherNotes', label: 'Other Notes' },
 ];
 
+const PACKAGING_HIDDEN = new Set(['performance', 'uiux', 'bugIssue']);
+
 function isCategoryComplete(cat) {
   const obs = cat.observations || {};
-  return OBSERVATION_FIELDS.every(f => (obs[f.key] || '').trim() !== '');
+  const fields = cat.id === 'packaging-unboxing'
+    ? OBSERVATION_FIELDS.filter(f => !PACKAGING_HIDDEN.has(f.key))
+    : OBSERVATION_FIELDS;
+  return fields.every(f => (obs[f.key] || '').trim() !== '');
 }
 
 function formatDate(iso) {
@@ -224,7 +229,10 @@ export default function ExploratoryRunner({ session, onUpdate, onFinish, onBack 
                   placeholder="Was anything else noted that doesn't fit under the other categories?"
                 />
               </div>
-            ) : OBSERVATION_FIELDS.map(field => (
+            ) : OBSERVATION_FIELDS.filter(f =>
+                activeCategory.id !== 'packaging-unboxing' ||
+                !['performance', 'uiux', 'bugIssue'].includes(f.key)
+              ).map(field => (
               <div className="form-group" key={field.key}>
                 <label>{field.label}</label>
                 <textarea
