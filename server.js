@@ -32,6 +32,7 @@ const ENV_FILE = join(__dirname, '.env');
 const DATA_BASE = process.env.DATA_DIR || join(__dirname, 'data');
 const IMAGES_DIR = join(DATA_BASE, 'images');
 
+app.set('trust proxy', 1); // Railway (and most PaaS) terminates SSL at the load balancer
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -44,7 +45,14 @@ if (process.env.DATABASE_URL) await initAuthDb();
 
 // ── Session + Passport ────────────────────────────────────────────────────────
 
-const PUBLIC_URL = (process.env.PUBLIC_URL || 'http://localhost:3001').replace(/\/$/, '');
+// Railway sets RAILWAY_PUBLIC_DOMAIN automatically; fall back to explicit PUBLIC_URL or localhost
+const PUBLIC_URL = (
+  process.env.PUBLIC_URL ||
+  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null) ||
+  'http://localhost:3001'
+).replace(/\/$/, '');
+
+console.log(`[auth] PUBLIC_URL resolved to: ${PUBLIC_URL}`);
 const AUTH_ENABLED = !!(process.env.DATABASE_URL && (process.env.GOOGLE_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID));
 const GOOGLE_ENABLED = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 const MICROSOFT_ENABLED = !!(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
