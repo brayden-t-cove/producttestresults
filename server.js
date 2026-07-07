@@ -49,6 +49,8 @@ const AUTH_ENABLED = !!(process.env.DATABASE_URL && (process.env.GOOGLE_CLIENT_I
 const GOOGLE_ENABLED = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 const MICROSOFT_ENABLED = !!(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
 
+console.log(`[auth] AUTH_ENABLED=${AUTH_ENABLED} GOOGLE_ENABLED=${GOOGLE_ENABLED} MICROSOFT_ENABLED=${MICROSOFT_ENABLED} DATABASE_URL=${!!process.env.DATABASE_URL}`);
+
 const PgSession = connectPgSimple(session);
 const sessionStore = process.env.DATABASE_URL
   ? new PgSession({ pool: getPool(), tableName: 'user_sessions', createTableIfMissing: true })
