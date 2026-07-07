@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, deleteSession, getSettings, saveSettings, getSpecSchema, saveSpecSchema, getCertSchema, saveCertSchema } from './lib/api.js';
+import { getMe, logout } from './lib/authApi.js';
+import LoginPage from './components/LoginPage.jsx';
+import AdminPanel from './components/AdminPanel.jsx';
 import VendorLibrary from './components/VendorLibrary.jsx';
 import CatalogImport from './components/CatalogImport.jsx';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
@@ -72,8 +75,9 @@ const TOP_LEVEL_VIEWS = {
   vendors: 'vendors',
 };
 
-function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onSettings }) {
+function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onSettings, currentUser, authEnabled, onAdmin, onLogout }) {
   const active = TOP_LEVEL_VIEWS[view] || 'dashboard';
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   return (
     <nav className="top-nav">
       <div className="top-nav-brand">
@@ -104,6 +108,35 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
         <button className="top-nav-link" onClick={onSettings} title="Settings">
           <IconSettings />
         </button>
+        {authEnabled && currentUser && (
+          <div style={{ position: 'relative' }}>
+            <button
+              className="top-nav-user-btn"
+              onClick={() => setUserMenuOpen(v => !v)}
+              title={currentUser.name}
+            >
+              {currentUser.avatar
+                ? <img src={currentUser.avatar} alt="" className="top-nav-avatar" />
+                : <span className="top-nav-avatar-initials">{currentUser.name?.[0]?.toUpperCase()}</span>}
+            </button>
+            {userMenuOpen && (
+              <div className="user-menu" onClick={() => setUserMenuOpen(false)}>
+                <div className="user-menu-header">
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{currentUser.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{currentUser.email}</div>
+                  <div style={{ fontSize: 11, marginTop: 3 }}>
+                    <span className={`role-badge role-${currentUser.role}`}>{currentUser.role}</span>
+                    {currentUser.entity && <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>{currentUser.entity}</span>}
+                  </div>
+                </div>
+                {currentUser.role === 'superuser' && (
+                  <button className="user-menu-item" onClick={onAdmin}>Admin Panel</button>
+                )}
+                <button className="user-menu-item user-menu-item-danger" onClick={onLogout}>Sign out</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   );
@@ -476,6 +509,27 @@ export default function App() {
   const [currentComparison, setCurrentComparison] = useState(null);
   const [comparisonPreselectedId, setComparisonPreselectedId] = useState(null);
 
+  // Auth
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authEnabled, setAuthEnabled] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [showAdmin, setShowAdmin] = useState(false);
+
+  useEffect(() => {
+    getMe().then(({ user, authEnabled: ae }) => {
+      setCurrentUser(user);
+      setAuthEnabled(ae);
+      setAuthLoading(false);
+    }).catch(() => setAuthLoading(false));
+  }, []);
+
+  async function handleLogout() {
+    await logout();
+    setCurrentUser(null);
+  }
+
+  const canEdit = !authEnabled || (currentUser && ['editor', 'superuser'].includes(currentUser.role));
+
   async function refreshSessions() {
     try {
       setLoadingSessions(true);
@@ -635,6 +689,27 @@ export default function App() {
     setView('newProduct');
   }
 
+  // Show blank while checking auth
+  if (authLoading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)' }}>Loading…</div>;
+  }
+
+  // Gate behind login if auth is enabled and no user
+  if (authEnabled && !currentUser) {
+    return <LoginPage />;
+  }
+
+  // Admin panel overlay
+  if (showAdmin && currentUser?.role === 'superuser') {
+    return (
+      <div className="app-layout">
+        <div className="view-content">
+          <AdminPanel currentUser={currentUser} onBack={() => setShowAdmin(false)} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-layout">
       {showSettings && (
@@ -657,6 +732,10 @@ export default function App() {
         onIssues={() => setView('issues')}
         onAnalytics={() => setView('analytics')}
         onSettings={() => setShowSettings(true)}
+        currentUser={currentUser}
+        authEnabled={authEnabled}
+        onAdmin={() => setShowAdmin(true)}
+        onLogout={handleLogout}
       />
 
       <div key={view} className="view-content">

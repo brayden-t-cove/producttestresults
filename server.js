@@ -10,8 +10,19 @@ import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
 import QRCode from 'qrcode';
+import session from 'express-session';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
+import connectPgSimple from 'connect-pg-simple';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
-import { initDb, catalog, sessions, comparisons, devices, firmwares, config, vendors } from './lib/storage.js';
+import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, getPool } from './lib/storage.js';
+import {
+  findOrCreateUser, createDomainRequest,
+  getAllUsers, updateUserRole, updateUserEntity,
+  getAllDomains, createDomain, deleteDomain,
+  getDomainRequests, approveDomainRequest, denyDomainRequest,
+} from './lib/auth.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '.env') });
@@ -29,6 +40,205 @@ app.use('/api/images', express.static(IMAGES_DIR));
 // ── Startup: init DB or file dirs ─────────────────────────────────────────────
 
 await initDb();
+if (process.env.DATABASE_URL) await initAuthDb();
+
+// ── Session + Passport ────────────────────────────────────────────────────────
+
+const PUBLIC_URL = (process.env.PUBLIC_URL || 'http://localhost:3001').replace(/\/$/, '');
+const AUTH_ENABLED = !!(process.env.DATABASE_URL && process.env.GOOGLE_CLIENT_ID && process.env.MICROSOFT_CLIENT_ID);
+
+const PgSession = connectPgSimple(session);
+const sessionStore = process.env.DATABASE_URL
+  ? new PgSession({ pool: getPool(), tableName: 'user_sessions', createTableIfMissing: true })
+  : undefined;
+
+app.use(session({
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET || 'dev-secret-change-in-prod',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
+  },
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => done(null, user.id));
+passport.deserializeUser(async (id, done) => {
+  try {
+    const pool = getPool();
+    if (!pool) return done(null, false);
+    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    done(null, rows[0] || false);
+  } catch (e) { done(e); }
+});
+
+if (AUTH_ENABLED) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: `${PUBLIC_URL}/auth/google/callback`,
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      const email = profile.emails?.[0]?.value;
+      if (!email) return done(null, false, { message: 'No email from Google' });
+      const result = await findOrCreateUser({
+        email, name: profile.displayName,
+        avatar: profile.photos?.[0]?.value,
+        provider: 'google', providerId: profile.id,
+      });
+      if (result?.blocked) {
+        await createDomainRequest({ email, name: profile.displayName, avatar: profile.photos?.[0]?.value, provider: 'google', providerId: profile.id });
+        return done(null, false, { message: 'domain_not_allowed' });
+      }
+      done(null, result);
+    } catch (e) { done(e); }
+  }));
+
+  passport.use(new MicrosoftStrategy({
+    clientID: process.env.MICROSOFT_CLIENT_ID,
+    clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+    callbackURL: `${PUBLIC_URL}/auth/microsoft/callback`,
+    scope: ['user.read'],
+    tenant: 'organizations',
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      const email = profile.emails?.[0]?.value || profile._json?.mail || profile._json?.userPrincipalName;
+      if (!email) return done(null, false, { message: 'No email from Microsoft' });
+      const result = await findOrCreateUser({
+        email, name: profile.displayName,
+        avatar: null,
+        provider: 'microsoft', providerId: profile.id,
+      });
+      if (result?.blocked) {
+        await createDomainRequest({ email, name: profile.displayName, avatar: null, provider: 'microsoft', providerId: profile.id });
+        return done(null, false, { message: 'domain_not_allowed' });
+      }
+      done(null, result);
+    } catch (e) { done(e); }
+  }));
+}
+
+// ── Auth middleware helpers ────────────────────────────────────────────────────
+
+function requireAuth(req, res, next) {
+  if (!AUTH_ENABLED) return next(); // local dev without OAuth: open access
+  if (req.isAuthenticated()) return next();
+  res.status(401).json({ error: 'Not authenticated' });
+}
+
+function requireEditor(req, res, next) {
+  if (!AUTH_ENABLED) return next();
+  if (req.isAuthenticated() && ['editor', 'superuser'].includes(req.user?.role)) return next();
+  res.status(403).json({ error: 'Editor or higher required' });
+}
+
+function requireSuperuser(req, res, next) {
+  if (!AUTH_ENABLED) return next();
+  if (req.isAuthenticated() && req.user?.role === 'superuser') return next();
+  res.status(403).json({ error: 'Superuser required' });
+}
+
+// Returns entity filter for a user. Superusers get null (no filter).
+function entityFilter(req) {
+  if (!AUTH_ENABLED) return null;
+  if (!req.user) return null;
+  if (req.user.role === 'superuser') return null;
+  return req.user.entity || null;
+}
+
+// ── Auth routes ───────────────────────────────────────────────────────────────
+
+app.get('/api/me', (req, res) => {
+  if (!AUTH_ENABLED) return res.json({ user: null, authEnabled: false });
+  if (!req.isAuthenticated()) return res.json({ user: null, authEnabled: true });
+  const { id, email, name, avatar, role, entity } = req.user;
+  res.json({ user: { id, email, name, avatar, role, entity }, authEnabled: true });
+});
+
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/?auth_error=domain_not_allowed' }),
+  (req, res) => res.redirect('/')
+);
+
+app.get('/auth/microsoft', passport.authenticate('microsoft'));
+app.get('/auth/microsoft/callback',
+  passport.authenticate('microsoft', { failureRedirect: '/?auth_error=domain_not_allowed' }),
+  (req, res) => res.redirect('/')
+);
+
+app.post('/auth/logout', (req, res, next) => {
+  req.logout(err => {
+    if (err) return next(err);
+    req.session.destroy(() => res.json({ ok: true }));
+  });
+});
+
+// ── Admin: users ──────────────────────────────────────────────────────────────
+
+app.get('/api/admin/users', requireSuperuser, async (req, res) => {
+  try { res.json(await getAllUsers()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/admin/users/:id', requireSuperuser, async (req, res) => {
+  try {
+    const { role, entity } = req.body;
+    let user = null;
+    if (role) user = await updateUserRole(req.params.id, role);
+    if (entity !== undefined) user = await updateUserEntity(req.params.id, entity);
+    res.json(user);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin: domains ────────────────────────────────────────────────────────────
+
+app.get('/api/admin/domains', requireSuperuser, async (req, res) => {
+  try { res.json(await getAllDomains()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/domains', requireSuperuser, async (req, res) => {
+  try {
+    const { domain, entity } = req.body;
+    if (!domain || !entity) return res.status(400).json({ error: 'domain and entity required' });
+    res.json(await createDomain({ domain, entity }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/domains/:id', requireSuperuser, async (req, res) => {
+  try { await deleteDomain(req.params.id); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin: domain requests ────────────────────────────────────────────────────
+
+app.get('/api/admin/domain-requests', requireSuperuser, async (req, res) => {
+  try { res.json(await getDomainRequests(req.query.status || 'pending')); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/domain-requests/:id/approve', requireSuperuser, async (req, res) => {
+  try {
+    const { role, entity } = req.body;
+    if (!role || !entity) return res.status(400).json({ error: 'role and entity required' });
+    const result = await approveDomainRequest(req.params.id, { role, entity, reviewedBy: req.user.email });
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/domain-requests/:id/deny', requireSuperuser, async (req, res) => {
+  try {
+    await denyDomainRequest(req.params.id, req.user.email);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 if (!process.env.DATABASE_URL) {
   // Local file-based mode — ensure directories exist
@@ -139,12 +349,17 @@ app.put('/api/cert-schema', async (req, res) => {
 
 // ── Catalog ───────────────────────────────────────────────────────────────────
 
-app.get('/api/catalog', async (req, res) => {
-  try { res.json(await catalog.getAll()); }
+app.get('/api/catalog', requireAuth, async (req, res) => {
+  try {
+    const all = await catalog.getAll();
+    const ef = entityFilter(req);
+    const result = ef ? all.filter(p => !p.entity || p.entity.length === 0 || p.entity.includes(ef)) : all;
+    res.json(result);
+  }
   catch { res.json([]); }
 });
 
-app.post('/api/catalog/import', async (req, res) => {
+app.post('/api/catalog/import', requireEditor, async (req, res) => {
   try {
     const { rows } = req.body;
     if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'No rows provided' });
@@ -187,7 +402,7 @@ app.post('/api/catalog/import', async (req, res) => {
   }
 });
 
-app.get('/api/catalog/export/csv', async (req, res) => {
+app.get('/api/catalog/export/csv', requireAuth, async (req, res) => {
   try {
     const data = await catalog.getAll();
     const headers = [
@@ -207,7 +422,7 @@ app.get('/api/catalog/export/csv', async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to export CSV' }); }
 });
 
-app.get('/api/catalog/export/json', async (req, res) => {
+app.get('/api/catalog/export/json', requireAuth, async (req, res) => {
   try {
     const data = await catalog.getAll();
     res.setHeader('Content-Type', 'application/json');
@@ -274,7 +489,7 @@ app.delete('/api/catalog/:id/image', async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to delete image' }); }
 });
 
-app.get('/api/catalog/:id', async (req, res) => {
+app.get('/api/catalog/:id', requireAuth, async (req, res) => {
   try {
     const entry = await catalog.getById(req.params.id);
     if (!entry) return res.status(404).json({ error: 'Not found' });
@@ -282,7 +497,7 @@ app.get('/api/catalog/:id', async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to read catalog' }); }
 });
 
-app.post('/api/catalog', async (req, res) => {
+app.post('/api/catalog', requireEditor, async (req, res) => {
   try {
     const { name, manufacturer, modelNumber, version, status, category, capabilities, appConfigs,
             specs, certifications, compatibleWith, entity, type, hubConnectionType, subclass } = req.body;
@@ -313,7 +528,7 @@ app.post('/api/catalog', async (req, res) => {
   }
 });
 
-app.put('/api/catalog/:id', async (req, res) => {
+app.put('/api/catalog/:id', requireEditor, async (req, res) => {
   try {
     const updated = await catalog.update(req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -323,7 +538,7 @@ app.put('/api/catalog/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/catalog/:id', async (req, res) => {
+app.delete('/api/catalog/:id', requireSuperuser, async (req, res) => {
   try {
     const removed = await catalog.delete(req.params.id);
     if (!removed) return res.status(404).json({ error: 'Not found' });
@@ -408,10 +623,12 @@ function getAnthropicClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
 
-app.get('/api/sessions', async (req, res) => {
+app.get('/api/sessions', requireAuth, async (req, res) => {
   try {
     const all = await sessions.getAllSummary();
-    const result = all.map(s => {
+    const ef = entityFilter(req);
+    const filtered = ef ? all.filter(s => !s.entity || s.entity === ef) : all;
+    const result = filtered.map(s => {
       const tc = s.testCases || [];
       return {
         id: s.id,
@@ -440,7 +657,7 @@ app.get('/api/sessions', async (req, res) => {
   }
 });
 
-app.get('/api/sessions/:id', async (req, res) => {
+app.get('/api/sessions/:id', requireAuth, async (req, res) => {
   try {
     const session = await sessions.getById(req.params.id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
@@ -501,7 +718,7 @@ app.get('/api/sessions/:id/export/exploratory-csv', async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to export session' }); }
 });
 
-app.post('/api/sessions', async (req, res) => {
+app.post('/api/sessions', requireEditor, async (req, res) => {
   try {
     const { productId, productName, category, subcategory, firmware, notes, type, testPlan,
             products, metrics, results, autoPulled, platform, testEnvironment, categories,
@@ -526,6 +743,8 @@ app.post('/api/sessions', async (req, res) => {
       verifications: [],
     };
     if (catalogId) session.catalogId = catalogId;
+    session.entity = req.user?.entity || null;
+    session.createdBy = req.user?.email || null;
     if (testPlan === 'comparative') {
       session.products = products || [];
       session.metrics = metrics || [];
@@ -549,7 +768,7 @@ app.post('/api/sessions', async (req, res) => {
   }
 });
 
-app.put('/api/sessions/:id', async (req, res) => {
+app.put('/api/sessions/:id', requireEditor, async (req, res) => {
   try {
     const updated = await sessions.update(req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: 'Session not found' });
@@ -560,7 +779,7 @@ app.put('/api/sessions/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/sessions/:id', async (req, res) => {
+app.delete('/api/sessions/:id', requireEditor, async (req, res) => {
   try {
     await sessions.delete(req.params.id);
     res.json({ ok: true });
