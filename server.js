@@ -45,7 +45,9 @@ if (process.env.DATABASE_URL) await initAuthDb();
 // ── Session + Passport ────────────────────────────────────────────────────────
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || 'http://localhost:3001').replace(/\/$/, '');
-const AUTH_ENABLED = !!(process.env.DATABASE_URL && process.env.GOOGLE_CLIENT_ID && process.env.MICROSOFT_CLIENT_ID);
+const AUTH_ENABLED = !!(process.env.DATABASE_URL && (process.env.GOOGLE_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID));
+const GOOGLE_ENABLED = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+const MICROSOFT_ENABLED = !!(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
 
 const PgSession = connectPgSimple(session);
 const sessionStore = process.env.DATABASE_URL
@@ -78,7 +80,7 @@ passport.deserializeUser(async (id, done) => {
   } catch (e) { done(e); }
 });
 
-if (AUTH_ENABLED) {
+if (GOOGLE_ENABLED) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -99,7 +101,9 @@ if (AUTH_ENABLED) {
       done(null, result);
     } catch (e) { done(e); }
   }));
+}
 
+if (MICROSOFT_ENABLED) {
   passport.use(new MicrosoftStrategy({
     clientID: process.env.MICROSOFT_CLIENT_ID,
     clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
@@ -155,23 +159,32 @@ function entityFilter(req) {
 // ── Auth routes ───────────────────────────────────────────────────────────────
 
 app.get('/api/me', (req, res) => {
-  if (!AUTH_ENABLED) return res.json({ user: null, authEnabled: false });
-  if (!req.isAuthenticated()) return res.json({ user: null, authEnabled: true });
+  const providers = { google: GOOGLE_ENABLED, microsoft: MICROSOFT_ENABLED };
+  if (!AUTH_ENABLED) return res.json({ user: null, authEnabled: false, providers });
+  if (!req.isAuthenticated()) return res.json({ user: null, authEnabled: true, providers });
   const { id, email, name, avatar, role, entity } = req.user;
-  res.json({ user: { id, email, name, avatar, role, entity }, authEnabled: true });
+  res.json({ user: { id, email, name, avatar, role, entity }, authEnabled: true, providers });
 });
 
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/?auth_error=domain_not_allowed' }),
-  (req, res) => res.redirect('/')
-);
+if (GOOGLE_ENABLED) {
+  app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+  app.get('/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: '/?auth_error=domain_not_allowed' }),
+    (req, res) => res.redirect('/')
+  );
+} else {
+  app.get('/auth/google', (req, res) => res.redirect('/?auth_error=provider_not_configured'));
+}
 
-app.get('/auth/microsoft', passport.authenticate('microsoft'));
-app.get('/auth/microsoft/callback',
-  passport.authenticate('microsoft', { failureRedirect: '/?auth_error=domain_not_allowed' }),
-  (req, res) => res.redirect('/')
-);
+if (MICROSOFT_ENABLED) {
+  app.get('/auth/microsoft', passport.authenticate('microsoft'));
+  app.get('/auth/microsoft/callback',
+    passport.authenticate('microsoft', { failureRedirect: '/?auth_error=domain_not_allowed' }),
+    (req, res) => res.redirect('/')
+  );
+} else {
+  app.get('/auth/microsoft', (req, res) => res.redirect('/?auth_error=provider_not_configured'));
+}
 
 app.post('/auth/logout', (req, res, next) => {
   req.logout(err => {

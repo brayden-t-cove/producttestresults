@@ -512,13 +512,15 @@ export default function App() {
   // Auth
   const [currentUser, setCurrentUser] = useState(null);
   const [authEnabled, setAuthEnabled] = useState(false);
+  const [authProviders, setAuthProviders] = useState({});
   const [authLoading, setAuthLoading] = useState(true);
   const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
-    getMe().then(({ user, authEnabled: ae }) => {
+    getMe().then(({ user, authEnabled: ae, providers }) => {
       setCurrentUser(user);
       setAuthEnabled(ae);
+      setAuthProviders(providers || {});
       setAuthLoading(false);
     }).catch(() => setAuthLoading(false));
   }, []);
@@ -696,7 +698,7 @@ export default function App() {
 
   // Gate behind login if auth is enabled and no user
   if (authEnabled && !currentUser) {
-    return <LoginPage />;
+    return <LoginPage providers={authProviders} />;
   }
 
   // Admin panel overlay
