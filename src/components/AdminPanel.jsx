@@ -160,7 +160,6 @@ export default function AdminPanel({ currentUser, onBack }) {
                     <select
                       value={u.entity || ''}
                       onChange={e => handleEntityChange(u.id, e.target.value || null)}
-                      disabled={u.email === currentUser.email}
                       style={{ fontSize: 12 }}
                     >
                       <option value="">— None —</option>
