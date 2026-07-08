@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { CAPABILITY_GROUPS, CATEGORY_LABELS, CATEGORIES } from '../data/capabilities.js';
-import { getDebugInfo, uploadProductImage, deleteProductImage } from '../lib/api.js';
+import { getDebugInfo } from '../lib/api.js';
+
+function toDriveDirectUrl(url) {
+  if (!url) return url;
+  const match = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (match) return `https://lh3.googleusercontent.com/d/${match[1]}`;
+  return url;
+}
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import SpecsForm from './SpecsForm.jsx';
 
@@ -139,7 +146,7 @@ function TabBar({ steps, current, onChange }) {
 
 // ─── Step 1: Basic Info ───────────────────────────────────────────────────────
 
-function StepBasics({ state, set, catalog, product, isEdit, onImageUpload, onImageRemove, uploadingImage }) {
+function StepBasics({ state, set, catalog, product, isEdit }) {
   return (
     <div className="wizard-step-content">
 
@@ -344,29 +351,27 @@ function StepBasics({ state, set, catalog, product, isEdit, onImageUpload, onIma
       {/* Product Image — edit mode only */}
       {isEdit && (
         <div className="form-group">
-          <label>Product Image</label>
-          <div className="product-image-upload">
-            {state.imageUrl ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                <img src={state.imageUrl} alt="Product" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
-                    Change Image
-                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={onImageUpload} />
-                  </label>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={onImageRemove} disabled={uploadingImage}>
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <label className="image-upload-dropzone" style={{ cursor: 'pointer' }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Upload product image</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>PNG, JPG, WEBP up to 5MB</div>
-                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={onImageUpload} />
-                {uploadingImage && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--primary)' }}>Uploading...</div>}
-              </label>
+          <label>Product Image URL</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {state.imageUrl && (
+              <img
+                src={state.imageUrl}
+                alt="Product"
+                style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }}
+                onError={e => { e.target.style.display = 'none'; }}
+              />
+            )}
+            <input
+              type="url"
+              className="form-control"
+              placeholder="Paste image URL or Google Drive share link"
+              value={state.imageUrl || ''}
+              onChange={e => set('imageUrl', toDriveDirectUrl(e.target.value.trim()) || null)}
+            />
+            {state.imageUrl && (
+              <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => set('imageUrl', null)}>
+                Remove image
+              </button>
             )}
           </div>
         </div>
@@ -519,7 +524,6 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [debugInfo, setDebugInfo] = useState(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
 
   function goTo(i) {
     setStep(i);
@@ -540,29 +544,6 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
     else setStep(s => s - 1);
   }
 
-  async function handleImageUpload(e) {
-    const file = e.target.files[0];
-    if (!file || !product?.id) return;
-    setUploadingImage(true);
-    try {
-      const result = await uploadProductImage(product.id, file);
-      set('imageUrl', result.imageUrl);
-    } catch (err) {
-      setError('Failed to upload image: ' + err.message);
-    } finally {
-      setUploadingImage(false);
-    }
-  }
-
-  async function handleImageRemove() {
-    if (!product?.id) return;
-    try {
-      await deleteProductImage(product.id);
-      set('imageUrl', null);
-    } catch (err) {
-      setError('Failed to remove image: ' + err.message);
-    }
-  }
 
   async function handleSave(e) {
     e.preventDefault();
@@ -664,9 +645,6 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
             catalog={catalog}
             product={product}
             isEdit={isEdit}
-            onImageUpload={handleImageUpload}
-            onImageRemove={handleImageRemove}
-            uploadingImage={uploadingImage}
           />
         )}
         {step === 1 && (
