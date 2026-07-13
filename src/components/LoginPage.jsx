@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LaserFlow from './LaserFlow.jsx';
 
 const LOGO_URL = 'https://lh3.googleusercontent.com/d/1z-qNySTnx6Fo9EnmSf0WBsWSMF_P1mBP';
 
@@ -18,6 +19,21 @@ export default function LoginPage({ providers = {} }) {
 
   return (
     <div className="login-page">
+      <LaserFlow
+        color="#38a8f5"
+        wispDensity={1}
+        flowSpeed={0.35}
+        verticalSizing={2}
+        horizontalSizing={0.5}
+        fogIntensity={0.45}
+        fogScale={0.3}
+        wispSpeed={15}
+        wispIntensity={5}
+        flowStrength={0.25}
+        decay={1.1}
+        horizontalBeamOffset={0}
+        verticalBeamOffset={-0.5}
+      />
       <div className="login-card">
         <div className="login-brand">
           {LOGO_URL && <img src={LOGO_URL} alt="Odyssey" className="login-brand-logo" />}
