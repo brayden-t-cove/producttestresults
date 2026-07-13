@@ -292,6 +292,8 @@ select { cursor: pointer; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+  isolation: isolate;
 }
 
 /* ============================================================
@@ -300,7 +302,8 @@ select { cursor: pointer; }
 .top-nav {
   height: 52px;
   min-height: 52px;
-  background: var(--surface);
+  background: rgba(13, 21, 38, 0.82);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;

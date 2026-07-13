@@ -3,6 +3,7 @@ import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, delet
 import { getMe, logout } from './lib/authApi.js';
 import LoginPage from './components/LoginPage.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
+import Particles from './components/Particles.jsx';
 import VendorLibrary from './components/VendorLibrary.jsx';
 import CatalogImport from './components/CatalogImport.jsx';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
@@ -714,6 +715,17 @@ export default function App() {
 
   return (
     <div className="app-layout">
+      <Particles
+        particleCount={300}
+        particleSpread={8}
+        speed={0.12}
+        particleColors={['#1c1ccb', '#00b6ff', '#8c13c2']}
+        moveParticlesOnHover={false}
+        particleBaseSize={60}
+        sizeRandomness={0.7}
+        cameraDistance={20}
+        disableRotation={false}
+      />
       {showSettings && (
         <SettingsModal
           onClose={() => setShowSettings(false)}
