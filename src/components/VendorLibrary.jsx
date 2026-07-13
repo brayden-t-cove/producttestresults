@@ -34,7 +34,7 @@ function VendorFormModal({ vendor, catalog, onSave, onClose }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [newContact, setNewContact] = useState({ name: '', email: '', role: '' });
+  const [newContact, setNewContact] = useState({ name: '', role: '', wechat: '', email: '' });
   const [newCatalog, setNewCatalog] = useState({ label: '', url: '' });
 
   function set(field, value) { setForm(f => ({ ...f, [field]: value })); }
@@ -42,7 +42,7 @@ function VendorFormModal({ vendor, catalog, onSave, onClose }) {
   function addContact() {
     if (!newContact.name.trim()) return;
     set('contacts', [...form.contacts, { ...newContact, id: Date.now().toString() }]);
-    setNewContact({ name: '', email: '', role: '' });
+    setNewContact({ name: '', role: '', wechat: '', email: '' });
   }
   function removeContact(id) { set('contacts', form.contacts.filter(c => c.id !== id)); }
 
@@ -130,14 +130,16 @@ function VendorFormModal({ vendor, catalog, onSave, onClose }) {
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 13 }}>
                 <span style={{ fontWeight: 500, minWidth: 100 }}>{c.name}</span>
                 {c.role && <span style={{ color: 'var(--text-muted)', minWidth: 80 }}>{c.role}</span>}
-                {c.email && <a href={`mailto:${c.email}`} style={{ color: 'var(--primary)', flex: 1 }}>{c.email}</a>}
+                {c.wechat && <span style={{ color: '#07c160', flex: 1 }}>💬 {c.wechat}</span>}
+                {c.email && <a href={`mailto:${c.email}`} style={{ color: 'var(--primary)', flex: c.wechat ? '0 0 auto' : 1 }}>{c.email}</a>}
                 <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)', flexShrink: 0 }} onClick={() => removeContact(c.id)}>✕</button>
               </div>
             ))}
-            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-              <input placeholder="Name" value={newContact.name} onChange={e => setNewContact(v => ({ ...v, name: e.target.value }))} style={{ flex: '0 0 130px' }} />
-              <input placeholder="Role" value={newContact.role} onChange={e => setNewContact(v => ({ ...v, role: e.target.value }))} style={{ flex: '0 0 100px' }} />
-              <input placeholder="Email" value={newContact.email} onChange={e => setNewContact(v => ({ ...v, email: e.target.value }))} style={{ flex: 1 }}
+            <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+              <input placeholder="Name" value={newContact.name} onChange={e => setNewContact(v => ({ ...v, name: e.target.value }))} style={{ flex: '0 0 120px' }} />
+              <input placeholder="Role" value={newContact.role} onChange={e => setNewContact(v => ({ ...v, role: e.target.value }))} style={{ flex: '0 0 90px' }} />
+              <input placeholder="WeChat ID" value={newContact.wechat} onChange={e => setNewContact(v => ({ ...v, wechat: e.target.value }))} style={{ flex: '0 0 120px' }} />
+              <input placeholder="Email (optional)" value={newContact.email} onChange={e => setNewContact(v => ({ ...v, email: e.target.value }))} style={{ flex: 1, minWidth: 140 }}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addContact())} />
               <button type="button" className="btn btn-secondary btn-sm" onClick={addContact}>Add</button>
             </div>
@@ -226,7 +228,8 @@ function VendorDetail({ vendor, catalog, onEdit, onDelete, onBack }) {
               {vendor.contacts.map(c => (
                 <div key={c.id} style={{ fontSize: 13 }}>
                   <div style={{ fontWeight: 600 }}>{c.name}{c.role && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>· {c.role}</span>}</div>
-                  {c.email && <a href={`mailto:${c.email}`} style={{ color: 'var(--primary)', fontSize: 12 }}>{c.email}</a>}
+                  {c.wechat && <div style={{ color: '#07c160', fontSize: 12, marginTop: 2 }}>💬 {c.wechat}</div>}
+                  {c.email && <div style={{ marginTop: 1 }}><a href={`mailto:${c.email}`} style={{ color: 'var(--primary)', fontSize: 12 }}>{c.email}</a></div>}
                 </div>
               ))}
             </div>
