@@ -335,6 +335,7 @@ export default function VendorLibrary({ catalog = [], onBack }) {
 
       <div className="dashboard-header">
         <div>
+          {onBack && <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 8 }}>← Back to Home</button>}
           <h1>Vendor Library</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>
             Companies you work with, evaluate, or want to do business with
