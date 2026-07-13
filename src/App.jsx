@@ -368,7 +368,7 @@ function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors }) {
         <h1 className="home-hero-title">Odyssey</h1>
         <p className="home-hero-subtitle">Security hardware testing &amp; evaluation</p>
       </div>
-      <div className="home-astronaut" aria-hidden="true">🧑‍🚀</div>
+      <img className="home-astronaut" src="https://lh3.googleusercontent.com/d/1gp3c55_xy2LLlmeSg0A8owuEKlz_wWVG" alt="" aria-hidden="true" />
       <div className="home-cards-grid">
         <div className="home-card" onClick={onCatalog}>
           <div className="home-card-icon"><IconCardCatalog /></div>

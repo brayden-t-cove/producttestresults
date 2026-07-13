@@ -757,15 +757,16 @@ select { cursor: pointer; }
 
 .home-astronaut {
   position: fixed;
-  font-size: 2.4rem;
-  top: 38%;
+  width: 130px;
+  top: 32%;
   left: 0;
   pointer-events: none;
   z-index: 1;
   animation: astronautDrift 22s ease-in-out infinite;
   animation-delay: 4s;
   opacity: 0;
-  filter: drop-shadow(0 0 8px rgba(56,168,245,0.4));
+  mix-blend-mode: multiply;
+  filter: brightness(0.82) drop-shadow(0 0 6px rgba(56,168,245,0.25));
 }
 
 /* ============================================================
