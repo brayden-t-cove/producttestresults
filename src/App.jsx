@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, deleteSession, getSettings, saveSettings, getSpecSchema, saveSpecSchema, getCertSchema, saveCertSchema } from './lib/api.js';
 import { getMe, logout } from './lib/authApi.js';
 import LoginPage from './components/LoginPage.jsx';
@@ -23,6 +23,8 @@ import IssuesPage from './components/IssuesPage.jsx';
 import SchemaEditor from './components/SchemaEditor.jsx';
 import CertEditor from './components/CertEditor.jsx';
 import ProductDetail from './components/ProductDetail.jsx';
+
+const LOGO_URL = 'https://lh3.googleusercontent.com/d/1z-qNySTnx6Fo9EnmSf0WBsWSMF_P1mBP';
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
 
@@ -82,7 +84,7 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
   return (
     <nav className="top-nav">
       <div className="top-nav-brand">
-        <span className="top-nav-brand-dot" />
+        <img src={LOGO_URL} alt="Odyssey" className="top-nav-brand-logo" />
         Odyssey
       </div>
       <div className="top-nav-links">
@@ -360,38 +362,37 @@ const IconCardVendors = () => (
 
 function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors }) {
   return (
-    <div className="dashboard">
-      <div className="dashboard-header">
-        <div>
-          <h1>Odyssey</h1>
-          <p>Security hardware testing &amp; evaluation</p>
-        </div>
+    <div className="dashboard home-dashboard">
+      <div className="home-hero">
+        <img src={LOGO_URL} alt="Odyssey" className="home-hero-logo" />
+        <h1 className="home-hero-title">Odyssey</h1>
+        <p className="home-hero-subtitle">Security hardware testing &amp; evaluation</p>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginTop: 8 }}>
-        <div className="session-type-card" onClick={onCatalog} style={{ cursor: 'pointer', padding: '20px 20px' }}>
-          <div style={{ marginBottom: 14 }}><IconCardCatalog /></div>
-          <h3 style={{ marginBottom: 6 }}>Product Catalog</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>Manage and browse your product inventory</p>
+      <div className="home-cards-grid">
+        <div className="home-card" onClick={onCatalog}>
+          <div className="home-card-icon"><IconCardCatalog /></div>
+          <h3 className="home-card-title">Product Catalog</h3>
+          <p className="home-card-desc">Manage and browse your product inventory</p>
         </div>
-        <div className="session-type-card" onClick={onTesting} style={{ cursor: 'pointer', padding: '20px 20px' }}>
-          <div style={{ marginBottom: 14 }}><IconCardTesting /></div>
-          <h3 style={{ marginBottom: 6 }}>Product Testing</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>Run test sessions and track results</p>
+        <div className="home-card" onClick={onTesting}>
+          <div className="home-card-icon"><IconCardTesting /></div>
+          <h3 className="home-card-title">Product Testing</h3>
+          <p className="home-card-desc">Run test sessions and track results</p>
         </div>
-        <div className="session-type-card" onClick={onVendors} style={{ cursor: 'pointer', padding: '20px 20px' }}>
-          <div style={{ marginBottom: 14 }}><IconCardVendors /></div>
-          <h3 style={{ marginBottom: 6 }}>Vendor Library</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>Track companies, catalog links, and contacts</p>
+        <div className="home-card" onClick={onVendors}>
+          <div className="home-card-icon"><IconCardVendors /></div>
+          <h3 className="home-card-title">Vendor Library</h3>
+          <p className="home-card-desc">Track companies, catalog links, and contacts</p>
         </div>
-        <div className="session-type-card" onClick={onIssues} style={{ cursor: 'pointer', padding: '20px 20px' }}>
-          <div style={{ marginBottom: 14 }}><IconCardIssues /></div>
-          <h3 style={{ marginBottom: 6 }}>Issues</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>View and track all open issues</p>
+        <div className="home-card" onClick={onIssues}>
+          <div className="home-card-icon"><IconCardIssues /></div>
+          <h3 className="home-card-title">Issues</h3>
+          <p className="home-card-desc">View and track all open issues</p>
         </div>
-        <div className="session-type-card" onClick={onAnalytics} style={{ cursor: 'pointer', padding: '20px 20px' }}>
-          <div style={{ marginBottom: 14 }}><IconCardAnalytics /></div>
-          <h3 style={{ marginBottom: 6 }}>Analytics</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>Pass rates, trends, and team metrics</p>
+        <div className="home-card" onClick={onAnalytics}>
+          <div className="home-card-icon"><IconCardAnalytics /></div>
+          <h3 className="home-card-title">Analytics</h3>
+          <p className="home-card-desc">Pass rates, trends, and team metrics</p>
         </div>
       </div>
     </div>
@@ -422,6 +423,7 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewC
     <div className="dashboard">
       <div className="dashboard-header">
         <div>
+          {onBack && <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 8 }}>← Back to Home</button>}
           <h1>Product Testing</h1>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -752,7 +754,7 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      <div key={view} className="view-content">
+      <div key={view} className="view-content fade-view">
 
       {view === 'dashboard' && (
         <HomePage
