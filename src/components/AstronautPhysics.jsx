@@ -3,8 +3,8 @@ import { useEffect, useRef } from 'react';
 const IMG_URL = 'https://lh3.googleusercontent.com/d/1gp3c55_xy2LLlmeSg0A8owuEKlz_wWVG';
 const SIZE = 120;
 const REPEL_RADIUS = 150;
-const REPEL_FORCE = 0.6;
-const DAMPING = 0.995;
+const REPEL_FORCE = 0.7;
+const DAMPING = 0.9992;
 const OFFSCREEN_PAD = SIZE + 40;
 
 function randomEdgeSpawn() {
@@ -12,10 +12,10 @@ function randomEdgeSpawn() {
   const h = window.innerHeight;
   const edge = Math.floor(Math.random() * 4);
   switch (edge) {
-    case 0: return { x: Math.random() * w, y: -OFFSCREEN_PAD,     vx: (Math.random() - 0.5) * 0.6, vy:  0.5 + Math.random() * 0.4 };
-    case 1: return { x: w + OFFSCREEN_PAD,  y: Math.random() * h,  vx: -(0.5 + Math.random() * 0.4), vy: (Math.random() - 0.5) * 0.6 };
-    case 2: return { x: Math.random() * w, y: h + OFFSCREEN_PAD,   vx: (Math.random() - 0.5) * 0.6, vy: -(0.5 + Math.random() * 0.4) };
-    default: return { x: -OFFSCREEN_PAD,   y: Math.random() * h,   vx:  0.5 + Math.random() * 0.4,  vy: (Math.random() - 0.5) * 0.6 };
+    case 0: return { x: Math.random() * w, y: -OFFSCREEN_PAD,     vx: (Math.random() - 0.5) * 1.2, vy:  1.4 + Math.random() * 0.8 };
+    case 1: return { x: w + OFFSCREEN_PAD,  y: Math.random() * h,  vx: -(1.4 + Math.random() * 0.8), vy: (Math.random() - 0.5) * 1.2 };
+    case 2: return { x: Math.random() * w, y: h + OFFSCREEN_PAD,   vx: (Math.random() - 0.5) * 1.2, vy: -(1.4 + Math.random() * 0.8) };
+    default: return { x: -OFFSCREEN_PAD,   y: Math.random() * h,   vx:  1.4 + Math.random() * 0.8,  vy: (Math.random() - 0.5) * 1.2 };
   }
 }
 
