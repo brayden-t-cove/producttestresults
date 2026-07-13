@@ -796,6 +796,7 @@ export default function App() {
             onBack={() => setView('dashboard')}
             onView={handleOpenProduct}
             onImport={() => setView('catalogImport')}
+            canEdit={canEdit}
           />
         </div>
       )}
@@ -838,6 +839,7 @@ export default function App() {
             }}
             catalog={catalog}
             onViewProduct={handleOpenProduct}
+            canEdit={canEdit}
           />
         </div>
       )}

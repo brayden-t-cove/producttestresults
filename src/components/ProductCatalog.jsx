@@ -196,7 +196,7 @@ function CollapsibleStatusGroup({ status, items, defaultOpen, renderCard }) {
   );
 }
 
-export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView, onImport }) {
+export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView, onImport, canEdit = true }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [openSpecsId, setOpenSpecsId] = useState(null);
   const [showExport, setShowExport] = useState(false);
@@ -286,14 +286,16 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
           <button className="btn btn-secondary btn-sm" onClick={() => setShowExport(true)}>
             ↓ Export
           </button>
-          {onImport && (
+          {canEdit && onImport && (
             <button className="btn btn-secondary btn-sm" onClick={onImport}>
               ↑ Bulk Import
             </button>
           )}
-          <button className="btn btn-primary btn-lg" onClick={onAdd}>
-            + Add Product
-          </button>
+          {canEdit && (
+            <button className="btn btn-primary btn-lg" onClick={onAdd}>
+              + Add Product
+            </button>
+          )}
         </div>
       </div>
 
@@ -392,9 +394,11 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
         <div className="empty-state">
           <h3>No products yet</h3>
           <p>No products yet — add your first product to get started.</p>
-          <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={onAdd}>
-            + Add Product
-          </button>
+          {canEdit && (
+            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={onAdd}>
+              + Add Product
+            </button>
+          )}
         </div>
       ) : pageFiltered.length === 0 ? (
         <div className="empty-state">
@@ -532,8 +536,8 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                         </button>
                       )
                     )}
-                    <button className="btn btn-secondary btn-sm" onClick={() => onEdit(product)}>Edit</button>
-                    <button className="btn btn-secondary btn-sm" title="Duplicate as new version" onClick={() => onDuplicate(product, incrementVersion(product.version))}>⧉ Duplicate</button>
+                    {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => onEdit(product)}>Edit</button>}
+                    {canEdit && <button className="btn btn-secondary btn-sm" title="Duplicate as new version" onClick={() => onDuplicate(product, incrementVersion(product.version))}>⧉ Duplicate</button>}
                     <button
                       className="btn btn-ghost btn-sm"
                       title="View technical specifications"
@@ -542,7 +546,7 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                     >
                       {openSpecsId === product.id ? '▾ Specs' : '▸ Specs'}
                     </button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteClick(product)}>Delete</button>
+                    {canEdit && <button className="btn btn-danger btn-sm" onClick={() => handleDeleteClick(product)}>Delete</button>}
                   </div>
                   {openSpecsId === product.id && (
                     <div className="spec-sheet-panel">

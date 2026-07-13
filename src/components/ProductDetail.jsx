@@ -748,7 +748,7 @@ function PdfExportModal({ product, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate, catalog, onViewProduct }) {
+export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate, catalog, onViewProduct, canEdit = true }) {
   const [activeTab, setActiveTab] = useState('Tech Specs');
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [comparisons, setComparisons] = useState([]);
@@ -807,8 +807,8 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
           <button className="btn btn-secondary btn-sm" onClick={() => setShowPdfModal(true)}>
             🖨 Export PDF
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={onEdit}>Edit Product</button>
-          <button className="btn btn-danger btn-sm" onClick={onDelete}>Delete</button>
+          {canEdit && <button className="btn btn-ghost btn-sm" onClick={onEdit}>Edit Product</button>}
+          {canEdit && <button className="btn btn-danger btn-sm" onClick={onDelete}>Delete</button>}
         </div>
       </div>
 
