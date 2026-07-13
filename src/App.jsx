@@ -82,7 +82,7 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
     <nav className="top-nav">
       <div className="top-nav-brand">
         <span className="top-nav-brand-dot" />
-        Product Platform
+        Odyssey
       </div>
       <div className="top-nav-links">
         <button className={`top-nav-link${active === 'dashboard' ? ' active' : ''}`} onClick={onDashboard}>
@@ -362,7 +362,7 @@ function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors }) {
     <div className="dashboard">
       <div className="dashboard-header">
         <div>
-          <h1>Product Platform</h1>
+          <h1>Odyssey</h1>
           <p>Security hardware testing &amp; evaluation</p>
         </div>
       </div>

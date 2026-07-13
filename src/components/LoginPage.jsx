@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 
+// Swap this URL once the logo is hosted (Google Drive direct link or CDN)
+const LOGO_URL = null;
+
 export default function LoginPage({ providers = {} }) {
   const [authError, setAuthError] = useState('');
 
@@ -18,8 +21,9 @@ export default function LoginPage({ providers = {} }) {
     <div className="login-page">
       <div className="login-card">
         <div className="login-brand">
-          <div className="login-brand-dot" />
-          <span className="login-brand-name">Product Platform</span>
+          {LOGO_URL && <img src={LOGO_URL} alt="Odyssey" className="login-brand-logo" />}
+          <span className="login-brand-name">Odyssey</span>
+          <span className="login-brand-tagline">Explore. Connect. Secure.</span>
         </div>
 
         <h1 className="login-title">Welcome back</h1>
