@@ -1,43 +1,43 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 const IMG_URL = 'https://lh3.googleusercontent.com/d/1gp3c55_xy2LLlmeSg0A8owuEKlz_wWVG';
 const SIZE = 120;
-const REPEL_RADIUS = 140;
-const REPEL_FORCE = 0.55;
-const DAMPING = 0.995; // near-zero drag — space-like
+const REPEL_RADIUS = 150;
+const REPEL_FORCE = 0.6;
+const DAMPING = 0.995;
 const OFFSCREEN_PAD = SIZE + 40;
 
 function randomEdgeSpawn() {
-  const edge = Math.floor(Math.random() * 4);
   const w = window.innerWidth;
   const h = window.innerHeight;
+  const edge = Math.floor(Math.random() * 4);
   switch (edge) {
-    case 0: return { x: Math.random() * w, y: -OFFSCREEN_PAD, vx: (Math.random() - 0.5) * 0.6, vy: 0.4 + Math.random() * 0.4 };
-    case 1: return { x: w + OFFSCREEN_PAD,  y: Math.random() * h, vx: -(0.4 + Math.random() * 0.4), vy: (Math.random() - 0.5) * 0.6 };
-    case 2: return { x: Math.random() * w, y: h + OFFSCREEN_PAD, vx: (Math.random() - 0.5) * 0.6, vy: -(0.4 + Math.random() * 0.4) };
-    default: return { x: -OFFSCREEN_PAD, y: Math.random() * h, vx: 0.4 + Math.random() * 0.4, vy: (Math.random() - 0.5) * 0.6 };
+    case 0: return { x: Math.random() * w, y: -OFFSCREEN_PAD,     vx: (Math.random() - 0.5) * 0.6, vy:  0.5 + Math.random() * 0.4 };
+    case 1: return { x: w + OFFSCREEN_PAD,  y: Math.random() * h,  vx: -(0.5 + Math.random() * 0.4), vy: (Math.random() - 0.5) * 0.6 };
+    case 2: return { x: Math.random() * w, y: h + OFFSCREEN_PAD,   vx: (Math.random() - 0.5) * 0.6, vy: -(0.5 + Math.random() * 0.4) };
+    default: return { x: -OFFSCREEN_PAD,   y: Math.random() * h,   vx:  0.5 + Math.random() * 0.4,  vy: (Math.random() - 0.5) * 0.6 };
   }
 }
 
 export default function AstronautPhysics() {
+  const imgRef = useRef(null);
   const stateRef = useRef(null);
   const mouseRef = useRef({ x: -9999, y: -9999 });
   const rafRef = useRef(null);
-  const [pos, setPos] = useState({ x: -OFFSCREEN_PAD, y: -OFFSCREEN_PAD, angle: 0 });
 
   useEffect(() => {
-    // Spawn after a short delay so the page settles first
     const spawnTimer = setTimeout(() => {
       const s = randomEdgeSpawn();
-      stateRef.current = { ...s, angle: Math.random() * 360, spin: (Math.random() - 0.5) * 0.3 };
-    }, 3000);
+      stateRef.current = { ...s, angle: Math.random() * 360, spin: (Math.random() - 0.5) * 0.4 };
+    }, 2500);
 
     const onMouseMove = e => { mouseRef.current = { x: e.clientX, y: e.clientY }; };
     window.addEventListener('mousemove', onMouseMove);
 
     function tick() {
       const s = stateRef.current;
-      if (s) {
+      const el = imgRef.current;
+      if (s && el) {
         const cx = s.x + SIZE / 2;
         const cy = s.y + SIZE / 2;
         const dx = cx - mouseRef.current.x;
@@ -48,7 +48,7 @@ export default function AstronautPhysics() {
           const strength = REPEL_FORCE * (1 - dist / REPEL_RADIUS);
           s.vx += (dx / dist) * strength;
           s.vy += (dy / dist) * strength;
-          s.spin += (Math.random() - 0.5) * 0.15;
+          s.spin += (Math.random() - 0.5) * 0.2;
         }
 
         s.vx *= DAMPING;
@@ -58,7 +58,11 @@ export default function AstronautPhysics() {
         s.y += s.vy;
         s.angle += s.spin;
 
-        // Respawn when fully off-screen
+        // Direct DOM update — no React re-render overhead
+        el.style.left = s.x + 'px';
+        el.style.top  = s.y + 'px';
+        el.style.transform = `rotate(${s.angle}deg)`;
+
         const w = window.innerWidth;
         const h = window.innerHeight;
         if (s.x > w + OFFSCREEN_PAD || s.x < -OFFSCREEN_PAD * 2 ||
@@ -67,10 +71,8 @@ export default function AstronautPhysics() {
           s.x = next.x; s.y = next.y;
           s.vx = next.vx; s.vy = next.vy;
           s.angle = Math.random() * 360;
-          s.spin = (Math.random() - 0.5) * 0.3;
+          s.spin = (Math.random() - 0.5) * 0.4;
         }
-
-        setPos({ x: s.x, y: s.y, angle: s.angle });
       }
       rafRef.current = requestAnimationFrame(tick);
     }
@@ -86,6 +88,7 @@ export default function AstronautPhysics() {
 
   return (
     <img
+      ref={imgRef}
       src={IMG_URL}
       alt=""
       aria-hidden="true"
@@ -94,14 +97,12 @@ export default function AstronautPhysics() {
         width: SIZE,
         height: SIZE,
         objectFit: 'contain',
-        left: pos.x,
-        top: pos.y,
-        transform: `rotate(${pos.angle}deg)`,
+        left: -OFFSCREEN_PAD,
+        top: -OFFSCREEN_PAD,
         pointerEvents: 'none',
         zIndex: 1,
-        opacity: 0.55,
-        mixBlendMode: 'multiply',
-        filter: 'brightness(0.85) drop-shadow(0 0 6px rgba(56,168,245,0.2))',
+        opacity: 0.45,
+        filter: 'drop-shadow(0 0 6px rgba(56,168,245,0.25))',
         willChange: 'transform, left, top',
       }}
     />
