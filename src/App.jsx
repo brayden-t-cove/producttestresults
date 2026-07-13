@@ -716,13 +716,13 @@ export default function App() {
   return (
     <div className="app-layout">
       <Particles
-        particleCount={300}
-        particleSpread={8}
+        particleCount={1000}
+        particleSpread={10}
         speed={0.12}
-        particleColors={['#1c1ccb', '#00b6ff', '#8c13c2']}
+        particleColors={['#1c1ccb', '#00b6ff', '#8c13c2', '#0e4aff', '#38a8f5', '#6a00d4']}
         moveParticlesOnHover={false}
-        particleBaseSize={60}
-        sizeRandomness={0.7}
+        particleBaseSize={120}
+        particleSizeRange={[2, 4]}
         cameraDistance={20}
         disableRotation={false}
       />

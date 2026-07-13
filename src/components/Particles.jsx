@@ -10,14 +10,15 @@ function hexToRgb(hex) {
 }
 
 export default function Particles({
-  particleCount = 300,
+  particleCount = 800,
   particleSpread = 8,
   speed = 0.12,
   particleColors = ['#1c1ccb', '#00b6ff', '#8c13c2'],
   moveParticlesOnHover = false,
   particleHoverFactor = 1,
   alphaParticles = false,
-  particleBaseSize = 60,
+  particleBaseSize = 120,
+  particleSizeRange = [1, 4], // min/max multiplier applied on top of baseSize
   sizeRandomness = 0.7,
   cameraDistance = 20,
   disableRotation = false,
@@ -56,7 +57,8 @@ export default function Particles({
       const phi = Math.acos(2 * Math.random() - 1);
       const r = Math.pow(Math.random(), 0.5) * particleSpread;
       const color = colors[Math.floor(Math.random() * colors.length)];
-      const sizeMult = 1 - sizeRandomness * Math.random();
+      const [minS, maxS] = particleSizeRange;
+      const sizeMult = minS + Math.random() * (maxS - minS);
       return {
         x: r * Math.sin(phi) * Math.cos(theta),
         y: r * Math.sin(phi) * Math.sin(theta),
@@ -159,8 +161,8 @@ export default function Particles({
       if (moveParticlesOnHover) canvas.removeEventListener('mousemove', onMouseMove);
     };
   }, [particleCount, particleSpread, speed, particleColors, moveParticlesOnHover,
-      particleHoverFactor, alphaParticles, particleBaseSize, sizeRandomness,
-      cameraDistance, disableRotation]);
+      particleHoverFactor, alphaParticles, particleBaseSize, particleSizeRange,
+      sizeRandomness, cameraDistance, disableRotation]);
 
   return (
     <canvas
