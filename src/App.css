@@ -745,6 +745,29 @@ select { cursor: pointer; }
   line-height: 1.55;
 }
 
+/* ── Floating astronaut ── */
+@keyframes astronautDrift {
+  0%   { transform: translateX(-120px) translateY(0px) rotate(-8deg); opacity: 0; }
+  5%   { opacity: 1; }
+  45%  { transform: translateX(42vw) translateY(-28px) rotate(4deg); }
+  55%  { transform: translateX(58vw) translateY(12px) rotate(-2deg); }
+  92%  { opacity: 1; }
+  100% { transform: translateX(calc(100vw + 120px)) translateY(-10px) rotate(10deg); opacity: 0; }
+}
+
+.home-astronaut {
+  position: fixed;
+  font-size: 2.4rem;
+  top: 38%;
+  left: 0;
+  pointer-events: none;
+  z-index: 1;
+  animation: astronautDrift 22s ease-in-out infinite;
+  animation-delay: 4s;
+  opacity: 0;
+  filter: drop-shadow(0 0 8px rgba(56,168,245,0.4));
+}
+
 /* ============================================================
    DASHBOARD
    ============================================================ */
