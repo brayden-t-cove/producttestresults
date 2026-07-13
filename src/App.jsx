@@ -4,6 +4,7 @@ import { getMe, logout } from './lib/authApi.js';
 import LoginPage from './components/LoginPage.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
 import Particles from './components/Particles.jsx';
+import AstronautPhysics from './components/AstronautPhysics.jsx';
 import VendorLibrary from './components/VendorLibrary.jsx';
 import CatalogImport from './components/CatalogImport.jsx';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
@@ -368,7 +369,7 @@ function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors }) {
         <h1 className="home-hero-title">Odyssey</h1>
         <p className="home-hero-subtitle">Security hardware testing &amp; evaluation</p>
       </div>
-      <img className="home-astronaut" src="https://lh3.googleusercontent.com/d/1gp3c55_xy2LLlmeSg0A8owuEKlz_wWVG" alt="" aria-hidden="true" />
+      <AstronautPhysics />
       <div className="home-cards-grid">
         <div className="home-card" onClick={onCatalog}>
           <div className="home-card-icon"><IconCardCatalog /></div>
