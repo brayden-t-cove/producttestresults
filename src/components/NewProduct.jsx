@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CAPABILITY_GROUPS, CATEGORY_LABELS, CATEGORIES } from '../data/capabilities.js';
-import { getDebugInfo } from '../lib/api.js';
+import { getDebugInfo, getCatalogParents } from '../lib/api.js';
+
+const CAMERA_CATEGORIES = new Set(['Indoor Camera', 'Outdoor Camera', 'Doorbell Camera', 'Floodlight Camera', 'PTZ Camera', 'Indoor', 'Outdoor', 'Doorbell', 'Floodlight']);
 
 function toDriveDirectUrl(url) {
   if (!url) return url;
@@ -335,6 +337,20 @@ function StepBasics({ state, set, catalog, product, isEdit }) {
         </div>
       )}
 
+      {/* Variation Label — shown when linked to a parent platform model */}
+      {state.parentId && (
+        <div className="form-group">
+          <label>Variation Label</label>
+          <input
+            className="form-control"
+            placeholder="e.g. Dual Band + BLE, Single Band, 4MP"
+            value={state.variationLabel || ''}
+            onChange={e => set('variationLabel', e.target.value)}
+          />
+          <div className="form-hint">Short description of what makes this variation distinct from the base model.</div>
+        </div>
+      )}
+
       {/* Replaces Product */}
       <div className="form-group">
         <label>Replaces Product <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — for hardware revisions)</span></label>
@@ -483,8 +499,18 @@ function StepCapabilities({ state, set }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function NewProduct({ product, onSave, onBack, catalog, specSchema: specSchemaProp }) {
+export default function NewProduct({ product, onSave, onBack, catalog, specSchema: specSchemaProp, currentUser }) {
   const isEdit = !!product;
+
+  // Parent search gate (new products only)
+  const [parentSearchDone, setParentSearchDone] = useState(isEdit);
+  const [parentModels, setParentModels] = useState([]);
+  const [parentSearch, setParentSearch] = useState('');
+  const [selectedParentId, setSelectedParentId] = useState(null);
+
+  useEffect(() => {
+    if (!isEdit) getCatalogParents().then(setParentModels).catch(() => {});
+  }, [isEdit]);
 
   // All form state in one object for easy prop-drilling
   const [state, setState] = useState({
@@ -505,6 +531,8 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
     entity:            product?.entity || [],
     productType:       product?.type || 'production',
     imageUrl:          product?.imageUrl || null,
+    parentId:          product?.parentId || null,
+    variationLabel:    product?.variationLabel || '',
   });
 
   function set(key, value) {
@@ -577,6 +605,8 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         imageUrl:         state.imageUrl,
         entity:           state.entity,
         type:             state.productType,
+        parentId:         state.parentId || undefined,
+        variationLabel:   state.variationLabel || undefined,
       });
     } catch (err) {
       setError(err.message || 'Failed to save product.');
@@ -587,6 +617,71 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
 
   const isLastStep = step === STEPS.length - 1;
 
+  // ── Parent search gate (new products only) ──────────────────────────────
+  if (!isEdit && !parentSearchDone) {
+    const filtered = parentModels.filter(p =>
+      !parentSearch ||
+      (p.name || '').toLowerCase().includes(parentSearch.toLowerCase()) ||
+      (p.modelNumber || '').toLowerCase().includes(parentSearch.toLowerCase()) ||
+      (p.category || '').toLowerCase().includes(parentSearch.toLowerCase())
+    );
+    return (
+      <div className="new-product-page">
+        <div className="new-product-header">
+          <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>← Cancel</button>
+          <h1>New Product</h1>
+        </div>
+        <div style={{ maxWidth: 560 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>Is this based on an existing platform model?</h2>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
+            Search existing hardware platforms before creating a new entry. If your product runs on a known platform, link it as a variation. For sensors, hubs, or touchpads, skip this step.
+          </p>
+          <input
+            className="form-control"
+            placeholder="Search by name, model number, or category..."
+            value={parentSearch}
+            onChange={e => setParentSearch(e.target.value)}
+            autoFocus
+            style={{ marginBottom: 16 }}
+          />
+          {filtered.length > 0 && (
+            <div style={{ maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+              {filtered.map(p => (
+                <div
+                  key={p.id}
+                  className={`parent-model-card${selectedParentId === p.id ? ' selected' : ''}`}
+                  onClick={() => setSelectedParentId(prev => prev === p.id ? null : p.id)}
+                >
+                  {p.imageUrl && (
+                    <img src={p.imageUrl} alt="" onError={e => { e.target.style.display = 'none'; }} />
+                  )}
+                  <div className="parent-model-card-info">
+                    <div className="parent-model-card-name">{p.name || p.modelNumber}</div>
+                    <div className="parent-model-card-meta">{[p.category, p.subclass, p.manufacturer].filter(Boolean).join(' · ')}</div>
+                  </div>
+                  {selectedParentId === p.id && <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: 18 }}>✓</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {parentSearch && filtered.length === 0 && (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>No matching platform models found.</div>
+          )}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" onClick={() => { setSelectedParentId(null); set('parentId', null); setParentSearchDone(true); }}>
+              Skip — Not a platform variation
+            </button>
+            {selectedParentId && (
+              <button className="btn btn-primary" onClick={() => { set('parentId', selectedParentId); setParentSearchDone(true); }}>
+                Continue as Variation →
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="new-product-page">
       <div className="new-product-header">
@@ -595,6 +690,13 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         </button>
         <h1>{isEdit ? 'Edit Product' : 'New Product'}</h1>
       </div>
+
+      {/* Pending review notice */}
+      {product?.status === 'pending_review' && (
+        <div className="pending-review-banner">
+          ⏳ This product is pending superuser review before it appears in the catalog.
+        </div>
+      )}
 
       {/* Step indicator (create) or tab bar (edit) */}
       {isEdit ? (

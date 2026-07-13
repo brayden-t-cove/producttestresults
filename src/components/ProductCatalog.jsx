@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { CATEGORY_LABELS } from '../data/capabilities.js';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import { exportCatalogCsv, exportCatalogJson } from '../lib/api.js';
@@ -131,6 +131,7 @@ const STATUS_LABELS = {
   'on-hold': 'On Hold',
   'under-evaluation': 'Under Evaluation',
   'rejected': 'Rejected',
+  'pending_review': 'Pending Review',
 };
 
 const STATUS_COLORS = {
@@ -142,6 +143,7 @@ const STATUS_COLORS = {
   'on-hold': '#94a3b8',
   'under-evaluation': '#a78bfa',
   'rejected': '#f43f5e',
+  'pending_review': '#f59e0b',
 };
 
 // Production: type=production, status is live/shipped
@@ -204,8 +206,14 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
+  const variationCounts = useMemo(() => {
+    const counts = {};
+    products.forEach(p => { if (p.parentId) counts[p.parentId] = (counts[p.parentId] || 0) + 1; });
+    return counts;
+  }, [products]);
+
   const categories = ['all', ...Object.keys(CATEGORY_LABELS).filter(cat => products.some(p => p.category === cat))];
-  const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = [...products].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const searched = search.trim()
     ? sorted.filter(p => {
         const q = search.toLowerCase();
@@ -445,6 +453,20 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                           <span style={{ marginLeft: 6, color: 'var(--primary)', fontWeight: 500, fontSize: 11 }}>· {product.subclass}</span>
                         )}
                       </div>
+                      {variationCounts[product.id] > 0 && (
+                        <div style={{ marginTop: 3 }}>
+                          <span className="variation-badge">{variationCounts[product.id]} variation{variationCounts[product.id] !== 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+                      {product.parentId && (() => {
+                        const parent = products.find(x => x.id === product.parentId);
+                        return parent ? (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                            Variation of {parent.name || parent.modelNumber}
+                            {product.variationLabel && <span style={{ fontStyle: 'italic' }}> · {product.variationLabel}</span>}
+                          </div>
+                        ) : null;
+                      })()}
                       {(product.entity || []).length > 0 && (
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
                           {product.entity.map(e => (

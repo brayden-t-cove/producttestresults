@@ -678,7 +678,32 @@ function KnownIssuesTab({ product, onOpenSession }) {
   );
 }
 
-const TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Media & Documents', 'Project Docs'];
+const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Media & Documents', 'Project Docs'];
+
+function VariationsTab({ variations, onViewProduct }) {
+  if (variations.length === 0) {
+    return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>No variations registered for this model.</div>;
+  }
+  return (
+    <div className="variations-list">
+      {variations.map(v => (
+        <div key={v.id} className="variation-row">
+          {v.imageUrl && (
+            <img src={v.imageUrl} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+              onError={e => { e.target.style.display = 'none'; }} />
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="variation-row-label">{v.variationLabel || v.name || v.modelNumber || 'Unnamed Variation'}</div>
+            <div className="variation-row-meta">{[v.modelNumber, v.status].filter(Boolean).join(' · ')}</div>
+          </div>
+          {onViewProduct && (
+            <button className="btn btn-secondary btn-sm" onClick={() => onViewProduct(v)}>View</button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function PdfExportModal({ product, onClose }) {
   const [hideOem, setHideOem] = useState(false);
@@ -727,6 +752,10 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
   const [activeTab, setActiveTab] = useState('Tech Specs');
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [comparisons, setComparisons] = useState([]);
+
+  const variationProducts = (catalog || []).filter(p => p.parentId === product.id);
+  const tabs = [...BASE_TABS, ...(variationProducts.length > 0 ? ['Variations'] : [])];
+  const parentProduct = product.parentId ? (catalog || []).find(p => p.id === product.parentId) : null;
 
   useEffect(() => {
     listComparisons(product.id).then(setComparisons).catch(() => {});
@@ -783,6 +812,16 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
         </div>
       </div>
 
+      {parentProduct && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: 12, marginBottom: 12 }}>
+          <span style={{ color: 'var(--text-muted)' }}>Platform model:</span>
+          <button className="btn btn-ghost btn-sm" style={{ padding: '0 4px', fontSize: 12, fontWeight: 600 }}
+            onClick={() => onViewProduct && onViewProduct(parentProduct)}>
+            {parentProduct.name || parentProduct.modelNumber}
+          </button>
+          {product.variationLabel && <span style={{ color: 'var(--text-muted)' }}>· {product.variationLabel}</span>}
+        </div>
+      )}
       {(product.replacesProductId || product.supersededBy) && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
           {product.replacesProductId && (() => {
@@ -819,13 +858,17 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       )}
 
       <div className="product-tabs">
-        {TABS.map(tab => (
+        {tabs.map(tab => (
           <button
             key={tab}
             className={`product-tab${activeTab === tab ? ' active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab}
+            {tab}{tab === 'Variations' && variationProducts.length > 0 && (
+              <span style={{ marginLeft: 6, background: 'var(--primary)', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px' }}>
+                {variationProducts.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -836,6 +879,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Known Issues' && <KnownIssuesTab product={product} onOpenSession={onOpenSession} />}
       {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} />}
       {activeTab === 'Project Docs' && <ProjectDocsTab product={product} onProductUpdate={onProductUpdate} />}
+      {activeTab === 'Variations' && <VariationsTab variations={variationProducts} onViewProduct={onViewProduct} />}
     </div>
   );
 }

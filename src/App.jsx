@@ -869,6 +869,7 @@ export default function App() {
             onBack={() => setView('catalog')}
             catalog={catalog}
             specSchema={specSchema}
+            currentUser={currentUser}
           />
         </div>
       )}

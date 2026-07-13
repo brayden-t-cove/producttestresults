@@ -4,6 +4,7 @@ import {
   adminGetDomains, adminCreateDomain, adminDeleteDomain,
   adminGetDomainRequests, adminApproveDomainRequest, adminDenyDomainRequest,
 } from '../lib/authApi.js';
+import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents } from '../lib/api.js';
 
 const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
 const ROLES = ['viewer', 'editor', 'superuser'];
@@ -24,14 +25,20 @@ export default function AdminPanel({ currentUser, onBack }) {
   // New domain form
   const [newDomain, setNewDomain] = useState('');
   const [newEntity, setNewEntity] = useState('Cove');
+  const [pendingProducts, setPendingProducts] = useState([]);
+  const [parentModels, setParentModels] = useState([]);
 
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [u, d, r] = await Promise.all([adminGetUsers(), adminGetDomains(), adminGetDomainRequests()]);
+      const [u, d, r, pend, pars] = await Promise.all([
+        adminGetUsers(), adminGetDomains(), adminGetDomainRequests(),
+        adminGetPendingProducts(), getCatalogParents(),
+      ]);
       setUsers(u); setDomains(d); setRequests(r);
+      setPendingProducts(pend); setParentModels(pars);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -99,6 +106,7 @@ export default function AdminPanel({ currentUser, onBack }) {
           { id: 'requests', label: `Access Requests${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
           { id: 'users',    label: 'Users' },
           { id: 'domains',  label: 'Domains' },
+          { id: 'pending',  label: `Pending Products${pendingProducts.length > 0 ? ` (${pendingProducts.length})` : ''}` },
         ].map(t => (
           <button
             key={t.id}
@@ -235,6 +243,34 @@ export default function AdminPanel({ currentUser, onBack }) {
           </div>
         </div>
       )}
+
+      {/* ── Pending Products ── */}
+      {tab === 'pending' && !loading && (
+        <div>
+          <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 700 }}>Pending Product Review</h3>
+          {pendingProducts.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>No products pending review.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {pendingProducts.map(p => (
+                <PendingProductRow
+                  key={p.id}
+                  product={p}
+                  parents={parentModels}
+                  onApprove={async (id, patch) => {
+                    await adminApprovePendingProduct(id, patch);
+                    setPendingProducts(prev => prev.filter(x => x.id !== id));
+                  }}
+                  onReject={async (id) => {
+                    await adminRejectPendingProduct(id);
+                    setPendingProducts(prev => prev.filter(x => x.id !== id));
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -269,6 +305,69 @@ function RequestRow({ request, onApprove, onDeny }) {
         <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)' }} onClick={() => onDeny(request.id)}>
           Deny
         </button>
+      </div>
+    </div>
+  );
+}
+
+function PendingProductRow({ product, parents, onApprove, onReject }) {
+  const [linkParentId, setLinkParentId] = useState('');
+  const [variationLabel, setVariationLabel] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function handleApprove() {
+    setBusy(true);
+    try {
+      const patch = {};
+      if (linkParentId) { patch.parentId = linkParentId; patch.variationLabel = variationLabel || undefined; }
+      await onApprove(product.id, patch);
+    } finally { setBusy(false); }
+  }
+
+  async function handleReject() {
+    if (!window.confirm(`Reject and delete "${product.name || product.modelNumber}"?`)) return;
+    setBusy(true);
+    try { await onReject(product.id); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="pending-product-card">
+      <div className="pending-product-card-header">
+        {product.imageUrl && (
+          <img src={product.imageUrl} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }}
+            onError={e => { e.target.style.display = 'none'; }} />
+        )}
+        <div className="pending-product-card-info">
+          <div className="pending-product-card-name">{product.name || product.modelNumber || 'Unnamed'}</div>
+          <div className="pending-product-card-meta">
+            {[product.category, product.subclass, product.manufacturer].filter(Boolean).join(' · ')}
+          </div>
+          <div className="pending-product-card-meta" style={{ marginTop: 4 }}>
+            Entity: {Array.isArray(product.entity) ? product.entity.join(', ') : product.entity || '—'}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 600 }}>Link to platform model <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>:</div>
+        <select value={linkParentId} onChange={e => setLinkParentId(e.target.value)} style={{ fontSize: 12 }}>
+          <option value="">— Standalone product (no parent) —</option>
+          {parents.map(p => (
+            <option key={p.id} value={p.id}>{p.name || p.modelNumber} ({p.category})</option>
+          ))}
+        </select>
+        {linkParentId && (
+          <input
+            className="form-control"
+            style={{ fontSize: 12 }}
+            placeholder="Variation label (e.g. Dual Band + BLE)"
+            value={variationLabel}
+            onChange={e => setVariationLabel(e.target.value)}
+          />
+        )}
+      </div>
+      <div className="pending-product-card-actions">
+        <button className="btn btn-primary btn-sm" onClick={handleApprove} disabled={busy}>Approve</button>
+        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)' }} onClick={handleReject} disabled={busy}>Reject</button>
       </div>
     </div>
   );

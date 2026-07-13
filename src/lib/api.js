@@ -400,3 +400,32 @@ export async function patchIssue(sessionId, issueId, data) {
   if (!res.ok) throw new Error('Failed to update issue');
   return res.json();
 }
+
+// ── Variations / pending review ───────────────────────────────────────────────
+
+export async function getCatalogParents() {
+  const res = await fetch(`${BASE}/catalog/parents`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function adminGetPendingProducts() {
+  const res = await fetch(`${BASE}/admin/pending-products`);
+  if (!res.ok) throw new Error('Failed to load pending products');
+  return res.json();
+}
+
+export async function adminApprovePendingProduct(id, patch = {}) {
+  const res = await fetch(`${BASE}/admin/pending-products/${id}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error('Failed to approve product');
+  return res.json();
+}
+
+export async function adminRejectPendingProduct(id) {
+  const res = await fetch(`${BASE}/admin/pending-products/${id}/reject`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to reject product');
+}

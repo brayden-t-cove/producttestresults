@@ -263,6 +263,35 @@ app.post('/api/admin/domain-requests/:id/deny', requireSuperuser, async (req, re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Admin: pending product review ─────────────────────────────────────────────
+
+app.get('/api/admin/pending-products', requireSuperuser, async (req, res) => {
+  try {
+    const all = await catalog.getAll();
+    res.json(all.filter(p => p.status === 'pending_review'));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/pending-products/:id/approve', requireSuperuser, async (req, res) => {
+  try {
+    const { parentId, variationLabel } = req.body;
+    const patch = { status: 'active' };
+    if (parentId !== undefined) patch.parentId = parentId || null;
+    if (variationLabel !== undefined) patch.variationLabel = variationLabel || null;
+    const updated = await catalog.update(req.params.id, patch);
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/pending-products/:id/reject', requireSuperuser, async (req, res) => {
+  try {
+    const removed = await catalog.delete(req.params.id);
+    if (!removed) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 if (!process.env.DATABASE_URL) {
   // Local file-based mode — ensure directories exist
   const { SPEC_SCHEMA } = await import('./src/data/productSpecs.js');
@@ -376,10 +405,31 @@ app.get('/api/catalog', requireAuth, async (req, res) => {
   try {
     const all = await catalog.getAll();
     const ef = entityFilter(req);
-    const result = ef ? all.filter(p => !p.entity || p.entity.length === 0 || p.entity.includes(ef)) : all;
+    let result;
+    if (!ef) {
+      result = all; // superuser or no auth — see everything
+    } else if (req.user?.entity === 'InstaVision') {
+      // IV sees parent platform models (entity=[]) + their own variations
+      result = all.filter(p =>
+        (p.entity && p.entity.includes('InstaVision')) ||
+        ((!p.entity || p.entity.length === 0) && !p.parentId)
+      );
+    } else {
+      // Other entities see only their own variations/standalone products
+      result = all.filter(p => p.entity && p.entity.includes(ef));
+    }
     res.json(result);
   }
   catch { res.json([]); }
+});
+
+// Parent platform models — accessible to all authenticated users for the new-product wizard
+app.get('/api/catalog/parents', requireAuth, async (req, res) => {
+  try {
+    const all = await catalog.getAll();
+    const parents = all.filter(p => !p.parentId && (!p.entity || p.entity.length === 0));
+    res.json(parents);
+  } catch { res.json([]); }
 });
 
 app.post('/api/catalog/import', requireEditor, async (req, res) => {
@@ -523,15 +573,17 @@ app.get('/api/catalog/:id', requireAuth, async (req, res) => {
 app.post('/api/catalog', requireEditor, async (req, res) => {
   try {
     const { name, manufacturer, modelNumber, version, status, category, capabilities, appConfigs,
-            specs, certifications, compatibleWith, entity, type, hubConnectionType, subclass } = req.body;
+            specs, certifications, compatibleWith, entity, type, hubConnectionType, subclass,
+            parentId, variationLabel } = req.body;
     if (!name || !category) return res.status(400).json({ error: 'name and category required', code: 'CAT_001_MISSING_FIELDS' });
+    const isSuperuser = req.user?.role === 'superuser';
     const entry = {
       id: uuidv4(),
       name: name.trim(),
       manufacturer: (manufacturer || '').trim(),
       modelNumber: (modelNumber || '').trim(),
       version: (version || '').trim(),
-      status: status || 'active',
+      status: isSuperuser ? (status || 'active') : 'pending_review',
       category,
       subclass: subclass || null,
       capabilities: capabilities || [],
@@ -542,6 +594,8 @@ app.post('/api/catalog', requireEditor, async (req, res) => {
       certifications: certifications || {},
       entity: entity || [],
       type: type || 'production',
+      parentId: parentId || null,
+      variationLabel: variationLabel || null,
       createdAt: new Date().toISOString(),
     };
     await catalog.create(entry);
