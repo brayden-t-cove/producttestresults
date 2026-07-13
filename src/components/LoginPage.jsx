@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 
-// Swap this URL once the logo is hosted (Google Drive direct link or CDN)
-const LOGO_URL = null;
+const LOGO_URL = 'https://lh3.googleusercontent.com/d/1z-qNySTnx6Fo9EnmSf0WBsWSMF_P1mBP';
 
 export default function LoginPage({ providers = {} }) {
   const [authError, setAuthError] = useState('');
