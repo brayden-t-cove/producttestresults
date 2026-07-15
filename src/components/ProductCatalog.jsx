@@ -154,7 +154,7 @@ const PRIMARY_STATUSES = ['active', 'in-testing'];
 const SECONDARY_STATUSES = ['eol', 'discontinued', 'on-hold', 'under-evaluation', 'rejected'];
 const DEV_PRIMARY_STATUSES = ['in-development'];
 const DEV_SECONDARY_STATUSES = ['on-hold', 'rejected'];
-const EVAL_PRIMARY_STATUSES = ['under-evaluation', 'in-development'];
+const EVAL_PRIMARY_STATUSES = ['under-evaluation'];
 const EVAL_SECONDARY_STATUSES = ['on-hold', 'rejected'];
 
 const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
@@ -163,10 +163,10 @@ function isProduction(p) {
   return (!p.type || p.type === 'production') && PRODUCTION_STATUSES.includes(p.status || 'active');
 }
 function isDevelopment(p) {
-  return (!p.type || p.type === 'production') && (p.status === 'in-development');
+  return p.status === 'in-development';
 }
 function isEvaluation(p) {
-  return p.type === 'sample' || p.type === 'prototype';
+  return (p.type === 'sample' || p.type === 'prototype') && p.status !== 'in-development';
 }
 function isCompetitor(p) {
   return p.type === 'competitor';
