@@ -74,6 +74,8 @@ export const SPEC_SCHEMA = {
         },
         { id: 'framerateDaytime', label: 'Framerate Daytime (fps)', type: 'text' },
         { id: 'framerateNighttime', label: 'Framerate Nighttime (fps)', type: 'text' },
+        { id: 'aov', label: 'AOV Support', type: 'boolean' },
+        { id: 'aovFps', label: 'AOV Frame Rate (fps)', type: 'text', placeholder: 'e.g. 15' },
         { id: 'videoFormat', label: 'Video Format', type: 'text' },
         { id: 'radarLidar', label: 'Radar / LiDAR Support', type: 'boolean' },
       ],
