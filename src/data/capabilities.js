@@ -73,6 +73,8 @@ export const CAPABILITY_GROUPS = {
       { id: 'wifi-2_4', label: '2.4GHz WiFi' },
       { id: 'wifi-5', label: '5GHz WiFi' },
       { id: 'ethernet-poe', label: 'Ethernet/PoE' },
+      { id: 'cellular-4g', label: '4G LTE' },
+      { id: 'cellular-5g', label: '5G' },
       { id: 'ble', label: 'BLE' },
     ]},
     { label: 'Form Factor', capabilities: [
