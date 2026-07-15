@@ -79,7 +79,7 @@ const TOP_LEVEL_VIEWS = {
   vendors: 'vendors',
 };
 
-function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onSettings, currentUser, authEnabled, onAdmin, onLogout }) {
+function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onSettings, currentUser, authEnabled, onAdmin, onLogout, canSeeVendors }) {
   const active = TOP_LEVEL_VIEWS[view] || 'dashboard';
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   return (
@@ -98,9 +98,11 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
         <button className={`top-nav-link${active === 'testing' ? ' active' : ''}`} onClick={onTesting}>
           <IconTesting /> Testing
         </button>
-        <button className={`top-nav-link${active === 'vendors' ? ' active' : ''}`} onClick={onVendors}>
-          <IconVendors /> Vendors
-        </button>
+        {canSeeVendors && (
+          <button className={`top-nav-link${active === 'vendors' ? ' active' : ''}`} onClick={onVendors}>
+            <IconVendors /> Vendors
+          </button>
+        )}
         <button className={`top-nav-link${active === 'issues' ? ' active' : ''}`} onClick={onIssues}>
           <IconIssues /> Issues
         </button>
@@ -361,7 +363,7 @@ const IconCardVendors = () => (
   </svg>
 );
 
-function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors }) {
+function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors, canSeeVendors }) {
   return (
     <div className="dashboard home-dashboard">
       <div className="home-hero">
@@ -380,11 +382,13 @@ function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors }) {
           <h3 className="home-card-title">Product Testing</h3>
           <p className="home-card-desc">Run test sessions and track results</p>
         </div>
-        <div className="home-card" onClick={onVendors}>
-          <div className="home-card-icon"><IconCardVendors /></div>
-          <h3 className="home-card-title">Vendor Library</h3>
-          <p className="home-card-desc">Track companies, catalog links, and contacts</p>
-        </div>
+        {canSeeVendors && (
+          <div className="home-card" onClick={onVendors}>
+            <div className="home-card-icon"><IconCardVendors /></div>
+            <h3 className="home-card-title">Vendor Library</h3>
+            <p className="home-card-desc">Track companies, catalog links, and contacts</p>
+          </div>
+        )}
         <div className="home-card" onClick={onIssues}>
           <div className="home-card-icon"><IconCardIssues /></div>
           <h3 className="home-card-title">Issues</h3>
@@ -536,6 +540,7 @@ export default function App() {
 
   const canEdit = !authEnabled || (currentUser && ['editor', 'superuser'].includes(currentUser.role));
   const canEditMedia = !authEnabled || (currentUser && ['editor', 'designer', 'superuser'].includes(currentUser.role));
+  const canSeeVendors = !authEnabled || (currentUser && ['analyst', 'editor', 'designer', 'superuser'].includes(currentUser.role));
 
   async function refreshSessions() {
     try {
@@ -756,6 +761,7 @@ export default function App() {
         authEnabled={authEnabled}
         onAdmin={() => setShowAdmin(true)}
         onLogout={handleLogout}
+        canSeeVendors={canSeeVendors}
       />
 
       <div key={view} className="view-content fade-view">
@@ -767,6 +773,7 @@ export default function App() {
           onVendors={() => setView('vendors')}
           onIssues={() => setView('issues')}
           onAnalytics={() => setView('analytics')}
+          canSeeVendors={canSeeVendors}
         />
       )}
 
@@ -936,12 +943,15 @@ export default function App() {
         />
       )}
 
-      {view === 'vendors' && (
+      {view === 'vendors' && (canSeeVendors ? (
         <VendorLibrary
           catalog={catalog}
           onBack={() => setView('dashboard')}
+          currentUser={currentUser}
         />
-      )}
+      ) : (
+        <>{setView('dashboard')}</>
+      ))}
 
       {view === 'schemaEditor' && (
         <div className="dashboard">

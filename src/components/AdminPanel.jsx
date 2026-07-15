@@ -7,7 +7,7 @@ import {
 import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents } from '../lib/api.js';
 
 const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
-const ROLES = ['viewer', 'editor', 'designer', 'superuser'];
+const ROLES = ['viewer', 'analyst', 'editor', 'designer', 'superuser'];
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -291,6 +291,7 @@ function RequestRow({ request, onApprove, onDeny }) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <select value={role} onChange={e => setRole(e.target.value)} style={{ fontSize: 12 }}>
           <option value="viewer">Viewer</option>
+          <option value="analyst">Analyst</option>
           <option value="editor">Editor</option>
           <option value="designer">Designer</option>
           <option value="superuser">Superuser</option>

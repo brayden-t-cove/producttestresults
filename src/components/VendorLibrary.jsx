@@ -22,9 +22,12 @@ function StatusBadge({ status }) {
   );
 }
 
-function VendorFormModal({ vendor, catalog, onSave, onClose }) {
+const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
+
+function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
   const [form, setForm] = useState({
     name: vendor?.name || '',
+    entity: vendor?.entity || (currentUser?.entity || ''),
     website: vendor?.website || '',
     relationshipStatus: vendor?.relationshipStatus || 'Prospect',
     industry: vendor?.industry || '',
@@ -56,6 +59,7 @@ function VendorFormModal({ vendor, catalog, onSave, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.name.trim()) { setError('Company name is required.'); return; }
+    if (!form.entity) { setError('Entity is required.'); return; }
     setSaving(true); setError('');
     try {
       await onSave({ ...vendor, ...form });
@@ -76,15 +80,22 @@ function VendorFormModal({ vendor, catalog, onSave, onClose }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
+              <label>Entity *</label>
+              <select value={form.entity} onChange={e => set('entity', e.target.value)} required>
+                <option value="">Select entity...</option>
+                {ENTITIES.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
               <label>Relationship Status</label>
               <select value={form.relationshipStatus} onChange={e => set('relationshipStatus', e.target.value)}>
                 {RELATIONSHIP_STATUSES.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
-            <div className="form-group">
-              <label>Industry / Category</label>
-              <input value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Smart Home, Security" />
-            </div>
+          </div>
+          <div className="form-group">
+            <label>Industry / Category</label>
+            <input value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Smart Home, Security" />
           </div>
           <div className="form-group">
             <label>Website</label>
@@ -168,6 +179,7 @@ function VendorDetail({ vendor, catalog, onEdit, onDelete, onBack }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h2 style={{ margin: 0 }}>{vendor.name}</h2>
             <StatusBadge status={vendor.relationshipStatus} />
+            {vendor.entity && <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '2px 10px' }}>{vendor.entity}</span>}
             {vendor.industry && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{vendor.industry}</span>}
           </div>
           {vendor.website && (
@@ -263,7 +275,7 @@ function VendorDetail({ vendor, catalog, onEdit, onDelete, onBack }) {
   );
 }
 
-export default function VendorLibrary({ catalog = [], onBack }) {
+export default function VendorLibrary({ catalog = [], onBack, currentUser }) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -312,6 +324,7 @@ export default function VendorLibrary({ catalog = [], onBack }) {
             catalog={catalog}
             onSave={handleSave}
             onClose={() => { setShowForm(false); setEditingVendor(null); }}
+            currentUser={currentUser}
           />
         )}
         <VendorDetail
@@ -333,6 +346,7 @@ export default function VendorLibrary({ catalog = [], onBack }) {
           catalog={catalog}
           onSave={handleSave}
           onClose={() => { setShowForm(false); setEditingVendor(null); }}
+          currentUser={currentUser}
         />
       )}
 
@@ -403,6 +417,7 @@ export default function VendorLibrary({ catalog = [], onBack }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
                   <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{v.name}</h3>
                   <StatusBadge status={v.relationshipStatus} />
+                  {v.entity && <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '1px 8px' }}>{v.entity}</span>}
                 </div>
                 {v.industry && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{v.industry}</div>}
                 {v.website && (
