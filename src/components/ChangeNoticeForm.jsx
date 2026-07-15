@@ -1,7 +1,5 @@
 import { useState } from 'react';
 
-const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
-
 const CHANGE_TYPES = [
   'Firmware / Software Update',
   'Hardware Revision',
@@ -20,11 +18,8 @@ const URGENCY_OPTIONS = [
 ];
 
 export default function ChangeNoticeForm() {
-  const params = new URLSearchParams(window.location.search);
-  const entityParam = ENTITIES.find(e => e.toLowerCase() === params.get('entity')?.toLowerCase()) || '';
-
   const [form, setForm] = useState({
-    entity: entityParam,
+    companyName: '',
     vendorName: '',
     vendorEmail: '',
     productName: '',
@@ -44,7 +39,7 @@ export default function ChangeNoticeForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    if (!form.entity || !form.vendorName || !form.vendorEmail || !form.productName || !form.changeType || !form.description) {
+    if (!form.companyName || !form.vendorName || !form.vendorEmail || !form.productName || !form.changeType || !form.description) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -95,14 +90,9 @@ export default function ChangeNoticeForm() {
         <form onSubmit={handleSubmit} className="public-form-body">
           <div className="public-form-section-title">Your Information</div>
 
-          <div className="public-form-row">
-            <div className="form-group">
-              <label>Entity <span className="req">*</span></label>
-              <select value={form.entity} onChange={e => set('entity', e.target.value)} required disabled={!!entityParam}>
-                <option value="">— Select entity —</option>
-                {ENTITIES.map(en => <option key={en} value={en}>{en}</option>)}
-              </select>
-            </div>
+          <div className="form-group">
+            <label>Company Name <span className="req">*</span></label>
+            <input type="text" placeholder="e.g. Acme Camera Co." value={form.companyName} onChange={e => set('companyName', e.target.value)} required />
           </div>
 
           <div className="public-form-row two-col">

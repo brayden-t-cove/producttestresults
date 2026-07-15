@@ -258,8 +258,8 @@ export default function AdminPanel({ currentUser, onBack }) {
                 <SubmissionRow
                   key={s.id}
                   submission={s}
-                  onReview={async (id) => {
-                    const updated = await adminUpdateSubmission(id, { status: 'reviewed' });
+                  onReview={async (id, entities) => {
+                    const updated = await adminUpdateSubmission(id, { status: 'reviewed', entities });
                     setSubmissions(prev => prev.map(x => x.id === id ? updated : x));
                   }}
                   onDismiss={async (id) => {
@@ -350,28 +350,50 @@ const URGENCY_COLORS = {
 function SubmissionRow({ submission: s, onReview, onDismiss }) {
   const urg = URGENCY_COLORS[s.urgency] || URGENCY_COLORS.normal;
   const isReviewed = s.status === 'reviewed';
+  const [selectedEntities, setSelectedEntities] = useState(s.entities || []);
+
+  function toggleEntity(en) {
+    setSelectedEntities(prev =>
+      prev.includes(en) ? prev.filter(e => e !== en) : [...prev, en]
+    );
+  }
 
   return (
     <div className="pending-product-card" style={{ opacity: isReviewed ? 0.6 : 1 }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flex: 1 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>{s.productName}</span>
-            {s.modelNumber && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.modelNumber}</span>}
-            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: urg.bg, color: urg.color, fontWeight: 600, textTransform: 'capitalize' }}>
-              {s.urgency}
-            </span>
-            {isReviewed && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: 'var(--pass-dim)', color: 'var(--pass)', fontWeight: 600 }}>Reviewed</span>}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-            <strong>{s.changeType}</strong> · {s.vendorName} ({s.vendorEmail}) · {s.entity} · {formatDate(s.submittedAt)}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{s.description}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>{s.productName}</span>
+          {s.modelNumber && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.modelNumber}</span>}
+          <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: urg.bg, color: urg.color, fontWeight: 600, textTransform: 'capitalize' }}>
+            {s.urgency}
+          </span>
+          {isReviewed && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: 'var(--pass-dim)', color: 'var(--pass)', fontWeight: 600 }}>Reviewed</span>}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+          <strong>{s.changeType}</strong> · {s.companyName || s.vendorName} — {s.vendorName} ({s.vendorEmail}) · {formatDate(s.submittedAt)}
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: 12 }}>{s.description}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>AFFECTS:</span>
+          {ENTITIES.map(en => (
+            <button
+              key={en}
+              onClick={() => !isReviewed && toggleEntity(en)}
+              style={{
+                fontSize: 11, padding: '3px 10px', borderRadius: 99, border: '1px solid',
+                cursor: isReviewed ? 'default' : 'pointer',
+                background: selectedEntities.includes(en) ? 'var(--primary-dim)' : 'transparent',
+                borderColor: selectedEntities.includes(en) ? 'var(--primary)' : 'var(--border)',
+                color: selectedEntities.includes(en) ? 'var(--primary)' : 'var(--text-muted)',
+                fontWeight: selectedEntities.includes(en) ? 700 : 400,
+              }}
+            >{en}</button>
+          ))}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
         {!isReviewed && (
-          <button className="btn btn-primary btn-sm" onClick={() => onReview(s.id)}>Mark Reviewed</button>
+          <button className="btn btn-primary btn-sm" onClick={() => onReview(s.id, selectedEntities)}>Mark Reviewed</button>
         )}
         <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)', fontSize: 12 }} onClick={() => onDismiss(s.id)}>
           Dismiss

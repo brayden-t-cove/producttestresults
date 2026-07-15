@@ -761,15 +761,16 @@ app.delete('/api/vendors/:id', async (req, res) => {
 
 app.post('/api/public/submit/change-notice', async (req, res) => {
   try {
-    const { entity, vendorName, vendorEmail, productName, modelNumber, changeType, description, urgency } = req.body;
-    if (!entity || !vendorName || !vendorEmail || !productName || !changeType || !description) {
+    const { companyName, vendorName, vendorEmail, productName, modelNumber, changeType, description, urgency } = req.body;
+    if (!companyName || !vendorName || !vendorEmail || !productName || !changeType || !description) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const entry = {
       id: uuidv4(),
       formType: 'change-notice',
       status: 'pending',
-      entity,
+      entities: [],
+      companyName,
       vendorName,
       vendorEmail,
       productName,
