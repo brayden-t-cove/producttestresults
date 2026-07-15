@@ -24,6 +24,7 @@ import IssuesPage from './components/IssuesPage.jsx';
 import SchemaEditor from './components/SchemaEditor.jsx';
 import CertEditor from './components/CertEditor.jsx';
 import ProductDetail from './components/ProductDetail.jsx';
+import ChangeNoticeForm from './components/ChangeNoticeForm.jsx';
 
 const LOGO_URL = 'https://lh3.googleusercontent.com/d/1z-qNySTnx6Fo9EnmSf0WBsWSMF_P1mBP';
 
@@ -503,7 +504,15 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewC
   );
 }
 
+function PublicFormRouter() {
+  const path = window.location.pathname;
+  if (path.startsWith('/submit/change-notice')) return <ChangeNoticeForm />;
+  return null;
+}
+
 export default function App() {
+  const isPublicRoute = window.location.pathname.startsWith('/submit/');
+
   const [view, setView] = useState('dashboard');
   const [currentSession, setCurrentSession] = useState(null);
   const [sessions, setSessions] = useState([]);
@@ -700,6 +709,9 @@ export default function App() {
     setEditingProduct(duped);
     setView('newProduct');
   }
+
+  // Public routes skip auth entirely
+  if (isPublicRoute) return <PublicFormRouter />;
 
   // Show blank while checking auth
   if (authLoading) {

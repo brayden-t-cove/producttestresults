@@ -16,7 +16,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
 import connectPgSimple from 'connect-pg-simple';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
-import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, getPool } from './lib/storage.js';
+import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, getPool } from './lib/storage.js';
 import {
   findOrCreateUser, createDomainRequest,
   getAllUsers, updateUserRole, updateUserEntity,
@@ -755,6 +755,55 @@ app.delete('/api/vendors/:id', async (req, res) => {
     await vendors.delete(req.params.id);
     res.json({ ok: true });
   } catch { res.status(500).json({ error: 'Failed to delete vendor' }); }
+});
+
+// ── Vendor Submissions (public — no auth) ─────────────────────────────────────
+
+app.post('/api/public/submit/change-notice', async (req, res) => {
+  try {
+    const { entity, vendorName, vendorEmail, productName, modelNumber, changeType, description, urgency } = req.body;
+    if (!entity || !vendorName || !vendorEmail || !productName || !changeType || !description) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const entry = {
+      id: uuidv4(),
+      formType: 'change-notice',
+      status: 'pending',
+      entity,
+      vendorName,
+      vendorEmail,
+      productName,
+      modelNumber: modelNumber || '',
+      changeType,
+      description,
+      urgency: urgency || 'normal',
+      submittedAt: new Date().toISOString(),
+    };
+    await vendorSubmissions.create(entry);
+    res.status(201).json({ success: true, id: entry.id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/submissions', requireSuperuser, async (req, res) => {
+  try {
+    const all = await vendorSubmissions.getAll();
+    res.json(all);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/admin/submissions/:id', requireSuperuser, async (req, res) => {
+  try {
+    const updated = await vendorSubmissions.update(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/admin/submissions/:id', requireSuperuser, async (req, res) => {
+  try {
+    await vendorSubmissions.delete(req.params.id);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Sessions ──────────────────────────────────────────────────────────────────

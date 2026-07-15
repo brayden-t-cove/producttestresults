@@ -429,3 +429,24 @@ export async function adminRejectPendingProduct(id) {
   const res = await fetch(`${BASE}/admin/pending-products/${id}/reject`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to reject product');
 }
+
+export async function adminGetSubmissions() {
+  const res = await fetch(`${BASE}/admin/submissions`);
+  if (!res.ok) throw new Error('Failed to load submissions');
+  return res.json();
+}
+
+export async function adminUpdateSubmission(id, patch) {
+  const res = await fetch(`${BASE}/admin/submissions/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error('Failed to update submission');
+  return res.json();
+}
+
+export async function adminDeleteSubmission(id) {
+  const res = await fetch(`${BASE}/admin/submissions/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete submission');
+}

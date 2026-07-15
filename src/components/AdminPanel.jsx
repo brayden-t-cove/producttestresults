@@ -4,7 +4,7 @@ import {
   adminGetDomains, adminCreateDomain, adminDeleteDomain,
   adminGetDomainRequests, adminApproveDomainRequest, adminDenyDomainRequest,
 } from '../lib/authApi.js';
-import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents } from '../lib/api.js';
+import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents, adminGetSubmissions, adminUpdateSubmission, adminDeleteSubmission } from '../lib/api.js';
 
 const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
 const ROLES = ['viewer', 'analyst', 'editor', 'designer', 'superuser'];
@@ -27,18 +27,19 @@ export default function AdminPanel({ currentUser, onBack }) {
   const [newEntity, setNewEntity] = useState('Cove');
   const [pendingProducts, setPendingProducts] = useState([]);
   const [parentModels, setParentModels] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
 
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [u, d, r, pend, pars] = await Promise.all([
+      const [u, d, r, pend, pars, subs] = await Promise.all([
         adminGetUsers(), adminGetDomains(), adminGetDomainRequests(),
-        adminGetPendingProducts(), getCatalogParents(),
+        adminGetPendingProducts(), getCatalogParents(), adminGetSubmissions(),
       ]);
       setUsers(u); setDomains(d); setRequests(r);
-      setPendingProducts(pend); setParentModels(pars);
+      setPendingProducts(pend); setParentModels(pars); setSubmissions(subs);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -107,6 +108,7 @@ export default function AdminPanel({ currentUser, onBack }) {
           { id: 'users',    label: 'Users' },
           { id: 'domains',  label: 'Domains' },
           { id: 'pending',  label: `Pending Products${pendingProducts.length > 0 ? ` (${pendingProducts.length})` : ''}` },
+          { id: 'submissions', label: `Change Notices${submissions.filter(s => s.status === 'pending').length > 0 ? ` (${submissions.filter(s => s.status === 'pending').length})` : ''}` },
         ].map(t => (
           <button
             key={t.id}
@@ -244,6 +246,33 @@ export default function AdminPanel({ currentUser, onBack }) {
         </div>
       )}
 
+      {/* ── Change Notices ── */}
+      {tab === 'submissions' && !loading && (
+        <div>
+          <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 700 }}>Vendor Change Notices</h3>
+          {submissions.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>No submissions yet.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {submissions.map(s => (
+                <SubmissionRow
+                  key={s.id}
+                  submission={s}
+                  onReview={async (id) => {
+                    const updated = await adminUpdateSubmission(id, { status: 'reviewed' });
+                    setSubmissions(prev => prev.map(x => x.id === id ? updated : x));
+                  }}
+                  onDismiss={async (id) => {
+                    await adminDeleteSubmission(id);
+                    setSubmissions(prev => prev.filter(x => x.id !== id));
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Pending Products ── */}
       {tab === 'pending' && !loading && (
         <div>
@@ -306,6 +335,46 @@ function RequestRow({ request, onApprove, onDeny }) {
         </button>
         <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)' }} onClick={() => onDeny(request.id)}>
           Deny
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const URGENCY_COLORS = {
+  low:    { bg: 'rgba(100,116,139,0.12)', color: 'var(--text-muted)' },
+  normal: { bg: 'var(--primary-dim)',     color: 'var(--primary)' },
+  high:   { bg: 'var(--fail-dim)',        color: 'var(--fail)' },
+};
+
+function SubmissionRow({ submission: s, onReview, onDismiss }) {
+  const urg = URGENCY_COLORS[s.urgency] || URGENCY_COLORS.normal;
+  const isReviewed = s.status === 'reviewed';
+
+  return (
+    <div className="pending-product-card" style={{ opacity: isReviewed ? 0.6 : 1 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flex: 1 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>{s.productName}</span>
+            {s.modelNumber && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.modelNumber}</span>}
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: urg.bg, color: urg.color, fontWeight: 600, textTransform: 'capitalize' }}>
+              {s.urgency}
+            </span>
+            {isReviewed && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: 'var(--pass-dim)', color: 'var(--pass)', fontWeight: 600 }}>Reviewed</span>}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+            <strong>{s.changeType}</strong> · {s.vendorName} ({s.vendorEmail}) · {s.entity} · {formatDate(s.submittedAt)}
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{s.description}</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+        {!isReviewed && (
+          <button className="btn btn-primary btn-sm" onClick={() => onReview(s.id)}>Mark Reviewed</button>
+        )}
+        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)', fontSize: 12 }} onClick={() => onDismiss(s.id)}>
+          Dismiss
         </button>
       </div>
     </div>
