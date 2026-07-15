@@ -478,21 +478,85 @@ app.post('/api/catalog/import', requireEditor, async (req, res) => {
 app.get('/api/catalog/export/csv', requireAuth, async (req, res) => {
   try {
     const data = await catalog.getAll();
-    const headers = [
-      'id', 'modelNumber', 'name', 'manufacturer', 'category', 'subclass',
+
+    // Core product fields
+    const coreHeaders = [
+      'id', 'name', 'modelNumber', 'manufacturer', 'category', 'subclass',
       'type', 'status', 'version', 'revision', 'description', 'msrp', 'upc',
-      'website', 'notes', 'entity', 'capabilities', 'specs', 'specNotes', 'createdAt',
+      'website', 'notes', 'entity', 'capabilities', 'specNotes',
+      'parentId', 'variationLabel', 'createdAt',
     ];
+
+    // All spec field IDs — kept in sync with src/data/productSpecs.js
+    const specFields = [
+      // Identity
+      'marketedName','modelName','sku','upc',
+      // Image / Sensor
+      'resolutionHorizontal','resolutionVertical','horizontalFov','verticalFov','diagonalFov',
+      'imageSensor','aperture','focalLength','lensLabel','lensCount','lensMaterial',
+      'aspectRatio','digitalZoom','opticalZoom','wideDynamicRange','flipImage','rotateImage',
+      // Video (Shared)
+      'videoEncoding','framerateDaytime','framerateNighttime','aov','aovFps','videoFormat','radarLidar',
+      // Night Vision
+      'colorNightVision','pirNightVision','irLights','irRange',
+      // Pan / Tilt
+      'ptViewRange','rotationSpeed','ptMechanismType','motionTracking','returnToHome','ptWaypoints',
+      // Audio
+      'speakerSpec','speakerSupport','simultaneousTwoWay','builtInSiren','sirenDecibels',
+      'noiseCancellation','micSensitivity','speakerVolumeAdjust','voicePitchChange','voip',
+      // Lighting
+      'ledType','lightBrightness','lightBrightnessControl','colorTemperature','lightTempControl',
+      'rgbSupport','lightRgbControl','ledIndicator','ledToggle',
+      // Connectivity
+      'wifiGeneration','wifi24ghz','wifi5ghz','cellular','cellularGeneration','simType',
+      'bluetooth','qrEnrollment','minAndroid','minIos','thirdPartyIntegrations',
+      // Edge AI
+      'edgeAi','humanDetection','vehicleDetection','animalDetection','birdDetection',
+      'packageDetection','gateFenceDetection','motionRegions','alarmRegionZones','privacyZones',
+      'soundDetection','babyCryingDetection','smokeCoDetection','sirenAlarmDetection',
+      // Cloud AI
+      'cloudAi',
+      // Storage
+      'localStorage','localStorageSizeLimit','localStorageReformat','cloudStorage',
+      // Power
+      'batteryCapacity','batteryType','batteryLifeEstimate','chargingTime',
+      'powerAdapterInput','powerAdapterOutput','powerCableLength','powerConservation','powerButton',
+      // Physical
+      'dimensions','weight','bodyMaterial','finish','colorOptions','ipRating','humidityRating',
+      'operatingTemp','storageTemp',
+      // Mounting
+      'wallMount','ceilingMount','standMount','magneticMount','adhesiveMount','lightSocketMount',
+      'mountScrewSize',
+      // Hardware
+      'cpuType','memory','otaUpdate','resetButton','syncButton','networkReconfiguration',
+      'manualRecording','manualScreenshot','resolutionAdjustment','activityScheduling',
+      'privacyMode','doorbellPress',
+      // Misc
+      'languages','packageContents','accessories','auxNotes',
+    ];
+
+    const allHeaders = [...coreHeaders, ...specFields.map(f => `spec_${f}`)];
+
     function csvCell(val) {
       if (val === null || val === undefined) return '""';
       if (typeof val === 'object') return `"${JSON.stringify(val).replace(/"/g, '""')}"`;
       return `"${String(val).replace(/"/g, '""')}"`;
     }
-    const rows = data.map(p => headers.map(h => csvCell(p[h])).join(','));
+
+    const rows = data.map(p => {
+      const specs = p.specs || {};
+      const coreCells = coreHeaders.map(h => {
+        if (h === 'entity' || h === 'capabilities') return csvCell(Array.isArray(p[h]) ? p[h].join('; ') : p[h]);
+        return csvCell(p[h]);
+      });
+      const specCells = specFields.map(f => csvCell(specs[f]));
+      return [...coreCells, ...specCells].join(',');
+    });
+
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="catalog-export.csv"');
-    res.send([headers.join(','), ...rows].join('\n'));
-  } catch { res.status(500).json({ error: 'Failed to export CSV' }); }
+    res.send([allHeaders.join(','), ...rows].join('\n'));
+  } catch (e) { res.status(500).json({ error: 'Failed to export CSV' }); }
 });
 
 app.get('/api/catalog/export/json', requireAuth, async (req, res) => {
