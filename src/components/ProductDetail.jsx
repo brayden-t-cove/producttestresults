@@ -347,7 +347,7 @@ const MEDIA_CATEGORIES = [
   { id: 'other', label: 'Other', icon: '🔗' },
 ];
 
-function MediaTab({ product, onProductUpdate, comparisons, onOpenComparison, onStartComparison }) {
+function MediaTab({ product, onProductUpdate, comparisons, onOpenComparison, onStartComparison, canEditMedia = true }) {
   const mediaLinks = product.mediaLinks || [];
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -379,7 +379,7 @@ function MediaTab({ product, onProductUpdate, comparisons, onOpenComparison, onS
           Add links to renders, packaging photos, manuals, and other visual reference material.
           Direct upload coming in a future release.
         </p>
-        {!adding && (
+        {!adding && canEditMedia && (
           <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0, marginLeft: 16 }} onClick={() => setAdding(true)}>
             + Add Link
           </button>
@@ -415,7 +415,7 @@ function MediaTab({ product, onProductUpdate, comparisons, onOpenComparison, onS
         <div className="empty-state" style={{ padding: '40px 0' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🖼</div>
           <p>No media links yet.</p>
-          <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add Link</button>
+          {canEditMedia && <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add Link</button>}
         </div>
       ) : (
         MEDIA_CATEGORIES.map(cat => {
@@ -432,7 +432,7 @@ function MediaTab({ product, onProductUpdate, comparisons, onOpenComparison, onS
                     <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, color: 'var(--primary)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {m.label || m.url}
                     </a>
-                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', padding: '2px 6px' }} onClick={() => handleRemove(m.id)}>×</button>
+                    {canEditMedia && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', padding: '2px 6px' }} onClick={() => handleRemove(m.id)}>×</button>}
                   </div>
                 ))}
               </div>
@@ -748,7 +748,7 @@ function PdfExportModal({ product, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate, catalog, onViewProduct, canEdit = true }) {
+export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate, catalog, onViewProduct, canEdit = true, canEditMedia = true }) {
   const [activeTab, setActiveTab] = useState('Tech Specs');
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [comparisons, setComparisons] = useState([]);
@@ -877,7 +877,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Certifications' && <CertificationsTab product={product} onCertUpdate={onCertUpdate} certSchema={certSchema} />}
       {activeTab === 'Testing Results' && <TestingResultsTab sessions={sessions} onOpenSession={onOpenSession} />}
       {activeTab === 'Known Issues' && <KnownIssuesTab product={product} onOpenSession={onOpenSession} />}
-      {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} />}
+      {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} canEditMedia={canEditMedia} />}
       {activeTab === 'Project Docs' && <ProjectDocsTab product={product} onProductUpdate={onProductUpdate} />}
       {activeTab === 'Variations' && <VariationsTab variations={variationProducts} onViewProduct={onViewProduct} />}
     </div>

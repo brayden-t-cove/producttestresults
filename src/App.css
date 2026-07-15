@@ -441,9 +441,10 @@ select { cursor: pointer; }
   font-weight: 600;
   text-transform: capitalize;
 }
-.role-viewer    { background: var(--skip-dim);    color: var(--skip); }
-.role-editor    { background: var(--primary-dim); color: var(--primary); }
-.role-superuser { background: var(--pass-dim);    color: var(--pass); }
+.role-viewer    { background: var(--skip-dim);             color: var(--skip); }
+.role-editor    { background: var(--primary-dim);          color: var(--primary); }
+.role-designer  { background: rgba(168,85,247,0.15);       color: #a855f7; }
+.role-superuser { background: var(--pass-dim);             color: var(--pass); }
 
 /* ── Login page ── */
 .login-page {

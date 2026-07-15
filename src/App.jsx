@@ -535,6 +535,7 @@ export default function App() {
   }
 
   const canEdit = !authEnabled || (currentUser && ['editor', 'superuser'].includes(currentUser.role));
+  const canEditMedia = !authEnabled || (currentUser && ['editor', 'designer', 'superuser'].includes(currentUser.role));
 
   async function refreshSessions() {
     try {
@@ -843,6 +844,7 @@ export default function App() {
             catalog={catalog}
             onViewProduct={handleOpenProduct}
             canEdit={canEdit}
+            canEditMedia={canEditMedia}
           />
         </div>
       )}
