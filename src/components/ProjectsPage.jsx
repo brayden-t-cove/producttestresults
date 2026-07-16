@@ -101,6 +101,13 @@ function ProjectCard({ project, onOpen }) {
           {project.entity && (
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{project.entity}</div>
           )}
+          {project.deadline && (() => {
+            const days = Math.ceil((new Date(project.deadline) - new Date()) / (1000 * 60 * 60 * 24));
+            const color = days < 0 ? 'var(--fail)' : days < 14 ? '#f59e0b' : 'var(--text-dim)';
+            return <div style={{ fontSize: 11, color, marginTop: 2, fontWeight: days < 14 ? 600 : 400 }}>
+              {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due today' : `${days}d remaining`}
+            </div>;
+          })()}
         </div>
         <div style={{ position: 'relative' }} onClick={e => { e.stopPropagation(); setShowReadiness(v => !v); }}>
           <ReadinessRing pct={pct} />
@@ -131,11 +138,15 @@ function ProjectCard({ project, onOpen }) {
   );
 }
 
-function buildDefaultStages() {
+
+const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
+const STEP_LABELS = ['Project Details', 'Checklist', 'Deadline'];
+
+function buildStagesFromSelections(selections) {
   const stages = {};
   for (const stage of STAGES) {
     stages[stage.id] = {
-      items: DEFAULT_ITEMS[stage.id].map(tpl => ({
+      items: (selections[stage.id] || []).map(tpl => ({
         id: crypto.randomUUID(),
         label: tpl.label,
         stage: stage.id,
@@ -151,24 +162,66 @@ function buildDefaultStages() {
 }
 
 function NewProjectModal({ catalog, onSave, onClose }) {
+  const [step, setStep] = useState(1);
   const [name, setName] = useState('');
-  const [productMode, setProductMode] = useState('catalog'); // 'catalog' | 'placeholder'
+  const [productMode, setProductMode] = useState('catalog');
   const [catalogId, setCatalogId] = useState('');
   const [placeholderName, setPlaceholderName] = useState('');
   const [entity, setEntity] = useState('');
   const [description, setDescription] = useState('');
+  const [deadline, setDeadline] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
+  // Step 2: checklist selections — start with all defaults checked
+  const [selections, setSelections] = useState(() => {
+    const s = {};
+    for (const stage of STAGES) s[stage.id] = [...DEFAULT_ITEMS[stage.id]];
+    return s;
+  });
+  const [customLabels, setCustomLabels] = useState(() => {
+    const s = {};
+    for (const stage of STAGES) s[stage.id] = '';
+    return s;
+  });
 
   const selectedProduct = catalog.find(p => p.id === catalogId);
 
+  function validateStep1() {
+    if (!name.trim()) { setError('Project name is required.'); return false; }
+    if (productMode === 'catalog' && !catalogId) { setError('Select a product or use a placeholder.'); return false; }
+    if (productMode === 'placeholder' && !placeholderName.trim()) { setError('Enter a placeholder name.'); return false; }
+    return true;
+  }
+
+  function goNext() {
+    setError('');
+    if (step === 1 && !validateStep1()) return;
+    setStep(s => s + 1);
+  }
+
+  function toggleItem(stageId, item) {
+    setSelections(prev => {
+      const cur = prev[stageId];
+      const exists = cur.some(i => i.label === item.label);
+      return { ...prev, [stageId]: exists ? cur.filter(i => i.label !== item.label) : [...cur, item] };
+    });
+  }
+
+  function addCustomItem(stageId) {
+    const label = customLabels[stageId].trim();
+    if (!label) return;
+    const newItem = { label, assignedDomain: null, subItems: [] };
+    setSelections(prev => ({ ...prev, [stageId]: [...prev[stageId], newItem] }));
+    setCustomLabels(prev => ({ ...prev, [stageId]: '' }));
+  }
+
+  function removeCustomItem(stageId, label) {
+    setSelections(prev => ({ ...prev, [stageId]: prev[stageId].filter(i => i.label !== label) }));
+  }
+
   async function handleCreate() {
     setError('');
-    if (!name.trim()) { setError('Project name is required.'); return; }
-    if (productMode === 'catalog' && !catalogId) { setError('Select a product or use a placeholder.'); return; }
-    if (productMode === 'placeholder' && !placeholderName.trim()) { setError('Enter a placeholder name.'); return; }
     setBusy(true);
     try {
       const productName = productMode === 'catalog'
@@ -182,9 +235,10 @@ function NewProjectModal({ catalog, onSave, onClose }) {
         productName,
         entity: entity || (selectedProduct?.entity?.[0] || ''),
         description: description.trim(),
+        deadline: deadline || null,
         parentProjectId: null,
         variationType: null,
-        stages: buildDefaultStages(),
+        stages: buildStagesFromSelections(selections),
       });
       onClose();
     } catch (e) { setError(e.message); }
@@ -193,58 +247,154 @@ function NewProjectModal({ catalog, onSave, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+      <div className="modal-box" style={{ maxWidth: step === 2 ? 640 : 520 }} onClick={e => e.stopPropagation()}>
+
+        {/* Step indicator */}
         <div className="modal-header">
-          <h2 style={{ fontSize: 18, fontWeight: 700 }}>New Project</h2>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>New Project</h2>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              {STEP_LABELS.map((label, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700,
+                    background: step > i + 1 ? 'var(--pass)' : step === i + 1 ? 'var(--primary)' : 'var(--border)',
+                    color: step >= i + 1 ? '#fff' : 'var(--text-muted)',
+                  }}>{step > i + 1 ? '✓' : i + 1}</div>
+                  <span style={{ fontSize: 12, color: step === i + 1 ? 'var(--text)' : 'var(--text-muted)', fontWeight: step === i + 1 ? 600 : 400 }}>{label}</span>
+                  {i < STEP_LABELS.length - 1 && <span style={{ color: 'var(--border)', fontSize: 12 }}>›</span>}
+                </div>
+              ))}
+            </div>
+          </div>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
         </div>
-        {error && <div className="error-msg" style={{ margin: '0 0 12px' }}>{error}</div>}
 
-        <div className="form-group">
-          <label>Project Name <span style={{ color: 'var(--fail)' }}>*</span></label>
-          <input type="text" placeholder="e.g. Lightbulb Camera v1" value={name} onChange={e => setName(e.target.value)} autoFocus />
-        </div>
+        {error && <div className="error-msg" style={{ marginBottom: 12 }}>{error}</div>}
 
-        <div className="form-group">
-          <label>Product</label>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            {['catalog', 'placeholder'].map(m => (
-              <button key={m} type="button"
-                className={`btn btn-sm ${productMode === m ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => setProductMode(m)}
-                style={{ textTransform: 'capitalize' }}>
-                {m === 'catalog' ? 'Link Catalog Product' : 'Placeholder / New Design'}
-              </button>
-            ))}
+        {/* Step 1: Project Details */}
+        {step === 1 && (
+          <>
+            <div className="form-group">
+              <label>Project Name <span style={{ color: 'var(--fail)' }}>*</span></label>
+              <input type="text" placeholder="e.g. Lightbulb Camera v1" value={name} onChange={e => setName(e.target.value)} autoFocus />
+            </div>
+            <div className="form-group">
+              <label>Product</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                {['catalog', 'placeholder'].map(m => (
+                  <button key={m} type="button"
+                    className={`btn btn-sm ${productMode === m ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setProductMode(m)}>
+                    {m === 'catalog' ? 'Link Catalog Product' : 'Placeholder / New Design'}
+                  </button>
+                ))}
+              </div>
+              {productMode === 'catalog' ? (
+                <select value={catalogId} onChange={e => setCatalogId(e.target.value)}>
+                  <option value="">— Select product —</option>
+                  {catalog.map(p => (
+                    <option key={p.id} value={p.id}>{p.name || p.modelNumber} ({p.manufacturer || p.category})</option>
+                  ))}
+                </select>
+              ) : (
+                <input type="text" placeholder="e.g. Bulb Camera — Custom Design" value={placeholderName} onChange={e => setPlaceholderName(e.target.value)} />
+              )}
+            </div>
+            <div className="form-group">
+              <label>Entity</label>
+              <select value={entity} onChange={e => setEntity(e.target.value)}>
+                <option value="">— Select entity —</option>
+                {ENTITIES.map(en => <option key={en} value={en}>{en}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Goal / Description <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+              <textarea rows={3} placeholder="What is this project trying to achieve?" value={description} onChange={e => setDescription(e.target.value)} style={{ resize: 'vertical' }} />
+            </div>
+          </>
+        )}
+
+        {/* Step 2: Checklist */}
+        {step === 2 && (
+          <div>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+              Check or uncheck items to include in this project. You can also add custom items to any stage.
+            </p>
+            {STAGES.map(stage => {
+              const defaultLabels = DEFAULT_ITEMS[stage.id].map(i => i.label);
+              const stageItems = selections[stage.id];
+              return (
+                <div key={stage.id} style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{stage.label}</div>
+                  {/* Default items */}
+                  {DEFAULT_ITEMS[stage.id].map(item => {
+                    const checked = stageItems.some(i => i.label === item.label);
+                    return (
+                      <label key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleItem(stage.id, item)} style={{ width: 14, height: 14 }} />
+                        <span style={{ fontSize: 13, textDecoration: checked ? 'none' : 'line-through', color: checked ? 'var(--text)' : 'var(--text-muted)' }}>{item.label}</span>
+                        {item.assignedDomain && <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>+{item.assignedDomain}</span>}
+                      </label>
+                    );
+                  })}
+                  {/* Custom items added */}
+                  {stageItems.filter(i => !defaultLabels.includes(i.label)).map(item => (
+                    <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                      <input type="checkbox" checked readOnly style={{ width: 14, height: 14 }} />
+                      <span style={{ fontSize: 13, flex: 1 }}>{item.label}</span>
+                      <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)', padding: '0 4px', fontSize: 12 }} onClick={() => removeCustomItem(stage.id, item.label)}>✕</button>
+                    </div>
+                  ))}
+                  {/* Add custom */}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="Add custom item…"
+                      value={customLabels[stage.id]}
+                      onChange={e => setCustomLabels(prev => ({ ...prev, [stage.id]: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && addCustomItem(stage.id)}
+                      style={{ flex: 1, fontSize: 12 }}
+                    />
+                    <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => addCustomItem(stage.id)}>+ Add</button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          {productMode === 'catalog' ? (
-            <select value={catalogId} onChange={e => setCatalogId(e.target.value)}>
-              <option value="">— Select product —</option>
-              {catalog.map(p => (
-                <option key={p.id} value={p.id}>{p.name || p.modelNumber} ({p.manufacturer || p.category})</option>
-              ))}
-            </select>
-          ) : (
-            <input type="text" placeholder="e.g. Bulb Camera — Custom Design" value={placeholderName} onChange={e => setPlaceholderName(e.target.value)} />
-          )}
-        </div>
+        )}
 
-        <div className="form-group">
-          <label>Entity</label>
-          <select value={entity} onChange={e => setEntity(e.target.value)}>
-            <option value="">— Select entity —</option>
-            {ENTITIES.map(en => <option key={en} value={en}>{en}</option>)}
-          </select>
-        </div>
+        {/* Step 3: Deadline */}
+        {step === 3 && (
+          <>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+              Set a target completion date for the overall project. This is a goal, not a gate — individual items have no deadlines by design.
+            </p>
+            <div className="form-group">
+              <label>Target Completion Date <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
+            </div>
+            {deadline && (
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: -8, marginBottom: 12 }}>
+                {Math.ceil((new Date(deadline) - new Date()) / (1000 * 60 * 60 * 24))} days from today
+              </div>
+            )}
+          </>
+        )}
 
-        <div className="form-group">
-          <label>Goal / Description <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-          <textarea rows={3} placeholder="What is this project trying to achieve?" value={description} onChange={e => setDescription(e.target.value)} style={{ resize: 'vertical' }} />
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleCreate} disabled={busy}>{busy ? 'Creating…' : 'Create Project'}</button>
+        {/* Footer nav */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+          <div>
+            {step > 1 && <button className="btn btn-ghost" onClick={() => { setError(''); setStep(s => s - 1); }}>← Back</button>}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            {step < 3
+              ? <button className="btn btn-primary" onClick={goNext}>Next →</button>
+              : <button className="btn btn-primary" onClick={handleCreate} disabled={busy}>{busy ? 'Creating…' : 'Create Project'}</button>
+            }
+          </div>
         </div>
       </div>
     </div>
