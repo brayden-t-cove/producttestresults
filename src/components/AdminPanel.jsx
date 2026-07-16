@@ -253,10 +253,10 @@ export default function AdminPanel({ currentUser, onBack }) {
           {submissions.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>No submissions yet.</div>
           ) : (
-            ['product-inquiry', 'change-notice'].map(formType => {
+            ['product-inquiry', 'product-specs', 'change-notice'].map(formType => {
               const group = submissions.filter(s => s.formType === formType);
               if (group.length === 0) return null;
-              const label = formType === 'product-inquiry' ? 'Product Inquiries' : 'Change Notices';
+              const label = formType === 'product-inquiry' ? 'Product Inquiries' : formType === 'product-specs' ? 'Spec Sheets' : 'Change Notices';
               return (
                 <div key={formType} style={{ marginBottom: 32 }}>
                   <h3 style={{ marginBottom: 12, fontSize: 15, fontWeight: 700 }}>{label}</h3>
@@ -290,12 +290,17 @@ export default function AdminPanel({ currentUser, onBack }) {
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Copy these links to share with vendors directly via email.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <FormLinkCard
-              title="Product Inquiry"
+              title="Form 1 — Product Inquiry"
               description="For vendors submitting a camera product they'd like evaluated on the platform."
               path="/submit/product-inquiry"
             />
             <FormLinkCard
-              title="Product Change Notice"
+              title="Form 2 — Product Spec Sheet"
+              description="Full technical spec sheet — mirrors the catalog tech specs fields. Send when you need the vendor to fill out the complete product details."
+              path="/submit/product-specs"
+            />
+            <FormLinkCard
+              title="Form 3 — Product Change Notice"
               description="For vendors notifying us of changes to a product already in our catalog or under evaluation."
               path="/submit/change-notice"
             />

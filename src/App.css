@@ -2551,3 +2551,37 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 }
 .public-form-success h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
 .public-form-success p { font-size: 13px; color: var(--text-muted); }
+
+/* ── Product Spec Form ────────────────────────────────────────────────────── */
+.spec-form-group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.spec-form-group-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+}
+.spec-form-group-header:hover { background: var(--bg); }
+.spec-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+  padding: 0 16px 16px;
+}
+.spec-form-grid .form-group { margin-bottom: 10px; }
+@media (max-width: 560px) {
+  .spec-form-grid { grid-template-columns: 1fr; }
+}

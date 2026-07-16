@@ -26,6 +26,7 @@ import CertEditor from './components/CertEditor.jsx';
 import ProductDetail from './components/ProductDetail.jsx';
 import ChangeNoticeForm from './components/ChangeNoticeForm.jsx';
 import ProductInquiryForm from './components/ProductInquiryForm.jsx';
+import ProductSpecForm from './components/ProductSpecForm.jsx';
 
 const LOGO_URL = 'https://lh3.googleusercontent.com/d/1z-qNySTnx6Fo9EnmSf0WBsWSMF_P1mBP';
 
@@ -509,6 +510,7 @@ function PublicFormRouter() {
   const path = window.location.pathname;
   if (path.startsWith('/submit/change-notice')) return <ChangeNoticeForm />;
   if (path.startsWith('/submit/product-inquiry')) return <ProductInquiryForm />;
+  if (path.startsWith('/submit/product-specs')) return <ProductSpecForm />;
   return null;
 }
 
