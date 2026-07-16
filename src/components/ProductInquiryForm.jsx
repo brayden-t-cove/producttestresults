@@ -31,6 +31,7 @@ export default function ProductInquiryForm() {
     sampleEta: '',
     sampleNotes: '',
   });
+  const [imageLinks, setImageLinks] = useState(['']);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -52,7 +53,7 @@ export default function ProductInquiryForm() {
       const res = await fetch('/api/public/submit/product-inquiry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, imageLinks: imageLinks.filter(l => l.trim()) }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -210,6 +211,49 @@ export default function ProductInquiryForm() {
               />
             </div>
           )}
+
+          {/* ── Images ── */}
+          <div className="public-form-section-title" style={{ marginTop: 24 }}>Product Images</div>
+
+          <div className="form-group">
+            <label>Image Links <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, marginTop: 2 }}>
+              Paste links to product photos — Google Drive, Dropbox, manufacturer site, or anywhere images are hosted.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {imageLinks.map((link, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="url"
+                    placeholder="https://…"
+                    value={link}
+                    onChange={e => {
+                      const next = [...imageLinks];
+                      next[i] = e.target.value;
+                      setImageLinks(next);
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                  {imageLinks.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--fail)', flexShrink: 0 }}
+                      onClick={() => setImageLinks(prev => prev.filter((_, idx) => idx !== i))}
+                    >✕</button>
+                  )}
+                </div>
+              ))}
+              {imageLinks.length < 6 && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ alignSelf: 'flex-start', fontSize: 12 }}
+                  onClick={() => setImageLinks(prev => [...prev, ''])}
+                >+ Add another link</button>
+              )}
+            </div>
+          </div>
 
           <button type="submit" className="btn btn-primary" disabled={busy} style={{ width: '100%', marginTop: 8 }}>
             {busy ? 'Submitting…' : 'Submit Inquiry'}

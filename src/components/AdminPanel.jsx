@@ -420,6 +420,17 @@ function SubmissionRow({ submission: s, onReview, onDismiss }) {
             <em>Why a fit:</em> {s.whyFit}
           </div>
         )}
+        {s.imageLinks?.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>IMAGES:</span>
+            {s.imageLinks.map((url, i) => (
+              <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 12, color: 'var(--primary)', textDecoration: 'underline' }}>
+                Link {i + 1}
+              </a>
+            ))}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>AFFECTS:</span>
           {ENTITIES.map(en => (
