@@ -487,7 +487,7 @@ const PROJECT_DOC_TYPES = [
   { id: 'other', label: 'Other', icon: '📎' },
 ];
 
-function ProjectDocsTab({ product, onProductUpdate }) {
+function ProjectDocsTab({ product, onProductUpdate, canEditMedia = true }) {
   const projectDocs = product.projectDocs || [];
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -514,7 +514,7 @@ function ProjectDocsTab({ product, onProductUpdate }) {
           Link project documents — Gantt charts, checklists, spec docs, and roadmaps.
           Direct upload and a full PM checklist builder are planned for a future release.
         </p>
-        {!adding && (
+        {!adding && canEditMedia && (
           <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0, marginLeft: 16 }} onClick={() => setAdding(true)}>
             + Add Link
           </button>
@@ -550,7 +550,7 @@ function ProjectDocsTab({ product, onProductUpdate }) {
         <div className="empty-state" style={{ padding: '40px 0' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
           <p>No project documents linked yet.</p>
-          <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add Link</button>
+          {canEditMedia && <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add Link</button>}
         </div>
       ) : (
         PROJECT_DOC_TYPES.map(docType => {
@@ -567,7 +567,7 @@ function ProjectDocsTab({ product, onProductUpdate }) {
                     <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, color: 'var(--primary)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {d.label || d.url}
                     </a>
-                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', padding: '2px 6px' }} onClick={() => handleRemove(d.id)}>×</button>
+                    {canEditMedia && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', padding: '2px 6px' }} onClick={() => handleRemove(d.id)}>×</button>}
                   </div>
                 ))}
               </div>
@@ -878,7 +878,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Testing Results' && <TestingResultsTab sessions={sessions} onOpenSession={onOpenSession} />}
       {activeTab === 'Known Issues' && <KnownIssuesTab product={product} onOpenSession={onOpenSession} />}
       {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} canEditMedia={canEditMedia} />}
-      {activeTab === 'Project Docs' && <ProjectDocsTab product={product} onProductUpdate={onProductUpdate} />}
+      {activeTab === 'Project Docs' && <ProjectDocsTab product={product} onProductUpdate={onProductUpdate} canEditMedia={canEditMedia} />}
       {activeTab === 'Variations' && <VariationsTab variations={variationProducts} onViewProduct={onViewProduct} />}
     </div>
   );

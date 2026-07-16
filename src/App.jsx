@@ -551,9 +551,9 @@ export default function App() {
     setCurrentUser(null);
   }
 
-  const canEdit = !authEnabled || (currentUser && ['editor', 'superuser'].includes(currentUser.role));
-  const canEditMedia = !authEnabled || (currentUser && ['editor', 'designer', 'superuser'].includes(currentUser.role));
-  const canSeeVendors = !authEnabled || (currentUser && ['analyst', 'editor', 'designer', 'superuser'].includes(currentUser.role));
+  const canEdit = !authEnabled || (currentUser && ['editor', 'project-manager', 'superuser'].includes(currentUser.role));
+  const canEditMedia = !authEnabled || (currentUser && ['editor', 'designer', 'project-manager', 'superuser'].includes(currentUser.role));
+  const canSeeVendors = !authEnabled || (currentUser && ['analyst', 'editor', 'designer', 'project-manager', 'superuser'].includes(currentUser.role));
 
   async function refreshSessions() {
     try {
