@@ -6,6 +6,7 @@ import AdminPanel from './components/AdminPanel.jsx';
 import Particles from './components/Particles.jsx';
 import AstronautPhysics from './components/AstronautPhysics.jsx';
 import VendorLibrary from './components/VendorLibrary.jsx';
+import ProjectsPage from './components/ProjectsPage.jsx';
 import CatalogImport from './components/CatalogImport.jsx';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
@@ -82,7 +83,7 @@ const TOP_LEVEL_VIEWS = {
   vendors: 'vendors',
 };
 
-function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onSettings, currentUser, authEnabled, onAdmin, onLogout, canSeeVendors }) {
+function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onProjects, onSettings, currentUser, authEnabled, onAdmin, onLogout, canSeeVendors, canSeeProjects }) {
   const active = TOP_LEVEL_VIEWS[view] || 'dashboard';
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   return (
@@ -104,6 +105,11 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
         {canSeeVendors && (
           <button className={`top-nav-link${active === 'vendors' ? ' active' : ''}`} onClick={onVendors}>
             <IconVendors /> Vendors
+          </button>
+        )}
+        {canSeeProjects && (
+          <button className={`top-nav-link${active === 'projects' ? ' active' : ''}`} onClick={onProjects}>
+            📋 Projects
           </button>
         )}
         <button className={`top-nav-link${active === 'issues' ? ' active' : ''}`} onClick={onIssues}>
@@ -366,7 +372,7 @@ const IconCardVendors = () => (
   </svg>
 );
 
-function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors, canSeeVendors }) {
+function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors, onProjects, canSeeVendors, canSeeProjects }) {
   return (
     <div className="dashboard home-dashboard">
       <div className="home-hero">
@@ -390,6 +396,13 @@ function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors, canS
             <div className="home-card-icon"><IconCardVendors /></div>
             <h3 className="home-card-title">Vendor Library</h3>
             <p className="home-card-desc">Track companies, catalog links, and contacts</p>
+          </div>
+        )}
+        {canSeeProjects && (
+          <div className="home-card" onClick={onProjects}>
+            <div className="home-card-icon" style={{ fontSize: 28 }}>📋</div>
+            <h3 className="home-card-title">Projects</h3>
+            <p className="home-card-desc">Launch readiness tracker and sign-off workflow</p>
           </div>
         )}
         <div className="home-card" onClick={onIssues}>
@@ -554,6 +567,7 @@ export default function App() {
   const canEdit = !authEnabled || (currentUser && ['editor', 'project-manager', 'superuser'].includes(currentUser.role));
   const canEditMedia = !authEnabled || (currentUser && ['editor', 'designer', 'project-manager', 'superuser'].includes(currentUser.role));
   const canSeeVendors = !authEnabled || (currentUser && ['analyst', 'editor', 'designer', 'project-manager', 'superuser'].includes(currentUser.role));
+  const canSeeProjects = !authEnabled || (currentUser && ['project-manager', 'superuser'].includes(currentUser.role));
 
   async function refreshSessions() {
     try {
@@ -770,6 +784,7 @@ export default function App() {
         onCatalog={() => setView('catalog')}
         onTesting={() => setView('testing')}
         onVendors={() => setView('vendors')}
+        onProjects={() => setView('projects')}
         onIssues={() => setView('issues')}
         onAnalytics={() => setView('analytics')}
         onSettings={() => setShowSettings(true)}
@@ -778,6 +793,7 @@ export default function App() {
         onAdmin={() => setShowAdmin(true)}
         onLogout={handleLogout}
         canSeeVendors={canSeeVendors}
+        canSeeProjects={canSeeProjects}
       />
 
       <div key={view} className="view-content fade-view">
@@ -787,9 +803,11 @@ export default function App() {
           onCatalog={() => setView('catalog')}
           onTesting={() => setView('testing')}
           onVendors={() => setView('vendors')}
+          onProjects={() => setView('projects')}
           onIssues={() => setView('issues')}
           onAnalytics={() => setView('analytics')}
           canSeeVendors={canSeeVendors}
+          canSeeProjects={canSeeProjects}
         />
       )}
 
@@ -958,6 +976,14 @@ export default function App() {
           onBack={() => setView('testing')}
         />
       )}
+
+      {view === 'projects' && (canSeeProjects ? (
+        <ProjectsPage
+          onBack={() => setView('dashboard')}
+          currentUser={currentUser}
+          catalog={catalog}
+        />
+      ) : setView('dashboard'))}
 
       {view === 'vendors' && (canSeeVendors ? (
         <VendorLibrary

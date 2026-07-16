@@ -16,7 +16,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
 import connectPgSimple from 'connect-pg-simple';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
-import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, getPool } from './lib/storage.js';
+import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, projects, getPool } from './lib/storage.js';
 import {
   findOrCreateUser, createDomainRequest,
   getAllUsers, updateUserRole, updateUserEntity,
@@ -1403,6 +1403,59 @@ app.delete('/api/comparisons/:id', async (req, res) => {
     if (!ok) return res.status(404).json({ error: 'Not found' });
     res.json({ success: true });
   } catch { res.status(404).json({ error: 'Not found' }); }
+});
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+function requireProjectManager(req, res, next) {
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
+    const ae = !!process.env.GOOGLE_CLIENT_ID;
+    if (!ae) return next();
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!['project-manager', 'superuser'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+  next();
+}
+
+app.get('/api/projects', requireProjectManager, async (req, res) => {
+  try { res.json(await projects.getAll()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/projects/:id', requireProjectManager, async (req, res) => {
+  try {
+    const p = await projects.getById(req.params.id);
+    if (!p) return res.status(404).json({ error: 'Not found' });
+    res.json(p);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/projects', requireProjectManager, async (req, res) => {
+  try {
+    const project = { id: uuidv4(), createdAt: new Date().toISOString(), createdBy: req.user?.email || 'system', ...req.body };
+    await projects.create(project);
+    res.status(201).json(project);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/projects/:id', requireProjectManager, async (req, res) => {
+  try {
+    const existing = await projects.getById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+    const updated = { ...existing, ...req.body, id: req.params.id, updatedAt: new Date().toISOString() };
+    await projects.update(req.params.id, updated);
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/projects/:id', requireProjectManager, async (req, res) => {
+  try {
+    await projects.delete(req.params.id);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Static frontend (production only — must be after all API routes) ───────────
