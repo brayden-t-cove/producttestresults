@@ -108,7 +108,8 @@ export default function AdminPanel({ currentUser, onBack }) {
           { id: 'users',    label: 'Users' },
           { id: 'domains',  label: 'Domains' },
           { id: 'pending',  label: `Pending Products${pendingProducts.length > 0 ? ` (${pendingProducts.length})` : ''}` },
-          { id: 'submissions', label: `Change Notices${submissions.filter(s => s.status === 'pending').length > 0 ? ` (${submissions.filter(s => s.status === 'pending').length})` : ''}` },
+          { id: 'submissions', label: `Submissions${submissions.filter(s => s.status === 'pending').length > 0 ? ` (${submissions.filter(s => s.status === 'pending').length})` : ''}` },
+          { id: 'formlinks',   label: 'Form Links' },
         ].map(t => (
           <button
             key={t.id}
@@ -246,30 +247,59 @@ export default function AdminPanel({ currentUser, onBack }) {
         </div>
       )}
 
-      {/* ── Change Notices ── */}
+      {/* ── Submissions ── */}
       {tab === 'submissions' && !loading && (
         <div>
-          <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 700 }}>Vendor Change Notices</h3>
           {submissions.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>No submissions yet.</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {submissions.map(s => (
-                <SubmissionRow
-                  key={s.id}
-                  submission={s}
-                  onReview={async (id, entities) => {
-                    const updated = await adminUpdateSubmission(id, { status: 'reviewed', entities });
-                    setSubmissions(prev => prev.map(x => x.id === id ? updated : x));
-                  }}
-                  onDismiss={async (id) => {
-                    await adminDeleteSubmission(id);
-                    setSubmissions(prev => prev.filter(x => x.id !== id));
-                  }}
-                />
-              ))}
-            </div>
+            ['product-inquiry', 'change-notice'].map(formType => {
+              const group = submissions.filter(s => s.formType === formType);
+              if (group.length === 0) return null;
+              const label = formType === 'product-inquiry' ? 'Product Inquiries' : 'Change Notices';
+              return (
+                <div key={formType} style={{ marginBottom: 32 }}>
+                  <h3 style={{ marginBottom: 12, fontSize: 15, fontWeight: 700 }}>{label}</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {group.map(s => (
+                      <SubmissionRow
+                        key={s.id}
+                        submission={s}
+                        onReview={async (id, entities) => {
+                          const updated = await adminUpdateSubmission(id, { status: 'reviewed', entities });
+                          setSubmissions(prev => prev.map(x => x.id === id ? updated : x));
+                        }}
+                        onDismiss={async (id) => {
+                          await adminDeleteSubmission(id);
+                          setSubmissions(prev => prev.filter(x => x.id !== id));
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })
           )}
+        </div>
+      )}
+
+      {/* ── Form Links ── */}
+      {tab === 'formlinks' && !loading && (
+        <div>
+          <h3 style={{ marginBottom: 4, fontSize: 16, fontWeight: 700 }}>Vendor Submission Links</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Copy these links to share with vendors directly via email.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <FormLinkCard
+              title="Product Inquiry"
+              description="For vendors submitting a camera product they'd like evaluated on the platform."
+              path="/submit/product-inquiry"
+            />
+            <FormLinkCard
+              title="Product Change Notice"
+              description="For vendors notifying us of changes to a product already in our catalog or under evaluation."
+              path="/submit/change-notice"
+            />
+          </div>
         </div>
       )}
 
@@ -370,9 +400,26 @@ function SubmissionRow({ submission: s, onReview, onDismiss }) {
           {isReviewed && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: 'var(--pass-dim)', color: 'var(--pass)', fontWeight: 600 }}>Reviewed</span>}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-          <strong>{s.changeType}</strong> · {s.companyName || s.vendorName} — {s.vendorName} ({s.vendorEmail}) · {formatDate(s.submittedAt)}
+          {s.formType === 'change-notice'
+            ? <><strong>{s.changeType}</strong> · </>
+            : s.category ? <><strong>{s.category}</strong>{s.connectivity ? ` · ${s.connectivity}` : ''} · </> : null
+          }
+          {s.companyName || s.vendorName} — {s.vendorName || s.contactName} ({s.vendorEmail || s.contactEmail}) · {formatDate(s.submittedAt)}
         </div>
         <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: 12 }}>{s.description}</div>
+        {s.formType === 'product-inquiry' && s.sampleAvailable && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+            Sample: <strong style={{ color: 'var(--text)' }}>
+              {s.sampleAvailable === 'yes' ? 'Ready to ship' : s.sampleAvailable === 'soon' ? `Available ${s.sampleEta || 'TBD'}` : 'Not available'}
+            </strong>
+            {s.sampleNotes && ` — ${s.sampleNotes}`}
+          </div>
+        )}
+        {s.whyFit && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+            <em>Why a fit:</em> {s.whyFit}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>AFFECTS:</span>
           {ENTITIES.map(en => (
@@ -397,6 +444,33 @@ function SubmissionRow({ submission: s, onReview, onDismiss }) {
         )}
         <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)', fontSize: 12 }} onClick={() => onDismiss(s.id)}>
           Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FormLinkCard({ title, description, path }) {
+  const [copied, setCopied] = useState(false);
+  const url = `${window.location.origin}${path}`;
+
+  function copy() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', background: 'var(--surface)' }}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{description}</div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <code style={{ flex: 1, fontSize: 12, padding: '7px 10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {url}
+        </code>
+        <button className="btn btn-primary btn-sm" onClick={copy} style={{ flexShrink: 0 }}>
+          {copied ? '✓ Copied' : 'Copy Link'}
         </button>
       </div>
     </div>

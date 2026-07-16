@@ -785,6 +785,25 @@ app.post('/api/public/submit/change-notice', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/public/submit/product-inquiry', async (req, res) => {
+  try {
+    const { companyName, contactName, contactEmail, productName, category, description } = req.body;
+    if (!companyName || !contactName || !contactEmail || !productName || !category || !description) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const entry = {
+      id: uuidv4(),
+      formType: 'product-inquiry',
+      status: 'pending',
+      entities: [],
+      ...req.body,
+      submittedAt: new Date().toISOString(),
+    };
+    await vendorSubmissions.create(entry);
+    res.status(201).json({ success: true, id: entry.id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/admin/submissions', requireSuperuser, async (req, res) => {
   try {
     const all = await vendorSubmissions.getAll();

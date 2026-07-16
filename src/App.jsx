@@ -25,6 +25,7 @@ import SchemaEditor from './components/SchemaEditor.jsx';
 import CertEditor from './components/CertEditor.jsx';
 import ProductDetail from './components/ProductDetail.jsx';
 import ChangeNoticeForm from './components/ChangeNoticeForm.jsx';
+import ProductInquiryForm from './components/ProductInquiryForm.jsx';
 
 const LOGO_URL = 'https://lh3.googleusercontent.com/d/1z-qNySTnx6Fo9EnmSf0WBsWSMF_P1mBP';
 
@@ -507,6 +508,7 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewC
 function PublicFormRouter() {
   const path = window.location.pathname;
   if (path.startsWith('/submit/change-notice')) return <ChangeNoticeForm />;
+  if (path.startsWith('/submit/product-inquiry')) return <ProductInquiryForm />;
   return null;
 }
 
