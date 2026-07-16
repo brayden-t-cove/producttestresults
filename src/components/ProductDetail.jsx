@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import { CERT_STATUS_LABELS, CERT_STATUS_COLORS } from '../data/certSchema.js';
-import { listComparisons } from '../lib/api.js';
+import { listComparisons, getProjects } from '../lib/api.js';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -487,7 +487,69 @@ const PROJECT_DOC_TYPES = [
   { id: 'other', label: 'Other', icon: '📎' },
 ];
 
-function ProjectDocsTab({ product, onProductUpdate, canEditMedia = true }) {
+function ProjectMiniCard({ project, onOpen }) {
+  let approved = 0, total = 0;
+  for (const stage of Object.values(project.stages || {})) {
+    for (const item of stage.items || []) {
+      total++;
+      if (item.status === 'approved') approved++;
+    }
+  }
+  const pct = total === 0 ? 0 : Math.round((approved / total) * 100);
+  const statusColors = { active: 'var(--primary)', 'on-hold': '#f59e0b', completed: 'var(--pass)', scrapped: 'var(--fail)' };
+  const statusLabels = { active: 'Active', 'on-hold': 'On Hold', completed: 'Completed', scrapped: 'Scrapped' };
+  const color = statusColors[project.status] || 'var(--primary)';
+
+  return (
+    <div
+      onClick={() => onOpen && onOpen(project.id)}
+      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', cursor: onOpen ? 'pointer' : 'default', marginBottom: 8 }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{project.name}</div>
+        <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+          <span style={{ color, fontWeight: 600 }}>{statusLabels[project.status] || project.status}</span>
+          {project.entity && <span>{project.entity}</span>}
+          {project.deadline && (() => {
+            const days = Math.ceil((new Date(project.deadline) - new Date()) / 86400000);
+            return <span style={{ color: days < 0 ? 'var(--fail)' : days < 14 ? '#f59e0b' : 'var(--text-dim)' }}>
+              {days < 0 ? `${Math.abs(days)}d overdue` : `${days}d remaining`}
+            </span>;
+          })()}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: pct === 100 ? 'var(--pass)' : pct >= 67 ? 'var(--primary)' : pct >= 34 ? '#f59e0b' : 'var(--fail)' }}>{pct}%</div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{approved}/{total} done</div>
+      </div>
+      {onOpen && <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>→</span>}
+    </div>
+  );
+}
+
+function ProjectDetailsTab({ product, onProductUpdate, canEditMedia = true, onOpenProject }) {
+  const [linkedProjects, setLinkedProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+
+  useEffect(() => {
+    getProjects()
+      .then(all => setLinkedProjects(all.filter(p => p.catalogProductId === product.id)))
+      .catch(() => {})
+      .finally(() => setLoadingProjects(false));
+  }, [product.id]);
+
+  // Docs state (unchanged)
+  return <ProjectDetailsTabInner
+    product={product}
+    onProductUpdate={onProductUpdate}
+    canEditMedia={canEditMedia}
+    onOpenProject={onOpenProject}
+    linkedProjects={linkedProjects}
+    loadingProjects={loadingProjects}
+  />;
+}
+
+function ProjectDetailsTabInner({ product, onProductUpdate, canEditMedia, onOpenProject, linkedProjects, loadingProjects }) {
   const projectDocs = product.projectDocs || [];
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -509,13 +571,39 @@ function ProjectDocsTab({ product, onProductUpdate, canEditMedia = true }) {
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
-          Link project documents — Gantt charts, checklists, spec docs, and roadmaps.
-          Direct upload and a full PM checklist builder are planned for a future release.
-        </p>
+      {/* Linked Projects Section */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+            Linked Projects
+          </div>
+          {onOpenProject && (
+            <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => onOpenProject(null)}>
+              Open Projects →
+            </button>
+          )}
+        </div>
+        {loadingProjects ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading…</div>
+        ) : linkedProjects.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 0' }}>
+            No projects linked to this product yet.
+            {onOpenProject && <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => onOpenProject(null)}>Create one in Projects →</button>}
+          </div>
+        ) : (
+          linkedProjects.map(p => (
+            <ProjectMiniCard key={p.id} project={p} onOpen={onOpenProject} />
+          ))
+        )}
+      </div>
+
+      {/* Docs Section */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+          Project Documents
+        </div>
         {!adding && canEditMedia && (
-          <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0, marginLeft: 16 }} onClick={() => setAdding(true)}>
+          <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }} onClick={() => setAdding(true)}>
             + Add Link
           </button>
         )}
@@ -678,7 +766,7 @@ function KnownIssuesTab({ product, onOpenSession }) {
   );
 }
 
-const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Media & Documents', 'Project Docs'];
+const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Media & Documents', 'Project Details'];
 
 function VariationsTab({ variations, onViewProduct }) {
   if (variations.length === 0) {
@@ -748,7 +836,7 @@ function PdfExportModal({ product, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate, catalog, onViewProduct, canEdit = true, canEditMedia = true }) {
+export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate, catalog, onViewProduct, canEdit = true, canEditMedia = true, onOpenProject }) {
   const [activeTab, setActiveTab] = useState('Tech Specs');
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [comparisons, setComparisons] = useState([]);
@@ -878,7 +966,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Testing Results' && <TestingResultsTab sessions={sessions} onOpenSession={onOpenSession} />}
       {activeTab === 'Known Issues' && <KnownIssuesTab product={product} onOpenSession={onOpenSession} />}
       {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} canEditMedia={canEditMedia} />}
-      {activeTab === 'Project Docs' && <ProjectDocsTab product={product} onProductUpdate={onProductUpdate} canEditMedia={canEditMedia} />}
+      {activeTab === 'Project Details' && <ProjectDetailsTab product={product} onProductUpdate={onProductUpdate} canEditMedia={canEditMedia} onOpenProject={onOpenProject} />}
       {activeTab === 'Variations' && <VariationsTab variations={variationProducts} onViewProduct={onViewProduct} />}
     </div>
   );

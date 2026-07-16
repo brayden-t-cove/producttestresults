@@ -81,6 +81,7 @@ const TOP_LEVEL_VIEWS = {
   issues: 'issues',
   analytics: 'analytics',
   vendors: 'vendors',
+  projects: 'projects',
 };
 
 function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onProjects, onSettings, currentUser, authEnabled, onAdmin, onLogout, canSeeVendors, canSeeProjects }) {
@@ -531,6 +532,7 @@ export default function App() {
   const isPublicRoute = window.location.pathname.startsWith('/submit/');
 
   const [view, setView] = useState('dashboard');
+  const [initialProjectId, setInitialProjectId] = useState(null);
   const [currentSession, setCurrentSession] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
@@ -886,6 +888,7 @@ export default function App() {
             onViewProduct={handleOpenProduct}
             canEdit={canEdit}
             canEditMedia={canEditMedia}
+            onOpenProject={canSeeProjects ? (projectId) => { setInitialProjectId(projectId || null); setView('projects'); } : undefined}
           />
         </div>
       )}
@@ -979,9 +982,10 @@ export default function App() {
 
       {view === 'projects' && (canSeeProjects ? (
         <ProjectsPage
-          onBack={() => setView('dashboard')}
+          onBack={() => { setInitialProjectId(null); setView('dashboard'); }}
           currentUser={currentUser}
           catalog={catalog}
+          initialProjectId={initialProjectId}
         />
       ) : setView('dashboard'))}
 

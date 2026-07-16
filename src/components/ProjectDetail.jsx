@@ -339,7 +339,7 @@ function StagePanel({ stage, stageData, currentUser, onUpdateStage }) {
   );
 }
 
-export default function ProjectDetail({ project, currentUser, onBack, onUpdate, onDelete }) {
+export default function ProjectDetail({ project, allProjects = [], currentUser, onBack, onUpdate, onDelete, onOpenProject, onCreateVariation }) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(project.name);
   const [editStatus, setEditStatus] = useState(project.status);
@@ -348,6 +348,8 @@ export default function ProjectDetail({ project, currentUser, onBack, onUpdate, 
 
   const sc = STATUS_CONFIG[project.status] || STATUS_CONFIG.active;
   const canEdit = currentUser && ['project-manager', 'superuser'].includes(currentUser.role);
+  const parentProject = project.parentProjectId ? allProjects.find(p => p.id === project.parentProjectId) : null;
+  const childProjects = allProjects.filter(p => p.parentProjectId === project.id);
 
   function updateStage(stageId, stageData) {
     const stages = { ...project.stages, [stageId]: stageData };
@@ -362,7 +364,19 @@ export default function ProjectDetail({ project, currentUser, onBack, onUpdate, 
   return (
     <div className="project-detail">
       <div className="project-detail-header">
-        <button className="btn btn-ghost btn-sm" onClick={onBack}>← Projects</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onBack}>← Projects</button>
+          {parentProject && (
+            <>
+              <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>›</span>
+              <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => onOpenProject && onOpenProject(parentProject.id)}>
+                {parentProject.name}
+              </button>
+              <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>›</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{project.name}</span>
+            </>
+          )}
+        </div>
 
         {editing ? (
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -406,6 +420,48 @@ export default function ProjectDetail({ project, currentUser, onBack, onUpdate, 
           />
         ))}
       </div>
+
+      {/* Child / Variation Projects */}
+      {(!project.parentProjectId) && (
+        <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              Variations ({childProjects.length})
+            </div>
+            {canEdit && onCreateVariation && (
+              <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={onCreateVariation}>
+                + Create Variation
+              </button>
+            )}
+          </div>
+          {childProjects.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              No variations yet. Variations track supplemental work — region-specific certs, component swaps, color variants.
+            </div>
+          ) : (
+            childProjects.map(child => {
+              let approved = 0, total = 0;
+              for (const stage of Object.values(child.stages || {})) {
+                for (const item of stage.items || []) { total++; if (item.status === 'approved') approved++; }
+              }
+              const pct = total === 0 ? 0 : Math.round((approved / total) * 100);
+              const csc = STATUS_CONFIG[child.status] || STATUS_CONFIG.active;
+              return (
+                <div key={child.id}
+                  onClick={() => onOpenProject && onOpenProject(child.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{child.name}</div>
+                    <div style={{ fontSize: 11, color: csc.color, fontWeight: 600, marginTop: 2 }}>{csc.label}</div>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: pct === 100 ? 'var(--pass)' : 'var(--primary)' }}>{pct}%</div>
+                  <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>→</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }

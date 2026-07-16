@@ -80,10 +80,11 @@ function ReadinessDropdown({ stages }) {
   );
 }
 
-function ProjectCard({ project, onOpen }) {
+function ProjectCard({ project, onOpen, allProjects = [] }) {
   const [showReadiness, setShowReadiness] = useState(false);
   const pct = computeReadiness(project.stages);
   const sc = STATUS_CONFIG[project.status] || STATUS_CONFIG.active;
+  const parentProject = project.parentProjectId ? allProjects.find(p => p.id === project.parentProjectId) : null;
 
   return (
     <div className="project-card" onClick={() => onOpen(project)}>
@@ -94,6 +95,11 @@ function ProjectCard({ project, onOpen }) {
             <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: sc.bg, color: sc.color, fontWeight: 600 }}>
               {sc.label}
             </span>
+            {parentProject && (
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: 'var(--border)', color: 'var(--text-muted)', fontWeight: 500 }}>
+                ↳ {parentProject.name}
+              </span>
+            )}
           </div>
           {project.productName && (
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{project.productName}</div>
@@ -161,7 +167,7 @@ function buildStagesFromSelections(selections) {
   return stages;
 }
 
-function NewProjectModal({ catalog, onSave, onClose }) {
+function NewProjectModal({ catalog, projects = [], onSave, onClose, initialParentId = null }) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [productMode, setProductMode] = useState('catalog');
@@ -170,6 +176,7 @@ function NewProjectModal({ catalog, onSave, onClose }) {
   const [entity, setEntity] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [parentProjectId, setParentProjectId] = useState(initialParentId || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -236,8 +243,8 @@ function NewProjectModal({ catalog, onSave, onClose }) {
         entity: entity || (selectedProduct?.entity?.[0] || ''),
         description: description.trim(),
         deadline: deadline || null,
-        parentProjectId: null,
-        variationType: null,
+        parentProjectId: parentProjectId || null,
+        variationType: parentProjectId ? 'variation' : null,
         stages: buildStagesFromSelections(selections),
       });
       onClose();
@@ -307,6 +314,15 @@ function NewProjectModal({ catalog, onSave, onClose }) {
               <select value={entity} onChange={e => setEntity(e.target.value)}>
                 <option value="">— Select entity —</option>
                 {ENTITIES.map(en => <option key={en} value={en}>{en}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Parent Project <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — for variations)</span></label>
+              <select value={parentProjectId} onChange={e => setParentProjectId(e.target.value)}>
+                <option value="">— None (standalone project) —</option>
+                {projects.filter(p => !p.parentProjectId).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
               </select>
             </div>
             <div className="form-group">
@@ -401,11 +417,12 @@ function NewProjectModal({ catalog, onSave, onClose }) {
   );
 }
 
-export default function ProjectsPage({ onBack, currentUser, catalog = [] }) {
+export default function ProjectsPage({ onBack, currentUser, catalog = [], initialProjectId = null }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showNew, setShowNew] = useState(false);
+  const [showNewVariant, setShowNewVariant] = useState(null); // parentProjectId for variation modal
   const [openProject, setOpenProject] = useState(null);
   const [statusFilter, setStatusFilter] = useState('active');
 
@@ -413,7 +430,14 @@ export default function ProjectsPage({ onBack, currentUser, catalog = [] }) {
 
   async function load() {
     setLoading(true);
-    try { setProjects(await getProjects()); }
+    try {
+      const all = await getProjects();
+      setProjects(all);
+      if (initialProjectId) {
+        const target = all.find(p => p.id === initialProjectId);
+        if (target) setOpenProject(target);
+      }
+    }
     catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -438,13 +462,27 @@ export default function ProjectsPage({ onBack, currentUser, catalog = [] }) {
 
   if (openProject) {
     return (
-      <ProjectDetail
-        project={openProject}
-        currentUser={currentUser}
-        onBack={() => setOpenProject(null)}
-        onUpdate={(data) => handleUpdate(openProject.id, data)}
-        onDelete={() => handleDelete(openProject.id)}
-      />
+      <>
+        <ProjectDetail
+          project={openProject}
+          allProjects={projects}
+          currentUser={currentUser}
+          onBack={() => setOpenProject(null)}
+          onUpdate={(data) => handleUpdate(openProject.id, data)}
+          onDelete={() => handleDelete(openProject.id)}
+          onOpenProject={(id) => { const p = projects.find(x => x.id === id); if (p) setOpenProject(p); }}
+          onCreateVariation={() => setShowNewVariant(openProject.id)}
+        />
+        {showNewVariant && (
+          <NewProjectModal
+            catalog={catalog}
+            projects={projects}
+            initialParentId={showNewVariant}
+            onSave={handleCreate}
+            onClose={() => setShowNewVariant(null)}
+          />
+        )}
+      </>
     );
   }
 
@@ -484,12 +522,12 @@ export default function ProjectsPage({ onBack, currentUser, catalog = [] }) {
       ) : (
         <div className="projects-grid">
           {filtered.map(p => (
-            <ProjectCard key={p.id} project={p} onOpen={setOpenProject} />
+            <ProjectCard key={p.id} project={p} onOpen={setOpenProject} allProjects={projects} />
           ))}
         </div>
       )}
 
-      {showNew && <NewProjectModal catalog={catalog} onSave={handleCreate} onClose={() => setShowNew(false)} />}
+      {showNew && <NewProjectModal catalog={catalog} projects={projects} onSave={handleCreate} onClose={() => setShowNew(false)} />}
     </div>
   );
 }
