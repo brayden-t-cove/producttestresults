@@ -310,19 +310,80 @@ export const SPEC_SCHEMA = {
     },
   ],
 
-  // TODO: expand with category-specific fields
   sensor: [
     {
       label: 'Identity & Record',
       fields: [
         { id: 'sku', label: 'SKU / Part Number', type: 'text' },
         { id: 'upc', label: 'UPC / Barcode', type: 'text' },
+        { id: 'modelName', label: 'Model Name (Manufacturer)', type: 'text' },
+        { id: 'marketedName', label: 'Marketed Name (Luna/Cove/Alder)', type: 'text' },
         {
           id: 'productStatus',
           label: 'Product Status',
           type: 'select',
           options: ['Active', 'EOL', 'Discontinued', 'Pre-release', 'In Testing'],
         },
+        { id: 'color', label: 'Color', type: 'text' },
+        { id: 'housingMaterial', label: 'Housing Material', type: 'text' },
+      ],
+    },
+    {
+      label: 'RF & Wireless',
+      fields: [
+        { id: 'rfFrequency', label: 'Transmitter Frequency', type: 'text', placeholder: 'e.g. 345.00 MHz' },
+        { id: 'rfRangeOpenAir', label: 'RF Signal Range — Open Air', type: 'text', placeholder: 'e.g. 350 ft (106.68 m)' },
+        { id: 'rfRangePanel', label: 'RF Signal Range — With Panel', type: 'text' },
+        { id: 'uniqueIdCodes', label: 'Unique ID Code Permutations', type: 'text', placeholder: 'e.g. Over 1 million' },
+        { id: 'supervisoryInterval', label: 'Supervisory Interval', type: 'text', placeholder: 'e.g. 70 minutes' },
+      ],
+    },
+    {
+      label: 'Compatibility',
+      fields: [
+        { id: 'panelCompatibility', label: 'Security Control Panel Compatibility', type: 'textarea', placeholder: 'e.g. Luna Products, 2GIG, Honeywell compatible panels' },
+        { id: 'codeOutputs', label: 'Code Outputs', type: 'textarea', placeholder: 'e.g. Loop 2 Internal (Alarm; Alarm Restore)…' },
+        { id: 'externalInput', label: 'External Input', type: 'text', placeholder: 'e.g. Accepts NC dry contact devices' },
+      ],
+    },
+    {
+      label: 'Detection',
+      fields: [
+        { id: 'reedSensitivity', label: 'Reed Sensitivity', type: 'text', placeholder: 'e.g. 0.625 in. min gap, 0.85 in. max' },
+        { id: 'magnetType', label: 'Magnet Type', type: 'text', placeholder: 'e.g. Rare Earth' },
+        { id: 'tamperProtection', label: 'Tamper Protection', type: 'boolean' },
+        { id: 'supervisory', label: 'Supervisory Signal', type: 'boolean' },
+      ],
+    },
+    {
+      label: 'Physical',
+      fields: [
+        { id: 'sensorDimensions', label: 'Sensor Dimensions (H × W × D)', type: 'text', placeholder: 'e.g. 2.13" × 1.00" × 0.50"' },
+        { id: 'magnetDimensions', label: 'Magnet Dimensions (H × W × D)', type: 'text', placeholder: 'e.g. 2.11" × 0.41" × 0.46"' },
+        { id: 'weight', label: 'Weight (including magnet & battery)', type: 'text', placeholder: 'e.g. 0.915 oz (26 g)' },
+      ],
+    },
+    {
+      label: 'Power',
+      fields: [
+        { id: 'batteryType', label: 'Battery Type', type: 'text', placeholder: 'e.g. CR2032 Lithium' },
+        { id: 'batteryCount', label: 'Number of Batteries', type: 'text', placeholder: 'e.g. 2' },
+        { id: 'batteryLife', label: 'Battery Life', type: 'text', placeholder: 'e.g. 5 Years' },
+        { id: 'lowBatteryAlert', label: 'Low Battery Alert', type: 'boolean' },
+      ],
+    },
+    {
+      label: 'Environmental',
+      fields: [
+        { id: 'operatingTemp', label: 'Operating Temperature', type: 'text', placeholder: 'e.g. 32°–120°F (0°–49°C)' },
+        { id: 'relativeHumidity', label: 'Relative Humidity', type: 'text', placeholder: 'e.g. 5–90% Non-Condensing' },
+      ],
+    },
+    {
+      label: 'Package & Warranty',
+      fields: [
+        { id: 'warranty', label: 'Warranty', type: 'text', placeholder: 'e.g. 2 Years' },
+        { id: 'packageContents', label: 'Package Contents', type: 'textarea' },
         { id: 'auxNotes', label: 'Auxiliary Notes', type: 'textarea' },
       ],
     },
