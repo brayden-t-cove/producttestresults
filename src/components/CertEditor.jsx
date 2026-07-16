@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CERT_SCHEMA, COMMON_COUNTRIES } from '../data/certSchema.js';
 
 function normalizeCert(entry) {
   if (typeof entry === 'string') return { name: entry, subcerts: [] };
@@ -24,6 +25,7 @@ export default function CertEditor({ schema, onSave, onBack }) {
   const [items, setItems] = useState(() => toArray(schema));
   const [saved, setSaved] = useState(false);
   const [newCountry, setNewCountry] = useState('');
+  const [customCountry, setCustomCountry] = useState('');
   const [expandedCerts, setExpandedCerts] = useState({});
 
   function updateItem(idx, patch) {
@@ -114,10 +116,12 @@ export default function CertEditor({ schema, onSave, onBack }) {
   }
 
   function addCountry() {
-    const name = newCountry.trim();
+    const name = newCountry === '__custom__' ? customCountry.trim() : newCountry.trim();
     if (!name) return;
-    setItems(prev => [...prev, { country: name, certs: [] }]);
+    const templateCerts = (CERT_SCHEMA[name] || []).map(c => ({ name: c.name, subcerts: [...(c.subcerts || [])] }));
+    setItems(prev => [...prev, { country: name, certs: templateCerts }]);
     setNewCountry('');
+    setCustomCountry('');
   }
 
   async function handleSave() {
@@ -216,16 +220,34 @@ export default function CertEditor({ schema, onSave, onBack }) {
         </div>
       ))}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-        <input
-          type="text"
-          placeholder="New country name..."
+      <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+        <select
           value={newCountry}
           onChange={e => setNewCountry(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && addCountry()}
-          style={{ flex: 1 }}
-        />
-        <button className="btn btn-secondary" onClick={addCountry} disabled={!newCountry.trim()}>
+          style={{ flex: 1, minWidth: 200 }}
+        >
+          <option value="">— Select country to add —</option>
+          {COMMON_COUNTRIES
+            .filter(c => !items.some(item => item.country === c))
+            .map(c => <option key={c} value={c}>{c}</option>)
+          }
+          <option value="__custom__">Custom country…</option>
+        </select>
+        {newCountry === '__custom__' && (
+          <input
+            type="text"
+            placeholder="Country name"
+            value={customCountry}
+            onChange={e => setCustomCountry(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addCountry()}
+            style={{ flex: 1, minWidth: 160 }}
+          />
+        )}
+        <button
+          className="btn btn-secondary"
+          onClick={addCountry}
+          disabled={!newCountry || (newCountry === '__custom__' && !customCountry.trim())}
+        >
           + Add Country
         </button>
       </div>
