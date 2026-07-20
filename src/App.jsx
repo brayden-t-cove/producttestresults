@@ -714,6 +714,12 @@ export default function App() {
     }
   }
 
+  function handleStartComparisonFromCatalog(product) {
+    setComparisonPreselectedId(product.id);
+    setCurrentComparison(null);
+    setView('comparisonBuilder');
+  }
+
   function handleOpenProduct(product) {
     setCurrentProduct(product);
     setView('productDetail');
@@ -838,6 +844,7 @@ export default function App() {
             onAdd={() => { setEditingProduct(null); setView('newProduct'); }}
             onEdit={product => { setEditingProduct(product); setView('editProduct'); }}
             onStartTest={handleStartTestFromCatalog}
+            onStartComparison={handleStartComparisonFromCatalog}
             onDelete={handleDeleteProduct}
             onDuplicate={handleDuplicateProduct}
             onBack={() => setView('dashboard')}
