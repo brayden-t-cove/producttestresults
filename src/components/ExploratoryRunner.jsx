@@ -291,9 +291,12 @@ export default function ExploratoryRunner({ session, onUpdate, onFinish, onBack 
                   type="checkbox"
                   checked={!!activeCategory.completed}
                   onChange={e => {
-                    updateCategoryField(activeCatIndex, 'completed', e.target.checked);
-                    // save on change
-                    setTimeout(handleBlur, 50);
+                    const checked = e.target.checked;
+                    const updated = categories.map((cat, i) =>
+                      i === activeCatIndex ? { ...cat, completed: checked } : cat
+                    );
+                    setCategories(updated);
+                    updateSession(session.id, { categories: updated }).then(onUpdate).catch(console.error);
                   }}
                   style={{ width: 'auto', margin: 0 }}
                 />
