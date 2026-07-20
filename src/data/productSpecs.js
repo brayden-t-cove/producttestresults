@@ -258,7 +258,7 @@ export const SPEC_SCHEMA = {
           id: 'ipRating',
           label: 'IP Rating',
           type: 'select',
-          options: ['Not Rated', 'IP44', 'IP54', 'IP55', 'IP65', 'IP66', 'IP67', 'IP68'],
+          options: ['Not Rated', 'IP44', 'IP54', 'IP55', 'IP64', 'IP65', 'IP66', 'IP67', 'IP68'],
         },
         { id: 'humidityRating', label: 'Humidity Rating', type: 'text' },
       ],
