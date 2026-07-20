@@ -44,29 +44,18 @@ function getCapabilityPosition(category, capabilityId) {
   return null;
 }
 
-function generateTestCases(product, appConfig) {
+function generateTestCases(product, appConfig, capabilitiesOverride) {
   const seen = new Set();
   const tests = [];
 
-  // Track baseline test index counter
   let baselineCounter = 0;
-
-  // Track per-capability test index
   const capTestCounters = {};
 
   function addBaselineTest(t) {
     if (!seen.has(t.id)) {
       seen.add(t.id);
       baselineCounter++;
-      const tc = {
-        ...t,
-        id: crypto.randomUUID(),
-        templateId: t.id,
-        status: 'pending',
-        notes: '',
-        testNumber: `0.${baselineCounter}`,
-      };
-      tests.push(tc);
+      tests.push({ ...t, id: crypto.randomUUID(), templateId: t.id, status: 'pending', notes: '', testNumber: `0.${baselineCounter}` });
     }
   }
 
@@ -77,25 +66,9 @@ function generateTestCases(product, appConfig) {
       if (!capTestCounters[capabilityId]) capTestCounters[capabilityId] = 0;
       capTestCounters[capabilityId]++;
       const testIndex = capTestCounters[capabilityId];
-      let testNumber;
-      if (pos) {
-        testNumber = `${pos.sectionIndex}.${pos.subsectionIndex}.${testIndex}`;
-      } else {
-        testNumber = `?.?.${testIndex}`;
-      }
-      const tc = {
-        ...t,
-        id: crypto.randomUUID(),
-        templateId: t.id,
-        status: 'pending',
-        notes: '',
-        capabilityId,
-        testNumber,
-      };
-      if (appConfig && appConfig.unavailableCapabilities &&
-          appConfig.unavailableCapabilities.includes(capabilityId)) {
-        tc.notAvailableInApp = true;
-      }
+      const testNumber = pos ? `${pos.sectionIndex}.${pos.subsectionIndex}.${testIndex}` : `?.?.${testIndex}`;
+      const tc = { ...t, id: crypto.randomUUID(), templateId: t.id, status: 'pending', notes: '', capabilityId, testNumber };
+      if (appConfig?.unavailableCapabilities?.includes(capabilityId)) tc.notAvailableInApp = true;
       tests.push(tc);
     }
   }
@@ -103,7 +76,8 @@ function generateTestCases(product, appConfig) {
   const baselines = BASELINE_TESTS[product.category] || [];
   baselines.forEach(t => addBaselineTest(t));
 
-  (product.capabilities || []).forEach(capId => {
+  const caps = capabilitiesOverride ?? (product.capabilities || []);
+  caps.forEach(capId => {
     const capTests = TEST_LIBRARY[capId] || [];
     capTests.forEach(t => addCapabilityTest(t, capId));
   });
@@ -148,6 +122,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   const [testEnvOpen, setTestEnvOpen] = useState(false);
   const [testEnv, setTestEnv] = useState({ appName: '', phoneType: '', osVersion: '', appVersion: '', username: '', password: '', deviceId: '' });
   const [showEnvPassword, setShowEnvPassword] = useState(false);
+  const [platformScope, setPlatformScope] = useState('both'); // 'ios' | 'android' | 'both'
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError] = useState('');
@@ -319,6 +294,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         testerName: testerName.trim() || undefined,
         type: sessionType,
         testPlan,
+        platformScope: firstProduct.category === 'app' ? platformScope : undefined,
         appConfigId: isMulti ? null : (firstAppConfig?.id || null),
         appConfigName: isMulti ? null : (firstAppConfig?.appName || null),
         products: isMulti ? products : null,
@@ -336,6 +312,12 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
       let testCases;
       let issues = session.issues || [];
 
+      function scopedCaps(product) {
+        const caps = product.capabilities || [];
+        if (product.category !== 'app' || platformScope === 'both') return caps;
+        return caps.filter(c => c !== (platformScope === 'ios' ? 'android' : 'ios'));
+      }
+
       if (csvPreview && !isMulti) {
         if (csvPreview.type === 'testCases') {
           testCases = csvPreview.data;
@@ -343,7 +325,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           issues = csvPreview.data;
           testCases = testPlan === 'vendor-eval'
             ? generateVendorEvalTestCases(firstProduct)
-            : generateTestCases(firstProduct, firstAppConfig);
+            : generateTestCases(firstProduct, firstAppConfig, scopedCaps(firstProduct));
         }
       } else if (isMulti) {
         const allTestCases = [];
@@ -351,7 +333,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           const { product, appConfig } = selectedProducts[i];
           const cases = testPlan === 'vendor-eval'
             ? generateVendorEvalTestCases(product)
-            : generateTestCases(product, appConfig);
+            : generateTestCases(product, appConfig, scopedCaps(product));
           cases.forEach(tc => {
             tc.productCatalogId = product.id;
             tc.productIndex = i;
@@ -362,7 +344,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
       } else {
         testCases = testPlan === 'vendor-eval'
           ? generateVendorEvalTestCases(firstProduct)
-          : generateTestCases(firstProduct, firstAppConfig);
+          : generateTestCases(firstProduct, firstAppConfig, scopedCaps(firstProduct));
       }
 
       const updated = await updateSession(session.id, { testCases, issues });
@@ -679,6 +661,32 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
             ))}
           </div>
         </div>
+
+        {/* Platform Scope — app products with both iOS and Android */}
+        {!isMultiProduct && selectedProduct?.category === 'app' &&
+          (selectedProduct.capabilities || []).includes('ios') &&
+          (selectedProduct.capabilities || []).includes('android') && (
+          <div className="form-group">
+            <label>Platform Scope</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[
+                { id: 'both', label: 'Both (iOS + Android)' },
+                { id: 'ios', label: 'iOS only' },
+                { id: 'android', label: 'Android only' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`btn ${platformScope === opt.id ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ flex: 1 }}
+                  onClick={() => setPlatformScope(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Firmware — single product only (existing dropdown) */}
         {!isMultiProduct && selectedProduct && (

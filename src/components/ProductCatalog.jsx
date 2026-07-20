@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { CATEGORY_LABELS } from '../data/capabilities.js';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import { exportCatalogCsv, exportCatalogJson } from '../lib/api.js';
@@ -10,6 +10,51 @@ const CATEGORY_ICONS = {
   sensor: '📡',
   app: '📱',
 };
+
+function SessionDropdown({ product, onStartTest, onStartComparison, isCompetitor }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        className="btn btn-primary btn-sm"
+        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+      >
+        + Session <span style={{ fontSize: 10, opacity: 0.8 }}>▾</span>
+      </button>
+      {open && (
+        <div onClick={e => e.stopPropagation()} style={{
+          position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 50,
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)', minWidth: 196, overflow: 'hidden',
+        }}>
+          {!isCompetitor && (
+            <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', borderRadius: 0, padding: '10px 14px', fontSize: 13 }}
+              onClick={() => { setOpen(false); onStartTest(product); }}>
+              ▶ New Product Testing
+            </button>
+          )}
+          <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', borderRadius: 0, padding: '10px 14px', fontSize: 13 }}
+            onClick={() => { setOpen(false); onStartTest(product, 'exploratory'); }}>
+            + New Exploration
+          </button>
+          <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', borderRadius: 0, padding: '10px 14px', fontSize: 13 }}
+            onClick={() => { setOpen(false); onStartComparison(product); }}>
+            ⚖ New Comparison
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -196,7 +241,7 @@ function CollapsibleStatusGroup({ status, items, defaultOpen, renderCard }) {
   );
 }
 
-export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onDelete, onDuplicate, onBack, onView, onImport, canEdit = true }) {
+export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, onStartComparison, onDelete, onDuplicate, onBack, onView, onImport, canEdit = true }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [openSpecsId, setOpenSpecsId] = useState(null);
   const [showExport, setShowExport] = useState(false);
@@ -523,18 +568,15 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
                     Added {formatDate(product.createdAt)}
                   </div>
                   <div className="card-actions">
-                    {product.type === 'competitor' ? (
-                      onStartTest && (
-                        <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); onStartTest(product, 'exploratory'); }}>
-                          + Exploratory
-                        </button>
-                      )
-                    ) : (
-                      onStartTest && (
-                        <button className="btn btn-primary btn-sm" onClick={e => { e.stopPropagation(); onStartTest(product); }}>
-                          ▶ Start Test
-                        </button>
-                      )
+                    {onStartTest && (
+                      <div onClick={e => e.stopPropagation()}>
+                        <SessionDropdown
+                          product={product}
+                          onStartTest={onStartTest}
+                          onStartComparison={onStartComparison || (() => {})}
+                          isCompetitor={product.type === 'competitor'}
+                        />
+                      </div>
                     )}
                     {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => onEdit(product)}>Edit</button>}
                     {canEdit && <button className="btn btn-secondary btn-sm" title="Duplicate as new version" onClick={() => onDuplicate(product, incrementVersion(product.version))}>⧉ Duplicate</button>}
