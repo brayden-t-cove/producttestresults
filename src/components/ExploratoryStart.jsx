@@ -72,12 +72,20 @@ export default function ExploratoryStart({ catalog, onCreated, onBack }) {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState(
     new Set(DEFAULT_CATEGORIES.map(c => c.id))
   );
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const filteredCatalog = categoryFilter
-    ? catalog.filter(p => p.category === categoryFilter)
-    : catalog;
+  const sorted = [...catalog].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const filteredCatalog = sorted
+    .filter(p => !categoryFilter || p.category === categoryFilter)
+    .filter(p => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return (p.name || '').toLowerCase().includes(q)
+        || (p.modelNumber || '').toLowerCase().includes(q)
+        || (p.manufacturer || '').toLowerCase().includes(q);
+    });
 
   const allCatalogCategories = [...new Set(catalog.map(p => p.category).filter(Boolean))];
 
@@ -182,8 +190,15 @@ export default function ExploratoryStart({ catalog, onCreated, onBack }) {
               ))}
             </div>
           )}
+          <input
+            type="text"
+            placeholder="Search by name, model, or manufacturer…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ marginBottom: 10 }}
+          />
           {filteredCatalog.length === 0 ? (
-            <div className="error-msg">No products found. Add a product to your catalog first.</div>
+            <div className="error-msg">{catalog.length === 0 ? 'No products found. Add a product to your catalog first.' : 'No products match your search.'}</div>
           ) : (
             <div className="product-picker-grid">
               {filteredCatalog.map(product => {
