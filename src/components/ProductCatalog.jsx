@@ -344,7 +344,7 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
               </div>
             </div>
           )}
-          {entityTabs.length > 2 && (
+          {entityTabs.length > 2 && activePage !== 'competitors' && (
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Entity</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -402,7 +402,7 @@ export default function ProductCatalog({ products, onAdd, onEdit, onStartTest, o
         </div>
       ) : pageFiltered.length === 0 ? (
         <div className="empty-state">
-          <p>No products here yet.</p>
+          <p>{activePage === 'competitors' ? 'No competitor products added yet. Add a product and set its type to Competitor.' : 'No products here yet.'}</p>
         </div>
       ) : (
         <div>

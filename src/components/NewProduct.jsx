@@ -213,7 +213,7 @@ function StepBasics({ state, set, catalog, product, isEdit }) {
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
-          {state.subclass && SUBCLASS_PRESETS[state.category]?.[state.subclass] && (
+          {state.subclass && SUBCLASS_PRESETS[state.category]?.[state.subclass] && state.productType !== 'competitor' && (
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
               Capabilities will be pre-filled based on subclass — adjust on the Capabilities step.
             </div>
@@ -287,16 +287,25 @@ function StepBasics({ state, set, catalog, product, isEdit }) {
       {/* Status */}
       <div className="form-group" style={{ marginTop: 16 }}>
         <label>Status</label>
-        <select value={state.status} onChange={e => set('status', e.target.value)}>
-          <option value="active">Active</option>
-          <option value="in-development">In Development</option>
-          <option value="in-testing">In Testing</option>
-          <option value="eol">EOL</option>
-          <option value="discontinued">Discontinued</option>
-          <option value="on-hold">On Hold</option>
-          <option value="under-evaluation">Under Evaluation</option>
-          <option value="rejected">Rejected</option>
-        </select>
+        {state.productType === 'competitor' ? (
+          <select value={state.status} onChange={e => set('status', e.target.value)}>
+            <option value="active">Active (on market)</option>
+            <option value="under-evaluation">Under Evaluation</option>
+            <option value="eol">EOL</option>
+            <option value="discontinued">Discontinued</option>
+          </select>
+        ) : (
+          <select value={state.status} onChange={e => set('status', e.target.value)}>
+            <option value="active">Active</option>
+            <option value="in-development">In Development</option>
+            <option value="in-testing">In Testing</option>
+            <option value="eol">EOL</option>
+            <option value="discontinued">Discontinued</option>
+            <option value="on-hold">On Hold</option>
+            <option value="under-evaluation">Under Evaluation</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        )}
       </div>
 
       {/* Entity — hidden for competitor */}
@@ -351,18 +360,20 @@ function StepBasics({ state, set, catalog, product, isEdit }) {
         </div>
       )}
 
-      {/* Replaces Product */}
-      <div className="form-group">
-        <label>Replaces Product <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — for hardware revisions)</span></label>
-        <select value={state.replacesProductId} onChange={e => set('replacesProductId', e.target.value)}>
-          <option value="">— None —</option>
-          {(catalog || []).filter(p => p.id !== product?.id).map(p => (
-            <option key={p.id} value={p.id}>
-              {p.modelNumber || p.name}{p.revision ? ` (${p.revision})` : ''}{p.version ? ` ${p.version}` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Replaces Product — not applicable for competitors */}
+      {state.productType !== 'competitor' && (
+        <div className="form-group">
+          <label>Replaces Product <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — for hardware revisions)</span></label>
+          <select value={state.replacesProductId} onChange={e => set('replacesProductId', e.target.value)}>
+            <option value="">— None —</option>
+            {(catalog || []).filter(p => p.id !== product?.id).map(p => (
+              <option key={p.id} value={p.id}>
+                {p.modelNumber || p.name}{p.revision ? ` (${p.revision})` : ''}{p.version ? ` ${p.version}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Product Image — edit mode only */}
       {isEdit && (
