@@ -25,9 +25,15 @@ function StatusBadge({ status }) {
 const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
 
 function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
+  function normalizeEntities(val) {
+    if (!val) return currentUser?.entity ? [currentUser.entity] : [];
+    if (Array.isArray(val)) return val;
+    return [val]; // migrate old single-string
+  }
+
   const [form, setForm] = useState({
     name: vendor?.name || '',
-    entity: vendor?.entity || (currentUser?.entity || ''),
+    entities: normalizeEntities(vendor?.entity ?? vendor?.entities),
     website: vendor?.website || '',
     relationshipStatus: vendor?.relationshipStatus || 'Prospect',
     industry: vendor?.industry || '',
@@ -37,7 +43,7 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [newContact, setNewContact] = useState({ name: '', role: '', wechat: '', email: '' });
+  const [newContact, setNewContact] = useState({ name: '', role: '', entity: '', wechat: '', email: '' });
   const [newCatalog, setNewCatalog] = useState({ label: '', url: '' });
 
   function set(field, value) { setForm(f => ({ ...f, [field]: value })); }
@@ -45,7 +51,7 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
   function addContact() {
     if (!newContact.name.trim()) return;
     set('contacts', [...form.contacts, { ...newContact, id: Date.now().toString() }]);
-    setNewContact({ name: '', role: '', wechat: '', email: '' });
+    setNewContact({ name: '', role: '', entity: '', wechat: '', email: '' });
   }
   function removeContact(id) { set('contacts', form.contacts.filter(c => c.id !== id)); }
 
@@ -59,10 +65,11 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.name.trim()) { setError('Company name is required.'); return; }
-    if (!form.entity) { setError('Entity is required.'); return; }
+    if (!form.entities || form.entities.length === 0) { setError('Select at least one entity.'); return; }
     setSaving(true); setError('');
     try {
-      await onSave({ ...vendor, ...form });
+      const { entities, ...rest } = form;
+      await onSave({ ...vendor, ...rest, entities, entity: entities[0] || '' });
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to save.');
@@ -80,11 +87,31 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
-              <label>Entity *</label>
-              <select value={form.entity} onChange={e => set('entity', e.target.value)} required>
-                <option value="">Select entity...</option>
-                {ENTITIES.map(e => <option key={e} value={e}>{e}</option>)}
-              </select>
+              <label>Entities * <span style={{ fontWeight: 400, fontSize: 11, textTransform: 'none', color: 'var(--text-muted)' }}>(select all that apply)</span></label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {ENTITIES.map(e => {
+                  const checked = form.entities.includes(e);
+                  return (
+                    <label key={e} style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px', borderRadius: 20,
+                      border: `1px solid ${checked ? 'var(--primary)' : 'var(--border)'}`,
+                      background: checked ? 'var(--primary-dim)' : 'var(--card)',
+                      cursor: 'pointer', fontSize: 13, fontWeight: checked ? 600 : 400,
+                      color: checked ? 'var(--primary)' : 'var(--text)',
+                      textTransform: 'none', letterSpacing: 0, marginBottom: 0,
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        style={{ width: 'auto', margin: 0 }}
+                        onChange={() => set('entities', checked ? form.entities.filter(x => x !== e) : [...form.entities, e])}
+                      />
+                      {e}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
             <div className="form-group">
               <label>Relationship Status</label>
@@ -141,6 +168,7 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 13 }}>
                 <span style={{ fontWeight: 500, minWidth: 100 }}>{c.name}</span>
                 {c.role && <span style={{ color: 'var(--text-muted)', minWidth: 80 }}>{c.role}</span>}
+                {c.entity && <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '1px 7px', flexShrink: 0 }}>{c.entity}</span>}
                 {c.wechat && <span style={{ color: '#07c160', flex: 1 }}>💬 {c.wechat}</span>}
                 {c.email && <a href={`mailto:${c.email}`} style={{ color: 'var(--primary)', flex: c.wechat ? '0 0 auto' : 1 }}>{c.email}</a>}
                 <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)', flexShrink: 0 }} onClick={() => removeContact(c.id)}>✕</button>
@@ -149,8 +177,15 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
             <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
               <input placeholder="Name" value={newContact.name} onChange={e => setNewContact(v => ({ ...v, name: e.target.value }))} style={{ flex: '0 0 120px' }} />
               <input placeholder="Role" value={newContact.role} onChange={e => setNewContact(v => ({ ...v, role: e.target.value }))} style={{ flex: '0 0 90px' }} />
-              <input placeholder="WeChat ID" value={newContact.wechat} onChange={e => setNewContact(v => ({ ...v, wechat: e.target.value }))} style={{ flex: '0 0 120px' }} />
-              <input placeholder="Email (optional)" value={newContact.email} onChange={e => setNewContact(v => ({ ...v, email: e.target.value }))} style={{ flex: 1, minWidth: 140 }}
+              <select value={newContact.entity} onChange={e => setNewContact(v => ({ ...v, entity: e.target.value }))} style={{ flex: '0 0 110px' }}>
+                <option value="">Entity...</option>
+                {form.entities.length > 0
+                  ? form.entities.map(en => <option key={en} value={en}>{en}</option>)
+                  : ENTITIES.map(en => <option key={en} value={en}>{en}</option>)
+                }
+              </select>
+              <input placeholder="WeChat ID" value={newContact.wechat} onChange={e => setNewContact(v => ({ ...v, wechat: e.target.value }))} style={{ flex: '0 0 110px' }} />
+              <input placeholder="Email (optional)" value={newContact.email} onChange={e => setNewContact(v => ({ ...v, email: e.target.value }))} style={{ flex: 1, minWidth: 130 }}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addContact())} />
               <button type="button" className="btn btn-secondary btn-sm" onClick={addContact}>Add</button>
             </div>
@@ -179,7 +214,9 @@ function VendorDetail({ vendor, catalog, onEdit, onDelete, onBack }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h2 style={{ margin: 0 }}>{vendor.name}</h2>
             <StatusBadge status={vendor.relationshipStatus} />
-            {vendor.entity && <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '2px 10px' }}>{vendor.entity}</span>}
+            {(vendor.entities || (vendor.entity ? [vendor.entity] : [])).map(e => (
+              <span key={e} style={{ fontSize: 12, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '2px 10px' }}>{e}</span>
+            ))}
             {vendor.industry && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{vendor.industry}</span>}
           </div>
           {vendor.website && (
@@ -239,7 +276,11 @@ function VendorDetail({ vendor, catalog, onEdit, onDelete, onBack }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {vendor.contacts.map(c => (
                 <div key={c.id} style={{ fontSize: 13 }}>
-                  <div style={{ fontWeight: 600 }}>{c.name}{c.role && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>· {c.role}</span>}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600 }}>{c.name}</span>
+                    {c.role && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>· {c.role}</span>}
+                    {c.entity && <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '1px 7px' }}>{c.entity}</span>}
+                  </div>
                   {c.wechat && <div style={{ color: '#07c160', fontSize: 12, marginTop: 2 }}>💬 {c.wechat}</div>}
                   {c.email && <div style={{ marginTop: 1 }}><a href={`mailto:${c.email}`} style={{ color: 'var(--primary)', fontSize: 12 }}>{c.email}</a></div>}
                 </div>
@@ -417,7 +458,9 @@ export default function VendorLibrary({ catalog = [], onBack, currentUser }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
                   <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{v.name}</h3>
                   <StatusBadge status={v.relationshipStatus} />
-                  {v.entity && <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '1px 8px' }}>{v.entity}</span>}
+                  {(v.entities || (v.entity ? [v.entity] : [])).map(e => (
+                    <span key={e} style={{ fontSize: 11, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '1px 8px' }}>{e}</span>
+                  ))}
                 </div>
                 {v.industry && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{v.industry}</div>}
                 {v.website && (
