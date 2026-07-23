@@ -430,6 +430,47 @@ function classifySession(s, catalog) {
   return 'production';
 }
 
+function NewSessionDropdown({ onNew, onNewExploratory, onNewComparison }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        className="btn btn-primary btn-lg"
+        onClick={() => setOpen(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+      >
+        + New Session <span style={{ fontSize: 11, opacity: 0.8 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 50,
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)', minWidth: 210, overflow: 'hidden',
+        }}>
+          <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', borderRadius: 0, padding: '11px 16px', fontSize: 13 }}
+            onClick={() => { setOpen(false); onNew(); }}>
+            ▶ New Product Testing
+          </button>
+          <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', borderRadius: 0, padding: '11px 16px', fontSize: 13 }}
+            onClick={() => { setOpen(false); onNewExploratory(); }}>
+            + New Exploration
+          </button>
+          <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', borderRadius: 0, padding: '11px 16px', fontSize: 13 }}
+            onClick={() => { setOpen(false); onNewComparison(); }}>
+            ⚖ New Comparison
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewComparison, onOpen, onDelete, onCatalog, onSettings, onAnalytics, onIssues, onBack, loading }) {
   const [activeTab, setActiveTab] = useState('production');
 
@@ -448,21 +489,7 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewC
           {onBack && <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 8 }}>← Back to Home</button>}
           <h1>Product Testing</h1>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {activeTab === 'evaluation' && (
-            <>
-              <button className="btn btn-secondary" onClick={onNewExploratory}>
-                + Exploratory
-              </button>
-              <button className="btn btn-secondary" onClick={onNewComparison}>
-                + Compare
-              </button>
-            </>
-          )}
-          <button className="btn btn-primary btn-lg" onClick={onNew}>
-            + New Session
-          </button>
-        </div>
+        <NewSessionDropdown onNew={onNew} onNewExploratory={onNewExploratory} onNewComparison={onNewComparison} />
       </div>
 
       <div className="product-tabs" style={{ marginBottom: 16 }}>
