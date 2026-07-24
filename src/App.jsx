@@ -430,44 +430,11 @@ function classifySession(s, catalog) {
   return 'production';
 }
 
-function NewSessionDropdown({ onNew, onNewExploratory, onNewComparison }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+function NewSessionButton({ onNew }) {
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        className="btn btn-primary btn-lg"
-        onClick={() => setOpen(v => !v)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-      >
-        + New Session <span style={{ fontSize: 11, opacity: 0.8 }}>▾</span>
-      </button>
-      {open && (
-        <div style={{
-          position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 50,
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.15)', minWidth: 210, overflow: 'hidden',
-        }}>
-          <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', borderRadius: 0, padding: '11px 16px', fontSize: 13 }}
-            onClick={() => { setOpen(false); onNew(); }}>
-            ▶ New Product Testing
-          </button>
-          <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', borderRadius: 0, padding: '11px 16px', fontSize: 13 }}
-            onClick={() => { setOpen(false); onNewExploratory(); }}>
-            + New Exploration
-          </button>
-          <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', borderRadius: 0, padding: '11px 16px', fontSize: 13 }}
-            onClick={() => { setOpen(false); onNewComparison(); }}>
-            ⚖ New Comparison
-          </button>
-        </div>
-      )}
-    </div>
+    <button className="btn btn-primary btn-lg" onClick={onNew}>
+      + New Session
+    </button>
   );
 }
 
@@ -489,7 +456,7 @@ function ProductTestingPage({ sessions, catalog, onNew, onNewExploratory, onNewC
           {onBack && <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 8 }}>← Back to Home</button>}
           <h1>Product Testing</h1>
         </div>
-        <NewSessionDropdown onNew={onNew} onNewExploratory={onNewExploratory} onNewComparison={onNewComparison} />
+        <NewSessionButton onNew={onNew} />
       </div>
 
       <div className="product-tabs" style={{ marginBottom: 16 }}>
@@ -979,6 +946,8 @@ export default function App() {
           onBack={() => setView('testing')}
           onCreated={handleSessionCreated}
           onGoToCatalog={() => setView('catalog')}
+          onStartExploratory={() => setView('exploratoryStart')}
+          onStartComparison={() => { setCurrentComparison(null); setView('comparisonBuilder'); }}
         />
       )}
 

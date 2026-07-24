@@ -1,13 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { CATEGORY_LABELS, CAPABILITY_GROUPS } from '../data/capabilities.js';
 import { BASELINE_TESTS, TEST_LIBRARY } from '../data/testLibrary.js';
-import { generateVendorEvalTestCases, VENDOR_EVAL_SESSION_TYPES } from '../data/vendorEvalLibrary.js';
-import { createSession, updateSession, downloadCsvTemplate, importCsv, getFirmwares, addFirmware } from '../lib/api.js';
-
-const TEST_PLANS = [
-  { id: 'production', label: 'Production', icon: '🏭', description: 'Test against our platform requirements and release criteria' },
-  { id: 'vendor-eval', label: 'Vendor Evaluation', icon: '🔍', description: 'Evaluate a third-party sample or prototype for potential adoption' },
-];
+import { createSession, updateSession, getFirmwares, addFirmware, listIssuesForProduct } from '../lib/api.js';
 
 const CATEGORY_ICONS = {
   hub: '🏠',
@@ -18,17 +12,19 @@ const CATEGORY_ICONS = {
 };
 
 const SESSION_TYPES = [
-  { id: 'e2e', label: 'E2E', icon: '🔄', description: 'Full end-to-end product testing' },
-  { id: 'reproduction', label: 'Issue Reproduction', icon: '🐛', description: 'Reproduce and document reported bugs' },
-  { id: 'regression', label: 'Regression', icon: '🔁', description: 'Verify previously fixed issues remain resolved' },
-  { id: 'feature', label: 'Feature / Targeted', icon: '🎯', description: 'Test a specific feature or acceptance criteria' },
+  { id: 'e2e',          label: 'E2E',                icon: '🔄', description: 'Full end-to-end product testing across all capabilities' },
+  { id: 'regression',   label: 'Regression',         icon: '🔁', description: 'Verify previously fixed issues remain resolved after a new build' },
+  { id: 'feature',      label: 'Feature / Targeted', icon: '🎯', description: 'Test a specific feature or acceptance criteria' },
+  { id: 'reproduction', label: 'Issue Reproduction',  icon: '🐛', description: 'Reproduce and document a reported issue with full traceability' },
+  { id: 'exploratory',  label: 'Exploratory',         icon: '🔍', description: 'Open-ended structured exploration with notes per category', external: true },
+  { id: 'comparison',   label: 'Comparison',          icon: '⚖️', description: 'Side-by-side evaluation of two or more products', external: true },
 ];
 
 const SESSION_TYPE_LABELS = {
   e2e: 'E2E Session',
-  reproduction: 'Reproduction Session',
   regression: 'Regression Session',
-  feature: 'Feature Session',
+  feature: 'Feature / Targeted Session',
+  reproduction: 'Issue Reproduction Session',
 };
 
 function getCapabilityPosition(category, capabilityId) {
@@ -47,7 +43,6 @@ function getCapabilityPosition(category, capabilityId) {
 function generateTestCases(product, appConfig, capabilitiesOverride) {
   const seen = new Set();
   const tests = [];
-
   let baselineCounter = 0;
   const capTestCounters = {};
 
@@ -91,45 +86,58 @@ function platformLabel(platform) {
   return 'iOS/Android';
 }
 
-export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog }) {
-  const [selectedProducts, setSelectedProducts] = useState([]);
-  // each item: { product, appConfig, firmware }
+function countTests(product) {
+  const seen = new Set();
+  const baselines = BASELINE_TESTS[product.category] || [];
+  baselines.forEach(t => seen.add(t.id));
+  (product.capabilities || []).forEach(capId => {
+    (TEST_LIBRARY[capId] || []).forEach(t => seen.add(t.id));
+  });
+  return seen.size;
+}
 
+export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog, onStartExploratory, onStartComparison }) {
+  // --- Session type selection ---
+  const [sessionType, setSessionType] = useState(null);
+
+  // --- Test environment fields ---
+  const [sessionName, setSessionName] = useState('');
+  const [testerName, setTesterName] = useState('');
+  const [appName, setAppName] = useState('');
+  const [phoneOS, setPhoneOS] = useState(null); // 'ios' | 'android' | null
+  const [osVersion, setOsVersion] = useState('');
+  const [appVersion, setAppVersion] = useState('');
+  const [accountUsername, setAccountUsername] = useState('');
+  const [notes, setNotes] = useState('');
+
+  // --- Issue Reproduction ---
+  const [documentedIssues, setDocumentedIssues] = useState([]);
+  const [selectedIssueId, setSelectedIssueId] = useState('');
+
+  // --- Products ---
+  const [selectedProducts, setSelectedProducts] = useState([]);
   const [productSearch, setProductSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Derived for backward compat with firmware loading logic
-  const selectedProduct = selectedProducts[0]?.product || null;
-
-  const [testPlan, setTestPlan] = useState('production');
-  const [sessionType, setSessionType] = useState('e2e');
-
-  // Single-product firmware state (kept for the existing firmware dropdown shown when one product selected)
+  // --- Firmware ---
   const [firmware, setFirmware] = useState('');
   const [addingFirmware, setAddingFirmware] = useState(false);
   const [newFirmwareVersion, setNewFirmwareVersion] = useState('');
   const [savedFirmwares, setSavedFirmwares] = useState([]);
+  const [firmwarePerProduct, setFirmwarePerProduct] = useState({});
   const newFirmwareInputRef = useRef(null);
 
-  // Per-product firmware for multi-product list (keyed by catalogId)
-  const [firmwarePerProduct, setFirmwarePerProduct] = useState({});
-
-  const [sessionName, setSessionName] = useState('');
-  const [notes, setNotes] = useState('');
-  const [testerName, setTesterName] = useState('');
-  const [testEnvOpen, setTestEnvOpen] = useState(false);
-  const [testEnv, setTestEnv] = useState({ appName: '', phoneType: '', osVersion: '', appVersion: '', username: '', password: '', deviceId: '' });
-  const [showEnvPassword, setShowEnvPassword] = useState(false);
-  const [platformScope, setPlatformScope] = useState('both'); // 'ios' | 'android' | 'both'
+  // --- UI state ---
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError] = useState('');
-  const [csvPreview, setCsvPreview] = useState(null);
-  const [csvError, setCsvError] = useState('');
-  const fileInputRef = useRef(null);
 
+  const selectedProduct = selectedProducts[0]?.product || null;
+  const isMultiProduct = selectedProducts.length > 1;
+
+  // Load firmwares and issues when first product changes
   useEffect(() => {
     setFirmware('');
     setAddingFirmware(false);
@@ -137,17 +145,22 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     setSavedFirmwares([]);
     if (selectedProduct) {
       getFirmwares(null, selectedProduct.id).then(setSavedFirmwares).catch(() => {});
-      const isSample = selectedProduct.type === 'sample' || selectedProduct.type === 'prototype';
-      setTestPlan(isSample ? 'vendor-eval' : 'production');
-      setSessionType('e2e');
     }
   }, [selectedProduct?.id]);
+
+  useEffect(() => {
+    if (sessionType === 'reproduction' && selectedProducts.length > 0) {
+      const ids = selectedProducts.map(p => p.product.id);
+      Promise.all(ids.map(id => listIssuesForProduct(id).catch(() => [])))
+        .then(results => setDocumentedIssues(results.flat()))
+        .catch(() => {});
+    }
+  }, [sessionType, selectedProducts.map(p => p.product.id).join(',')]);
 
   useEffect(() => {
     if (addingFirmware) newFirmwareInputRef.current?.focus();
   }, [addingFirmware]);
 
-  // Close search dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e) {
       if (
@@ -162,7 +175,6 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   }, []);
 
   const eligibleProducts = catalog.filter(p => p.type !== 'competitor');
-
   const searchResults = productSearch.trim().length === 0
     ? eligibleProducts
     : eligibleProducts.filter(p => {
@@ -193,21 +205,14 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   function toggleProduct(product) {
     setSelectedProducts(prev => {
       const exists = prev.find(p => p.product.id === product.id);
-      if (exists) {
-        return prev.filter(p => p.product.id !== product.id);
-      } else {
-        return [...prev, { product, appConfig: null }];
-      }
+      if (exists) return prev.filter(p => p.product.id !== product.id);
+      return [...prev, { product, appConfig: null }];
     });
   }
 
   function removeSelectedProduct(catalogId) {
     setSelectedProducts(prev => prev.filter(p => p.product.id !== catalogId));
-    setFirmwarePerProduct(prev => {
-      const next = { ...prev };
-      delete next[catalogId];
-      return next;
-    });
+    setFirmwarePerProduct(prev => { const next = { ...prev }; delete next[catalogId]; return next; });
   }
 
   function moveProduct(index, direction) {
@@ -226,31 +231,16 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     );
   }
 
-  async function handleCsvUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    setCsvError('');
-    setCsvPreview(null);
-    try {
-      const text = await file.text();
-      const result = await importCsv(text, sessionType);
-      if (result.issues) {
-        setCsvPreview({ count: result.issues.length, rows: result.issues.slice(0, 3), type: 'issues', data: result.issues });
-      } else if (result.testCases) {
-        setCsvPreview({ count: result.testCases.length, rows: result.testCases.slice(0, 3), type: 'testCases', data: result.testCases });
-      }
-    } catch (err) {
-      setCsvError(err.message || 'CSV import failed');
-    }
-    e.target.value = '';
+  function scopedCaps(product) {
+    const caps = product.capabilities || [];
+    if (product.category !== 'app' || !phoneOS) return caps;
+    return caps.filter(c => c !== (phoneOS === 'ios' ? 'android' : 'ios'));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (selectedProducts.length === 0) {
-      setError('Please select a product from your catalog.');
-      return;
-    }
+    if (!sessionType) { setError('Please select a session type.'); return; }
+    if (selectedProducts.length === 0) { setError('Please select at least one product.'); return; }
     setError('');
     setLoading(true);
     setLoadingMsg('Creating session...');
@@ -258,8 +248,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     try {
       const isMulti = selectedProducts.length > 1;
 
-      // Build products array
-      const products = selectedProducts.map(({ product, appConfig }, i) => ({
+      const products = selectedProducts.map(({ product, appConfig }) => ({
         catalogId: product.id,
         name: product.name,
         modelNumber: product.modelNumber || '',
@@ -269,7 +258,6 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         appConfigName: appConfig?.appName || null,
       }));
 
-      // Build productName
       let productName;
       if (!isMulti) {
         productName = selectedProducts[0].product.name;
@@ -293,61 +281,36 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         notes,
         testerName: testerName.trim() || undefined,
         type: sessionType,
-        testPlan,
-        platformScope: firstProduct.category === 'app' ? platformScope : undefined,
+        testPlan: 'production',
+        platformScope: phoneOS || 'both',
+        documentedIssueId: sessionType === 'reproduction' ? (selectedIssueId || undefined) : undefined,
         appConfigId: isMulti ? null : (firstAppConfig?.id || null),
         appConfigName: isMulti ? null : (firstAppConfig?.appName || null),
         products: isMulti ? products : null,
         testEnvironment: {
-          appName: testEnv.appName,
-          phoneType: testEnv.phoneType,
-          osVersion: testEnv.osVersion,
-          appVersion: testEnv.appVersion,
-          username: testEnv.username,
-          password: testEnv.password,
-          deviceId: testEnv.deviceId,
+          appName,
+          phoneType: phoneOS === 'ios' ? 'iOS' : phoneOS === 'android' ? 'Android' : '',
+          osVersion,
+          appVersion,
+          username: accountUsername,
         },
       });
 
       let testCases;
-      let issues = session.issues || [];
-
-      function scopedCaps(product) {
-        const caps = product.capabilities || [];
-        if (product.category !== 'app' || platformScope === 'both') return caps;
-        return caps.filter(c => c !== (platformScope === 'ios' ? 'android' : 'ios'));
-      }
-
-      if (csvPreview && !isMulti) {
-        if (csvPreview.type === 'testCases') {
-          testCases = csvPreview.data;
-        } else {
-          issues = csvPreview.data;
-          testCases = testPlan === 'vendor-eval'
-            ? generateVendorEvalTestCases(firstProduct)
-            : generateTestCases(firstProduct, firstAppConfig, scopedCaps(firstProduct));
-        }
-      } else if (isMulti) {
+      if (isMulti) {
         const allTestCases = [];
         for (let i = 0; i < selectedProducts.length; i++) {
           const { product, appConfig } = selectedProducts[i];
-          const cases = testPlan === 'vendor-eval'
-            ? generateVendorEvalTestCases(product)
-            : generateTestCases(product, appConfig, scopedCaps(product));
-          cases.forEach(tc => {
-            tc.productCatalogId = product.id;
-            tc.productIndex = i;
-          });
+          const cases = generateTestCases(product, appConfig, scopedCaps(product));
+          cases.forEach(tc => { tc.productCatalogId = product.id; tc.productIndex = i; });
           allTestCases.push(...cases);
         }
         testCases = allTestCases;
       } else {
-        testCases = testPlan === 'vendor-eval'
-          ? generateVendorEvalTestCases(firstProduct)
-          : generateTestCases(firstProduct, firstAppConfig, scopedCaps(firstProduct));
+        testCases = generateTestCases(firstProduct, firstAppConfig, scopedCaps(firstProduct));
       }
 
-      const updated = await updateSession(session.id, { testCases, issues });
+      const updated = await updateSession(session.id, { testCases });
       onCreated(updated);
     } catch (err) {
       setError(err.message || 'Failed to create session');
@@ -362,21 +325,13 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         <div className="ai-loading">
           <div className="spinner spinner-lg" />
           <p>{loadingMsg}</p>
-          {selectedProduct && (
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{selectedProduct.name}</p>
-          )}
+          {selectedProduct && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{selectedProduct.name}</p>}
         </div>
       </div>
     );
   }
 
-  const previewHeaders = csvPreview
-    ? csvPreview.rows.length > 0
-      ? Object.keys(csvPreview.rows[0]).filter(k => k !== 'id' && k !== 'status')
-      : []
-    : [];
-
-  const isMultiProduct = selectedProducts.length > 1;
+  const showForm = sessionType && !SESSION_TYPES.find(t => t.id === sessionType)?.external;
 
   return (
     <div className="session-start">
@@ -385,524 +340,333 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           ← Back
         </button>
         <h1>New Testing Session</h1>
-        <p>Select one or more products from your catalog, choose a session type, then start testing.</p>
+        <p>Choose a session type to get started.</p>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        {error && <div className="error-msg">{error}</div>}
-
-        {/* Product Search Picker */}
-        <div className="form-group">
-          <label>Add Products to Session</label>
-          {catalog.length === 0 ? (
-            <div className="error-msg" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              No products in catalog.{' '}
-              <button type="button" className="btn btn-primary btn-sm" onClick={onGoToCatalog}>
-                Add a product first
-              </button>
+      {/* Session Type Picker */}
+      <div className="form-group">
+        <label>Session Type</label>
+        <div className="session-type-cards">
+          {SESSION_TYPES.map(st => (
+            <div
+              key={st.id}
+              className={`session-type-card ${sessionType === st.id ? 'selected' : ''}`}
+              onClick={() => {
+                if (st.external) {
+                  if (st.id === 'exploratory' && onStartExploratory) onStartExploratory();
+                  if (st.id === 'comparison' && onStartComparison) onStartComparison();
+                  return;
+                }
+                setSessionType(st.id);
+                setError('');
+              }}
+              style={{ cursor: 'pointer', position: 'relative' }}
+            >
+              <span className="session-type-icon">{st.icon}</span>
+              <span className="session-type-label">{st.label}</span>
+              <span className="session-type-desc">{st.description}</span>
+              {st.external && (
+                <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 11, color: 'var(--text-muted)' }}>→</span>
+              )}
             </div>
-          ) : (
-            <div style={{ position: 'relative' }}>
-              <div style={{ position: 'relative' }}>
-                <input
-                  ref={searchRef}
-                  type="text"
-                  placeholder="Search by model number, name, manufacturer, or category…"
-                  value={productSearch}
-                  onChange={e => { setProductSearch(e.target.value); setSearchOpen(true); }}
-                  onFocus={() => setSearchOpen(true)}
-                  style={{ paddingLeft: 36 }}
-                />
-                <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-muted)', pointerEvents: 'none' }}>
-                  🔍
-                </span>
-                {productSearch && (
-                  <button
-                    type="button"
-                    onClick={() => { setProductSearch(''); searchRef.current?.focus(); }}
-                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
+          ))}
+        </div>
+      </div>
 
-              {searchOpen && (
-                <div ref={dropdownRef} className="product-search-dropdown">
-                  {searchResults.length === 0 ? (
-                    <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-muted)' }}>
-                      No products match "{productSearch}"
-                    </div>
-                  ) : (() => {
-                    const categoryOrder = ['hub', 'touchpad', 'camera', 'sensor', 'app'];
-                    const grouped = categoryOrder
-                      .map(cat => ({ cat, items: searchResults.filter(p => p.category === cat) }))
-                      .concat([{ cat: 'other', items: searchResults.filter(p => !categoryOrder.includes(p.category)) }])
-                      .filter(g => g.items.length > 0);
-                    return grouped.map(({ cat, items }) => (
-                      <div key={cat}>
-                        <div className="product-search-category-header">
-                          <span>{CATEGORY_ICONS[cat] || '📦'}</span>
-                          <span>{CATEGORY_LABELS[cat] || cat}</span>
-                        </div>
-                        {items.map(product => {
-                          const isSelected = selectedProducts.some(p => p.product.id === product.id);
-                          return (
-                            <button
-                              key={product.id}
-                              type="button"
-                              className={`product-search-result ${isSelected ? 'selected' : ''}`}
-                              onClick={() => {
-                                toggleProduct(product);
-                                if (!isSelected) {
-                                  setProductSearch('');
-                                  setSearchOpen(false);
-                                }
-                              }}
-                            >
-                              <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                                <div style={{ fontWeight: 700, fontSize: 13 }}>
-                                  {product.modelNumber || product.name}
-                                </div>
-                                {product.modelNumber && (
-                                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{product.name}</div>
-                                )}
-                                {product.manufacturer && (
-                                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1 }}>{product.manufacturer}</div>
-                                )}
-                              </div>
-                              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{countTests(product)} tests</span>
-                                {isSelected && <span style={{ color: 'var(--primary)', fontSize: 15 }}>✓</span>}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ));
-                  })()}
+      {showForm && (
+        <form onSubmit={handleSubmit}>
+          {error && <div className="error-msg">{error}</div>}
+
+          {/* Test Name */}
+          <div className="form-group">
+            <label>Test Name <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)', textTransform: 'none' }}>(optional — displayed as the session title)</span></label>
+            <input
+              type="text"
+              placeholder="e.g. App v4.2 Regression, Prime Day Camera Eval, Doorbell Range Test..."
+              value={sessionName}
+              onChange={e => setSessionName(e.target.value)}
+            />
+          </div>
+
+          {/* Tester Name */}
+          <div className="form-group">
+            <label>Tester Name <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)', textTransform: 'none' }}>(optional)</span></label>
+            <input
+              type="text"
+              placeholder="Your name"
+              value={testerName}
+              onChange={e => setTesterName(e.target.value)}
+            />
+          </div>
+
+          {/* Test Environment */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>App Name</label>
+              <input
+                type="text"
+                placeholder="e.g. Cove Security, InstaVision"
+                value={appName}
+                onChange={e => setAppName(e.target.value)}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Phone OS <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)', textTransform: 'none' }}>(drives platform test cases)</span></label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[{ id: 'ios', label: '🍎 iOS' }, { id: 'android', label: '🤖 Android' }].map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`btn ${phoneOS === opt.id ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setPhoneOS(prev => prev === opt.id ? null : opt.id)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>OS Version</label>
+              <input
+                type="text"
+                placeholder={phoneOS === 'android' ? 'e.g. Android 14' : 'e.g. iOS 17.4'}
+                value={osVersion}
+                onChange={e => setOsVersion(e.target.value)}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>App Version</label>
+              <input
+                type="text"
+                placeholder="e.g. 3.2.1"
+                value={appVersion}
+                onChange={e => setAppVersion(e.target.value)}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
+              <label>Account Username</label>
+              <input
+                type="text"
+                placeholder="e.g. test@example.com"
+                value={accountUsername}
+                onChange={e => setAccountUsername(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          {/* Documented Issue — Issue Reproduction only */}
+          {sessionType === 'reproduction' && (
+            <div className="form-group" style={{ marginTop: 12 }}>
+              <label>Documented Issue</label>
+              {documentedIssues.length > 0 ? (
+                <select value={selectedIssueId} onChange={e => setSelectedIssueId(e.target.value)}>
+                  <option value="">— Select an issue —</option>
+                  {documentedIssues.map(issue => (
+                    <option key={issue.id} value={issue.id}>
+                      {issue.title || issue.description || `Issue #${issue.id}`}
+                      {issue.severity ? ` [${issue.severity}]` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '10px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  {selectedProducts.length === 0
+                    ? 'Select a product below to load its documented issues.'
+                    : 'No documented issues found for the selected product(s).'}
                 </div>
               )}
             </div>
           )}
-        </div>
 
-        {/* Selected Products — Test Environment */}
-        {selectedProducts.length > 0 && (
+          {/* Session Notes */}
+          <div className="form-group" style={{ marginTop: 12 }}>
+            <label>Session Notes</label>
+            <textarea
+              placeholder="Any context for this session — build notes, known issues, special focus areas..."
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+            />
+          </div>
+
+          {/* Product Picker */}
           <div className="form-group">
-            <label>
-              Test Environment
-              <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
-                {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
-              </span>
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {selectedProducts.map(({ product, appConfig }, index) => (
-                <div key={product.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontSize: 18 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>{product.modelNumber || product.name}</div>
-                      {product.modelNumber && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{product.name}</div>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => moveProduct(index, -1)}
-                        disabled={index === 0}
-                        style={{ padding: '2px 6px', fontSize: 12 }}
-                        title="Move up"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => moveProduct(index, 1)}
-                        disabled={index === selectedProducts.length - 1}
-                        style={{ padding: '2px 6px', fontSize: 12 }}
-                        title="Move down"
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => removeSelectedProduct(product.id)}
-                        style={{ padding: '2px 6px', fontSize: 12, color: 'var(--text-muted)' }}
-                        title="Remove"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: (product.appConfigs || []).length > 0 ? 8 : 0 }}>
-                    <input
-                      type="text"
-                      placeholder="Firmware version (optional)"
-                      value={firmwarePerProduct[product.id] || ''}
-                      onChange={e => setFirmwarePerProduct(prev => ({ ...prev, [product.id]: e.target.value }))}
-                      style={{ flex: 1, fontSize: 13 }}
-                    />
-                  </div>
-                  {(product.appConfigs || []).length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>App configuration:</div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          className={`btn btn-sm ${appConfig === null ? 'btn-primary' : 'btn-ghost'}`}
-                          onClick={() => setAppConfigForProduct(product.id, null)}
-                          style={{ fontSize: 12 }}
-                        >
-                          Generic
-                        </button>
-                        {(product.appConfigs || []).map(ac => (
-                          <button
-                            type="button"
-                            key={ac.id}
-                            className={`btn btn-sm ${appConfig?.id === ac.id ? 'btn-primary' : 'btn-ghost'}`}
-                            onClick={() => setAppConfigForProduct(product.id, ac)}
-                            style={{ fontSize: 12 }}
-                          >
-                            {ac.appName}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+            <label>Products</label>
+            {catalog.length === 0 ? (
+              <div className="error-msg" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                No products in catalog.{' '}
+                <button type="button" className="btn btn-primary btn-sm" onClick={onGoToCatalog}>
+                  Add a product first
+                </button>
+              </div>
+            ) : (
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    placeholder="Search by model number, name, manufacturer, or category…"
+                    value={productSearch}
+                    onChange={e => { setProductSearch(e.target.value); setSearchOpen(true); }}
+                    onFocus={() => setSearchOpen(true)}
+                    style={{ paddingLeft: 36 }}
+                  />
+                  <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
+                  {productSearch && (
+                    <button
+                      type="button"
+                      onClick={() => { setProductSearch(''); searchRef.current?.focus(); }}
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
+                    >×</button>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* App Configuration Selector — single product only */}
-        {!isMultiProduct && selectedProduct && (selectedProduct.appConfigs || []).length > 0 && (
-          <div className="form-group">
-            <label>APP CONFIGURATION <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 12, color: 'var(--text-muted)' }}>(optional)</span></label>
-            <div className="product-picker-grid">
-              <div
-                className={`product-picker-card ${selectedProducts[0]?.appConfig === null ? 'selected' : ''}`}
-                onClick={() => setAppConfigForProduct(selectedProduct.id, null)}
-              >
-                <span style={{ fontSize: 22 }}>🌐</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Generic — no specific app</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>All capabilities available</div>
-                </div>
-              </div>
-              {(selectedProduct.appConfigs || []).map(ac => (
-                <div
-                  key={ac.id}
-                  className={`product-picker-card ${selectedProducts[0]?.appConfig?.id === ac.id ? 'selected' : ''}`}
-                  onClick={() => setAppConfigForProduct(selectedProduct.id, ac)}
-                >
-                  <span style={{ fontSize: 22 }}>📱</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{ac.appName}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {platformLabel(ac.platform)}
-                      {ac.unavailableCapabilities.length > 0
-                        ? ` · ${ac.unavailableCapabilities.length} feature${ac.unavailableCapabilities.length !== 1 ? 's' : ''} hidden`
-                        : ' · All features available'}
-                    </div>
+                {searchOpen && (
+                  <div ref={dropdownRef} className="product-search-dropdown">
+                    {searchResults.length === 0 ? (
+                      <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-muted)' }}>
+                        No products match "{productSearch}"
+                      </div>
+                    ) : (() => {
+                      const categoryOrder = ['hub', 'touchpad', 'camera', 'sensor', 'app'];
+                      const grouped = categoryOrder
+                        .map(cat => ({ cat, items: searchResults.filter(p => p.category === cat) }))
+                        .concat([{ cat: 'other', items: searchResults.filter(p => !categoryOrder.includes(p.category)) }])
+                        .filter(g => g.items.length > 0);
+                      return grouped.map(({ cat, items }) => (
+                        <div key={cat}>
+                          <div className="product-search-category-header">
+                            <span>{CATEGORY_ICONS[cat] || '📦'}</span>
+                            <span>{CATEGORY_LABELS[cat] || cat}</span>
+                          </div>
+                          {items.map(product => {
+                            const isSelected = selectedProducts.some(p => p.product.id === product.id);
+                            return (
+                              <button
+                                key={product.id}
+                                type="button"
+                                className={`product-search-result ${isSelected ? 'selected' : ''}`}
+                                onClick={() => {
+                                  toggleProduct(product);
+                                  if (!isSelected) { setProductSearch(''); setSearchOpen(false); }
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                                  <div style={{ fontWeight: 700, fontSize: 13 }}>{product.modelNumber || product.name}</div>
+                                  {product.modelNumber && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{product.name}</div>}
+                                  {product.manufacturer && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1 }}>{product.manufacturer}</div>}
+                                </div>
+                                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{countTests(product)} tests</span>
+                                  {isSelected && <span style={{ color: 'var(--primary)', fontSize: 15 }}>✓</span>}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ));
+                    })()}
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Test Plan Selector */}
-        {selectedProducts.length > 0 && (
-          <div className="form-group">
-            <label>Test Plan</label>
-            <div className="session-type-cards">
-              {TEST_PLANS.map(tp => (
-                <div
-                  key={tp.id}
-                  className={`session-type-card ${testPlan === tp.id ? 'selected' : ''}`}
-                  onClick={() => { setTestPlan(tp.id); setSessionType('e2e'); }}
-                >
-                  <span className="session-type-icon">{tp.icon}</span>
-                  <span className="session-type-label">{tp.label}</span>
-                  <span className="session-type-desc">{tp.description}</span>
-                </div>
-              ))}
-            </div>
-            {testPlan === 'vendor-eval' && selectedProduct && (
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)', padding: '8px 12px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-                🔍 Vendor Eval uses a standardized checklist ({generateVendorEvalTestCases(selectedProduct).length} test cases) covering packaging, build quality, setup, core function, connectivity, and interoperability.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Session Type Selector */}
-        <div className="form-group">
-          <label>Session Type</label>
-          <div className="session-type-cards">
-            {(testPlan === 'vendor-eval' ? VENDOR_EVAL_SESSION_TYPES : SESSION_TYPES).map(st => (
-              <div
-                key={st.id}
-                className={`session-type-card ${sessionType === st.id ? 'selected' : ''}`}
-                onClick={() => {
-                  setSessionType(st.id);
-                  setCsvPreview(null);
-                  setCsvError('');
-                }}
-              >
-                <span className="session-type-icon">{st.icon}</span>
-                <span className="session-type-label">{st.label}</span>
-                <span className="session-type-desc">{st.description}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Platform Scope — app products with both iOS and Android */}
-        {!isMultiProduct && selectedProduct?.category === 'app' &&
-          (selectedProduct.capabilities || []).includes('ios') &&
-          (selectedProduct.capabilities || []).includes('android') && (
-          <div className="form-group">
-            <label>Platform Scope</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[
-                { id: 'both', label: 'Both (iOS + Android)' },
-                { id: 'ios', label: 'iOS only' },
-                { id: 'android', label: 'Android only' },
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  className={`btn ${platformScope === opt.id ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ flex: 1 }}
-                  onClick={() => setPlatformScope(opt.id)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Firmware — single product only (existing dropdown) */}
-        {!isMultiProduct && selectedProduct && (
-          <div className="form-group">
-            <label>Firmware Version</label>
-            {!addingFirmware ? (
-              <select value={firmware} onChange={e => {
-                if (e.target.value === '__add__') {
-                  setAddingFirmware(true);
-                  setFirmware('');
-                } else {
-                  setFirmware(e.target.value);
-                }
-              }}>
-                <option value="">— Select or add firmware —</option>
-                {savedFirmwares.map(f => (
-                  <option key={f.id} value={f.version}>{f.version}</option>
-                ))}
-                <option value="__add__">+ Add new firmware version...</option>
-              </select>
-            ) : (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  ref={newFirmwareInputRef}
-                  type="text"
-                  placeholder="e.g. 3.4.2-beta, 2024.11.01"
-                  value={newFirmwareVersion}
-                  onChange={e => setNewFirmwareVersion(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); handleAddFirmware(); }
-                    if (e.key === 'Escape') { setAddingFirmware(false); setNewFirmwareVersion(''); }
-                  }}
-                  style={{ flex: 1 }}
-                />
-                <button type="button" className="btn btn-primary btn-sm" onClick={handleAddFirmware} disabled={!newFirmwareVersion.trim()}>Save</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setAddingFirmware(false); setNewFirmwareVersion(''); }}>Cancel</button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Session Name */}
-        <div className="form-group">
-          <label>Test Name <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)', textTransform: 'none' }}>(optional — displayed as the session title on the card)</span></label>
-          <input
-            type="text"
-            placeholder="e.g. App v4.2 Regression, Prime Day Camera Eval, Doorbell Range Test..."
-            value={sessionName}
-            onChange={e => setSessionName(e.target.value)}
-          />
-        </div>
-
-        {/* Tester Name */}
-        <div className="form-group">
-          <label>Tester Name <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)', textTransform: 'none' }}>(optional — will be shown on results)</span></label>
-          <input
-            type="text"
-            placeholder="Your name"
-            value={testerName}
-            onChange={e => setTesterName(e.target.value)}
-          />
-        </div>
-
-        {/* Session Notes */}
-        <div className="form-group">
-          <label>Session Notes</label>
-          <textarea
-            placeholder="Any context for this session — build notes, known issues, special focus areas..."
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            rows={3}
-          />
-        </div>
-
-        {/* Test Environment — collapsible */}
-        <div className="form-group">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', fontWeight: 600, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: testEnvOpen ? 10 : 0 }}
-            onClick={() => setTestEnvOpen(v => !v)}
-          >
-            <span>{testEnvOpen ? '▾' : '▸'}</span>
-            <span>Test Environment</span>
-          </button>
-          {testEnvOpen && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>App Name <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)', textTransform: 'none' }}>(as found in App Store)</span></label>
-                <input type="text" placeholder="e.g. Cove Security, InstaVision" value={testEnv.appName} onChange={e => setTestEnv(p => ({ ...p, appName: e.target.value }))} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Phone / Device Type</label>
-                <input type="text" placeholder="e.g. iPhone 15 Pro" value={testEnv.phoneType} onChange={e => setTestEnv(p => ({ ...p, phoneType: e.target.value }))} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>OS Version</label>
-                <input type="text" placeholder="e.g. iOS 17.4" value={testEnv.osVersion} onChange={e => setTestEnv(p => ({ ...p, osVersion: e.target.value }))} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>App Version</label>
-                <input type="text" placeholder="e.g. 3.2.1" value={testEnv.appVersion} onChange={e => setTestEnv(p => ({ ...p, appVersion: e.target.value }))} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Device ID / DID</label>
-                <input type="text" placeholder="e.g. ABC123456" value={testEnv.deviceId} onChange={e => setTestEnv(p => ({ ...p, deviceId: e.target.value }))} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Account Username</label>
-                <input type="text" placeholder="e.g. test@example.com" value={testEnv.username} onChange={e => setTestEnv(p => ({ ...p, username: e.target.value }))} autoComplete="off" />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Account Password</label>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    type={showEnvPassword ? 'text' : 'password'}
-                    placeholder="Password"
-                    value={testEnv.password}
-                    onChange={e => setTestEnv(p => ({ ...p, password: e.target.value }))}
-                    autoComplete="new-password"
-                    style={{ flex: 1 }}
-                  />
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowEnvPassword(v => !v)} style={{ flexShrink: 0 }}>
-                    {showEnvPassword ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* CSV Section — single product only */}
-        {!isMultiProduct && (
-          <div className="csv-section">
-            <div className="csv-section-label">CSV Import (optional — overrides auto-generated test cases)</div>
-            <div className="csv-buttons-row">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => downloadCsvTemplate(sessionType)}
-              >
-                ↓ Download Template
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                ↑ Upload CSV
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                style={{ display: 'none' }}
-                onChange={handleCsvUpload}
-              />
-            </div>
-
-            {csvError && (
-              <div className="error-msg" style={{ marginTop: 8 }}>{csvError}</div>
-            )}
-
-            {csvPreview && (
-              <div className="csv-preview">
-                <div className="csv-preview-summary">
-                  ✓ {csvPreview.count} {csvPreview.type === 'issues' ? 'issues' : 'test cases'} loaded from CSV
-                  {csvPreview.count > 3 && ` (showing first 3)`}
-                </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="csv-preview-table">
-                    <thead>
-                      <tr>
-                        {previewHeaders.slice(0, 4).map(h => <th key={h}>{h}</th>)}
-                        {previewHeaders.length > 4 && <th>...</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {csvPreview.rows.map((row, i) => (
-                        <tr key={i}>
-                          {previewHeaders.slice(0, 4).map(h => (
-                            <td key={h}>{String(row[h] ?? '').slice(0, 50)}{String(row[h] ?? '').length > 50 ? '…' : ''}</td>
-                          ))}
-                          {previewHeaders.length > 4 && <td>…</td>}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {csvPreview.count > 3 && (
-                  <div className="csv-preview-more">… and {csvPreview.count - 3} more</div>
                 )}
               </div>
             )}
           </div>
-        )}
 
-        <button
-          type="submit"
-          className="btn btn-primary btn-lg"
-          style={{ width: '100%' }}
-          disabled={catalog.length === 0}
-        >
-          {isMultiProduct ? 'Start Session' : `Start ${SESSION_TYPE_LABELS[sessionType]}`}
-        </button>
-      </form>
+          {/* Selected Products list */}
+          {selectedProducts.length > 0 && (
+            <div className="form-group">
+              <label>
+                Selected Products
+                <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
+                  {selectedProducts.length} selected
+                </span>
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {selectedProducts.map(({ product, appConfig }, index) => (
+                  <div key={product.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 18 }}>{CATEGORY_ICONS[product.category] || '📦'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{product.modelNumber || product.name}</div>
+                        {product.modelNumber && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{product.name}</div>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => moveProduct(index, -1)} disabled={index === 0} style={{ padding: '2px 6px', fontSize: 12 }} title="Move up">↑</button>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => moveProduct(index, 1)} disabled={index === selectedProducts.length - 1} style={{ padding: '2px 6px', fontSize: 12 }} title="Move down">↓</button>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeSelectedProduct(product.id)} style={{ padding: '2px 6px', fontSize: 12, color: 'var(--text-muted)' }} title="Remove">×</button>
+                      </div>
+                    </div>
+
+                    {/* Firmware */}
+                    {isMultiProduct ? (
+                      <input
+                        type="text"
+                        placeholder="Firmware version (optional)"
+                        value={firmwarePerProduct[product.id] || ''}
+                        onChange={e => setFirmwarePerProduct(prev => ({ ...prev, [product.id]: e.target.value }))}
+                        style={{ flex: 1, fontSize: 13, width: '100%', marginBottom: (product.appConfigs || []).length > 0 ? 8 : 0 }}
+                      />
+                    ) : (
+                      !addingFirmware ? (
+                        <select value={firmware} onChange={e => {
+                          if (e.target.value === '__add__') { setAddingFirmware(true); setFirmware(''); }
+                          else setFirmware(e.target.value);
+                        }} style={{ fontSize: 13, marginBottom: (product.appConfigs || []).length > 0 ? 8 : 0 }}>
+                          <option value="">— Select or add firmware —</option>
+                          {savedFirmwares.map(f => <option key={f.id} value={f.version}>{f.version}</option>)}
+                          <option value="__add__">+ Add new firmware version...</option>
+                        </select>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 8, marginBottom: (product.appConfigs || []).length > 0 ? 8 : 0 }}>
+                          <input
+                            ref={newFirmwareInputRef}
+                            type="text"
+                            placeholder="e.g. 3.4.2-beta, 2024.11.01"
+                            value={newFirmwareVersion}
+                            onChange={e => setNewFirmwareVersion(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); handleAddFirmware(); }
+                              if (e.key === 'Escape') { setAddingFirmware(false); setNewFirmwareVersion(''); }
+                            }}
+                            style={{ flex: 1 }}
+                          />
+                          <button type="button" className="btn btn-primary btn-sm" onClick={handleAddFirmware} disabled={!newFirmwareVersion.trim()}>Save</button>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setAddingFirmware(false); setNewFirmwareVersion(''); }}>Cancel</button>
+                        </div>
+                      )
+                    )}
+
+                    {/* App config */}
+                    {(product.appConfigs || []).length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>App configuration:</div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <button type="button" className={`btn btn-sm ${appConfig === null ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setAppConfigForProduct(product.id, null)} style={{ fontSize: 12 }}>Generic</button>
+                          {(product.appConfigs || []).map(ac => (
+                            <button type="button" key={ac.id} className={`btn btn-sm ${appConfig?.id === ac.id ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setAppConfigForProduct(product.id, ac)} style={{ fontSize: 12 }}>
+                              {ac.appName}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="btn btn-primary btn-lg"
+            style={{ width: '100%' }}
+            disabled={catalog.length === 0 || !sessionType || selectedProducts.length === 0}
+          >
+            {sessionType ? `Start ${SESSION_TYPE_LABELS[sessionType] || 'Session'}` : 'Start Session'}
+          </button>
+        </form>
+      )}
     </div>
   );
-}
-
-function countTests(product) {
-  const seen = new Set();
-  const baselines = BASELINE_TESTS[product.category] || [];
-  baselines.forEach(t => seen.add(t.id));
-  (product.capabilities || []).forEach(capId => {
-    (TEST_LIBRARY[capId] || []).forEach(t => seen.add(t.id));
-  });
-  return seen.size;
 }
