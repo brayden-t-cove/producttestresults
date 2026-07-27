@@ -318,10 +318,10 @@ function ReproductionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerd
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, fontFamily: 'inherit' }}>{test.reproSteps}</pre>
           </div>
         )}
-        {test.expectedBehavior && (
+        {(test.expectedBehavior || test.expectedResult) && (
           <div className="test-detail-section">
             <label>Expected Behavior</label>
-            <p>{test.expectedBehavior}</p>
+            <p>{test.expectedBehavior || test.expectedResult}</p>
           </div>
         )}
         {test.sourceTicket && (
@@ -408,10 +408,10 @@ function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdic
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, fontFamily: 'inherit' }}>{test.reproSteps}</pre>
           </div>
         )}
-        {test.expectedBehavior && (
+        {(test.expectedBehavior || test.expectedResult) && (
           <div className="test-detail-section">
             <label>Expected Behavior</label>
-            <p>{test.expectedBehavior}</p>
+            <p>{test.expectedBehavior || test.expectedResult}</p>
           </div>
         )}
 
@@ -983,7 +983,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                     </span>
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       {sessionType === 'e2e' && t.area && <AreaBadge area={t.area} />}
-                      {sessionType === 'e2e' && t.priority && <PriorityBadge priority={t.priority} />}
+                      {(sessionType === 'e2e' || sessionType === 'custom') && t.priority && <PriorityBadge priority={t.priority} />}
                       {sessionType === 'regression' && t.regressionRisk && <RegressionRiskBadge risk={t.regressionRisk} />}
                       {t.status === 'na' || (t.notAvailableInApp && t.status === 'pending')
                         ? <span className="badge badge-na">N/A</span>

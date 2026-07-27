@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { CATEGORY_LABELS, CAPABILITY_GROUPS } from '../data/capabilities.js';
 import { BASELINE_TESTS, TEST_LIBRARY } from '../data/testLibrary.js';
 import { createSession, updateSession, getFirmwares, addFirmware, listIssuesForProduct } from '../lib/api.js';
+import CustomSessionBuilder from './CustomSessionBuilder.jsx';
 
 const CATEGORY_ICONS = {
   hub: '🏠',
@@ -18,6 +19,7 @@ const SESSION_TYPES = [
   { id: 'reproduction', label: 'Issue Reproduction',  icon: '🐛', description: 'Reproduce and document a reported issue with full traceability' },
   { id: 'exploratory',  label: 'Exploratory',         icon: '🔍', description: 'Open-ended structured exploration with notes per category', external: true },
   { id: 'comparison',   label: 'Comparison',          icon: '⚖️', description: 'Side-by-side evaluation of two or more products', external: true },
+  { id: 'custom',       label: 'Custom',              icon: '📋', description: 'Import a test sheet or build a custom checklist from scratch' },
 ];
 
 const SESSION_TYPE_LABELS = {
@@ -25,6 +27,7 @@ const SESSION_TYPE_LABELS = {
   regression: 'Regression Session',
   feature: 'Feature / Targeted Session',
   reproduction: 'Issue Reproduction Session',
+  custom: 'Custom Session',
 };
 
 function getCapabilityPosition(category, capabilityId) {
@@ -113,6 +116,9 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   // --- Issue Reproduction ---
   const [documentedIssues, setDocumentedIssues] = useState([]);
   const [selectedIssueId, setSelectedIssueId] = useState('');
+
+  // --- Custom session ---
+  const [customTestCases, setCustomTestCases] = useState(null);
 
   // --- Products ---
   const [selectedProducts, setSelectedProducts] = useState([]);
@@ -241,6 +247,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     e.preventDefault();
     if (!sessionType) { setError('Please select a session type.'); return; }
     if (selectedProducts.length === 0) { setError('Please select at least one product.'); return; }
+    if (sessionType === 'custom' && !customTestCases?.length) { setError('Please add at least one test case before starting.'); return; }
     setError('');
     setLoading(true);
     setLoadingMsg('Creating session...');
@@ -297,7 +304,9 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
       });
 
       let testCases;
-      if (isMulti) {
+      if (sessionType === 'custom') {
+        testCases = customTestCases.map(tc => ({ ...tc, id: crypto.randomUUID(), templateId: tc.templateId || tc.id, status: tc.status || 'pending' }));
+      } else if (isMulti) {
         const allTestCases = [];
         for (let i = 0; i < selectedProducts.length; i++) {
           const { product, appConfig } = selectedProducts[i];
@@ -490,6 +499,17 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
               rows={3}
             />
           </div>
+
+          {/* Custom test case builder */}
+          {sessionType === 'custom' && (
+            <div className="form-group">
+              <label>Test Cases</label>
+              <CustomSessionBuilder
+                onTestCasesReady={cases => setCustomTestCases(cases)}
+                onClear={() => setCustomTestCases(null)}
+              />
+            </div>
+          )}
 
           {/* Product Picker */}
           <div className="form-group">
