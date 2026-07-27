@@ -425,8 +425,13 @@ function classifySession(s, catalog) {
   if (s.testPlan === 'vendor-eval') return 'evaluation';
   if (s.testPlan === 'exploratory') return 'production';
   const product = catalog.find(p => p.id === s.catalogId || p.name === s.productName);
-  if (product && (product.type === 'sample' || product.type === 'prototype')) return 'evaluation';
-  if (product && product.status === 'in-development') return 'development';
+  if (!product) return 'production';
+  // Status takes precedence over type — a sample in development belongs in development
+  if (product.status === 'in-development') return 'development';
+  if (product.status === 'under-evaluation') return 'evaluation';
+  if (product.status === 'in-testing') return 'production';
+  // Fall back to type when status isn't conclusive
+  if (product.type === 'sample' || product.type === 'prototype') return 'evaluation';
   return 'production';
 }
 

@@ -341,108 +341,186 @@ function TestingResultsTab({ sessions, onOpenSession }) {
 }
 
 const MEDIA_CATEGORIES = [
-  { id: 'renders', label: 'Renders & Product Images', icon: '🖼' },
-  { id: 'packaging', label: 'Packaging', icon: '📦' },
-  { id: 'manual', label: 'User Manual', icon: '📖' },
-  { id: 'other', label: 'Other', icon: '🔗' },
+  { id: 'renders',    label: 'Renders & Images', icon: '🖼',  placeholder: 'e.g. Front render, Studio shot' },
+  { id: 'packaging',  label: 'Packaging',         icon: '📦',  placeholder: 'e.g. Retail box, Insert card' },
+  { id: 'docs',       label: 'Documentation',     icon: '📖',  placeholder: 'e.g. User Manual v2, Quick Start Guide' },
+  { id: 'other',      label: 'Other',             icon: '🔗',  placeholder: 'e.g. Spec sheet, Marketing deck' },
 ];
 
-function MediaTab({ product, onProductUpdate, comparisons, onOpenComparison, onStartComparison, canEditMedia = true }) {
-  const mediaLinks = product.mediaLinks || [];
+function MediaCategoryPane({ cat, items, canEditMedia, onAdd, onArchive, onRestore, onRemove }) {
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newUrl, setNewUrl] = useState('');
-  const [newCategory, setNewCategory] = useState('renders');
+  const [newVersion, setNewVersion] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+
+  const active   = items.filter(m => m.status !== 'archived');
+  const archived = items.filter(m => m.status === 'archived');
 
   async function handleAdd() {
     if (!newUrl.trim()) return;
     setSaving(true);
-    const entry = { id: crypto.randomUUID(), label: newLabel.trim() || newUrl.trim(), url: newUrl.trim(), category: newCategory };
-    await onProductUpdate({ mediaLinks: [...mediaLinks, entry] });
-    setNewLabel(''); setNewUrl(''); setNewCategory('renders'); setAdding(false); setSaving(false);
+    await onAdd({ label: newLabel.trim() || newUrl.trim(), url: newUrl.trim(), version: newVersion.trim() || undefined, status: 'active' });
+    setNewLabel(''); setNewUrl(''); setNewVersion(''); setAdding(false); setSaving(false);
+  }
+
+  function MediaRow({ m, faded }) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', opacity: faded ? 0.6 : 1 }}>
+        <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, color: 'var(--primary)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {m.label || m.url}
+        </a>
+        {m.version && (
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 6px' }}>
+            {m.version}
+          </span>
+        )}
+        {canEditMedia && (
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+            {faded
+              ? <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 6px' }} onClick={() => onRestore(m.id)} title="Restore to active">↑ Restore</button>
+              : <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '1px 6px', color: 'var(--text-muted)' }} onClick={() => onArchive(m.id)} title="Archive this version">Archive</button>
+            }
+            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)', padding: '2px 6px' }} onClick={() => onRemove(m.id)}>×</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Active items */}
+      {active.length === 0 && !adding ? (
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>
+          No {cat.label.toLowerCase()} added yet.
+          {canEditMedia && <> <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => setAdding(true)}>+ Add</button></>}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: active.length > 0 ? 12 : 0 }}>
+          {active.map(m => <MediaRow key={m.id} m={m} faded={false} />)}
+        </div>
+      )}
+
+      {/* Add form */}
+      {adding && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 14, marginBottom: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Label <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)', textTransform: 'none' }}>(optional)</span></label>
+              <input type="text" placeholder={cat.placeholder} value={newLabel} onChange={e => setNewLabel(e.target.value)} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Version <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)', textTransform: 'none' }}>(optional)</span></label>
+              <input type="text" placeholder="e.g. v2.1, Rev B, Final" value={newVersion} onChange={e => setNewVersion(e.target.value)} />
+            </div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 10 }}>
+            <label>URL</label>
+            <input type="url" placeholder="https://..." value={newUrl} onChange={e => setNewUrl(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAdd())} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" onClick={handleAdd} disabled={!newUrl.trim() || saving}>{saving ? 'Saving…' : 'Add'}</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setAdding(false); setNewLabel(''); setNewUrl(''); setNewVersion(''); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {canEditMedia && !adding && active.length > 0 && (
+        <button className="btn btn-ghost btn-sm" style={{ fontSize: 12, marginBottom: 8 }} onClick={() => setAdding(true)}>+ Add</button>
+      )}
+
+      {/* Archived */}
+      {archived.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: 12, color: 'var(--text-muted)' }}
+            onClick={() => setShowArchived(v => !v)}
+          >
+            {showArchived ? '▾' : '▸'} {archived.length} archived version{archived.length !== 1 ? 's' : ''}
+          </button>
+          {showArchived && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              {archived.map(m => <MediaRow key={m.id} m={m} faded={true} />)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MediaTab({ product, onProductUpdate, comparisons, onOpenComparison, onStartComparison, canEditMedia = true }) {
+  const mediaLinks = product.mediaLinks || [];
+  const [activeSubtab, setActiveSubtab] = useState('renders');
+
+  async function handleAdd(catId, entry) {
+    const newEntry = { id: crypto.randomUUID(), category: catId, status: 'active', ...entry };
+    await onProductUpdate({ mediaLinks: [...mediaLinks, newEntry] });
+  }
+
+  async function handleArchive(id) {
+    await onProductUpdate({ mediaLinks: mediaLinks.map(m => m.id === id ? { ...m, status: 'archived' } : m) });
+  }
+
+  async function handleRestore(id) {
+    await onProductUpdate({ mediaLinks: mediaLinks.map(m => m.id === id ? { ...m, status: 'active' } : m) });
   }
 
   async function handleRemove(id) {
     await onProductUpdate({ mediaLinks: mediaLinks.filter(m => m.id !== id) });
   }
 
-  const grouped = MEDIA_CATEGORIES.map(cat => ({
-    ...cat,
-    items: mediaLinks.filter(m => m.category === cat.id),
-  })).filter(g => g.items.length > 0 || adding);
+  const activeCat = MEDIA_CATEGORIES.find(c => c.id === activeSubtab);
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
-          Add links to renders, packaging photos, manuals, and other visual reference material.
-          Direct upload coming in a future release.
-        </p>
-        {!adding && canEditMedia && (
-          <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0, marginLeft: 16 }} onClick={() => setAdding(true)}>
-            + Add Link
-          </button>
-        )}
+      {/* Subtabs */}
+      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+        {MEDIA_CATEGORIES.map(cat => {
+          const count = mediaLinks.filter(m => m.category === cat.id && m.status !== 'archived').length;
+          const isActive = activeSubtab === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setActiveSubtab(cat.id)}
+              style={{
+                background: 'none', border: 'none', padding: '8px 14px', cursor: 'pointer',
+                fontSize: 13, fontWeight: isActive ? 600 : 400,
+                color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+                borderBottom: isActive ? '2px solid var(--primary)' : '2px solid transparent',
+                marginBottom: -1, display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <span>{cat.icon}</span>
+              <span>{cat.label}</span>
+              {count > 0 && (
+                <span style={{ fontSize: 11, background: isActive ? 'var(--primary-dim)' : 'var(--bg)', color: isActive ? 'var(--primary)' : 'var(--text-muted)', borderRadius: 10, padding: '1px 6px', fontWeight: 600 }}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {adding && (
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 16, marginBottom: 20 }}>
-          <div className="form-group" style={{ marginBottom: 10 }}>
-            <label>Category</label>
-            <select value={newCategory} onChange={e => setNewCategory(e.target.value)}>
-              {MEDIA_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
-            </select>
-          </div>
-          <div className="form-group" style={{ marginBottom: 10 }}>
-            <label>Label <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 12 }}>(optional)</span></label>
-            <input type="text" placeholder="e.g. Front render, Retail box" value={newLabel} onChange={e => setNewLabel(e.target.value)} />
-          </div>
-          <div className="form-group" style={{ marginBottom: 12 }}>
-            <label>URL</label>
-            <input type="url" placeholder="https://..." value={newUrl} onChange={e => setNewUrl(e.target.value)} />
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary btn-sm" onClick={handleAdd} disabled={!newUrl.trim() || saving}>
-              {saving ? 'Saving...' : 'Add'}
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => { setAdding(false); setNewLabel(''); setNewUrl(''); }}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {mediaLinks.length === 0 && !adding ? (
-        <div className="empty-state" style={{ padding: '40px 0' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🖼</div>
-          <p>No media links yet.</p>
-          {canEditMedia && <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add Link</button>}
-        </div>
-      ) : (
-        MEDIA_CATEGORIES.map(cat => {
-          const items = mediaLinks.filter(m => m.category === cat.id);
-          if (items.length === 0) return null;
-          return (
-            <div key={cat.id} style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10 }}>
-                {cat.icon} {cat.label}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {items.map(m => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-                    <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, color: 'var(--primary)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {m.label || m.url}
-                    </a>
-                    {canEditMedia && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', padding: '2px 6px' }} onClick={() => handleRemove(m.id)}>×</button>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })
-      )}
+      {/* Active subtab content */}
+      <MediaCategoryPane
+        key={activeSubtab}
+        cat={activeCat}
+        items={mediaLinks.filter(m => m.category === activeSubtab)}
+        canEditMedia={canEditMedia}
+        onAdd={entry => handleAdd(activeSubtab, entry)}
+        onArchive={handleArchive}
+        onRestore={handleRestore}
+        onRemove={handleRemove}
+      />
 
       {/* Comparisons */}
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
             Comparisons
