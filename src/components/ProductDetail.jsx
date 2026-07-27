@@ -844,7 +844,97 @@ function KnownIssuesTab({ product, onOpenSession }) {
   );
 }
 
-const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Media & Documents', 'Project Details'];
+function AccessoriesTab({ product, onProductUpdate, canEdit }) {
+  const accessories = product.accessories || [];
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [sku, setSku] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleAdd() {
+    if (!name.trim()) return;
+    setSaving(true);
+    const entry = { id: crypto.randomUUID(), name: name.trim(), sku: sku.trim() || undefined, note: note.trim() || undefined };
+    await onProductUpdate({ accessories: [...accessories, entry] });
+    setName(''); setSku(''); setNote(''); setAdding(false); setSaving(false);
+  }
+
+  async function handleRemove(id) {
+    await onProductUpdate({ accessories: accessories.filter(a => a.id !== id) });
+  }
+
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+          Optional add-ons and compatible accessories that work alongside this product but are cataloged separately or not at all.
+        </p>
+        {canEdit && !adding && (
+          <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0, marginLeft: 16 }} onClick={() => setAdding(true)}>
+            + Add Accessory
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 14, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Item Name *</label>
+              <input type="text" placeholder="e.g. Solar Panel, Garage Hinge Bracket" value={name} onChange={e => setName(e.target.value)} autoFocus />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>SKU <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)', textTransform: 'none' }}>(optional)</span></label>
+              <input type="text" placeholder="e.g. ACC-12345" value={sku} onChange={e => setSku(e.target.value)} />
+            </div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 10 }}>
+            <label>Note <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)', textTransform: 'none' }}>(optional)</span></label>
+            <input type="text" placeholder="e.g. Extends battery life via solar charging, sold separately"
+              value={note} onChange={e => setNote(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAdd())} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" onClick={handleAdd} disabled={!name.trim() || saving}>{saving ? 'Saving…' : 'Add'}</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setAdding(false); setName(''); setSku(''); setNote(''); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {accessories.length === 0 && !adding ? (
+        <div className="empty-state" style={{ padding: '40px 0' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔩</div>
+          <p>No accessories added yet.</p>
+          {canEdit && <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add Accessory</button>}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {accessories.map(a => (
+            <div key={a.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 14px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{a.name}</span>
+                  {a.sku && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>
+                      {a.sku}
+                    </span>
+                  )}
+                </div>
+                {a.note && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>{a.note}</div>}
+              </div>
+              {canEdit && (
+                <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', padding: '2px 6px', flexShrink: 0 }} onClick={() => handleRemove(a.id)}>×</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Media & Documents', 'Accessories', 'Project Details'];
 
 function VariationsTab({ variations, onViewProduct }) {
   if (variations.length === 0) {
@@ -1044,6 +1134,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Testing Results' && <TestingResultsTab sessions={sessions} onOpenSession={onOpenSession} />}
       {activeTab === 'Known Issues' && <KnownIssuesTab product={product} onOpenSession={onOpenSession} />}
       {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} canEditMedia={canEditMedia} />}
+      {activeTab === 'Accessories' && <AccessoriesTab product={product} onProductUpdate={onProductUpdate} canEdit={canEdit} />}
       {activeTab === 'Project Details' && <ProjectDetailsTab product={product} onProductUpdate={onProductUpdate} canEditMedia={canEditMedia} onOpenProject={onOpenProject} />}
       {activeTab === 'Variations' && <VariationsTab variations={variationProducts} onViewProduct={onViewProduct} />}
     </div>
