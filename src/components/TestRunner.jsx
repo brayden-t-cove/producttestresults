@@ -496,7 +496,7 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
 
         <div className="test-detail-section">
           <label>Expected Result</label>
-          <p>{test.expected || test.defaultExpected || '—'}</p>
+          <p>{test.expected || test.defaultExpected || test.expectedResult || test.expectedBehavior || '—'}</p>
         </div>
 
         <div className="test-detail-section" style={{ marginTop: 0 }}>
