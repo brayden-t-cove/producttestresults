@@ -68,7 +68,10 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
     if (!form.entities || form.entities.length === 0) { setError('Select at least one entity.'); return; }
     setSaving(true); setError('');
     try {
-      const { entities, ...rest } = form;
+      const finalContacts = newContact.name.trim()
+        ? [...form.contacts, { ...newContact, id: Date.now().toString() }]
+        : form.contacts;
+      const { entities, ...rest } = { ...form, contacts: finalContacts };
       await onSave({ ...vendor, ...rest, entities, entity: entities[0] || '' });
       onClose();
     } catch (err) {
