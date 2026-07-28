@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import { CERT_STATUS_LABELS, CERT_STATUS_COLORS } from '../data/certSchema.js';
 import { listComparisons, getProjects } from '../lib/api.js';
@@ -936,27 +936,168 @@ function AccessoriesTab({ product, onProductUpdate, canEdit }) {
 
 const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Media & Documents', 'Accessories', 'Project Details'];
 
-function VariationsTab({ variations, onViewProduct }) {
-  if (variations.length === 0) {
-    return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>No variations registered for this model.</div>;
-  }
+const STATUS_LABEL = {
+  'active': 'Active',
+  'in-development': 'In Development',
+  'under-evaluation': 'Under Evaluation',
+  'in-testing': 'In Testing',
+  'discontinued': 'Discontinued',
+  'grandfathered': 'Grandfathered',
+};
+const STATUS_COLOR = {
+  'active': '#22c55e',
+  'in-development': '#f59e0b',
+  'under-evaluation': '#6366f1',
+  'in-testing': '#3b82f6',
+  'discontinued': '#6b7280',
+  'grandfathered': '#a78bfa',
+};
+
+function ProductChip({ p, isCurrent, onViewProduct }) {
+  const statusColor = STATUS_COLOR[p.status] || '#6b7280';
   return (
-    <div className="variations-list">
-      {variations.map(v => (
-        <div key={v.id} className="variation-row">
-          {v.imageUrl && (
-            <img src={v.imageUrl} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
-              onError={e => { e.target.style.display = 'none'; }} />
-          )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="variation-row-label">{v.variationLabel || v.name || v.modelNumber || 'Unnamed Variation'}</div>
-            <div className="variation-row-meta">{[v.modelNumber, v.status].filter(Boolean).join(' · ')}</div>
-          </div>
-          {onViewProduct && (
-            <button className="btn btn-secondary btn-sm" onClick={() => onViewProduct(v)}>View</button>
-          )}
+    <div
+      onClick={() => !isCurrent && onViewProduct && onViewProduct(p)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+        borderRadius: 8, border: `2px solid ${isCurrent ? 'var(--primary)' : 'var(--border)'}`,
+        background: isCurrent ? 'var(--primary-dim)' : 'var(--card)',
+        cursor: isCurrent ? 'default' : 'pointer', minWidth: 180, maxWidth: 260,
+        transition: 'border-color 0.15s',
+      }}
+    >
+      {p.imageUrl && (
+        <img src={p.imageUrl} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+          onError={e => { e.target.style.display = 'none'; }} />
+      )}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {p.name || p.modelNumber}
+          {isCurrent && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--primary)', fontWeight: 700 }}>YOU ARE HERE</span>}
         </div>
-      ))}
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+          {[p.modelNumber, p.version, p.revision].filter(Boolean).join(' · ')}
+        </div>
+        <div style={{ marginTop: 4, display: 'inline-block', fontSize: 10, fontWeight: 600, borderRadius: 8, padding: '1px 7px', background: statusColor + '22', color: statusColor }}>
+          {STATUS_LABEL[p.status] || p.status || 'Unknown'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RelationshipsTab({ product, catalog, onViewProduct }) {
+  // Build lineage chain: walk replacesProductId backward and supersededBy/successors forward
+  function buildLineage() {
+    const all = catalog || [];
+    const chain = [product];
+
+    // Walk predecessors (replacesProductId chain)
+    let cursor = product;
+    const seen = new Set([product.id]);
+    while (cursor.replacesProductId) {
+      const pred = all.find(p => p.id === cursor.replacesProductId);
+      if (!pred || seen.has(pred.id)) break;
+      seen.add(pred.id);
+      chain.unshift(pred);
+      cursor = pred;
+    }
+
+    // Walk successors: any product whose replacesProductId is the last in chain
+    cursor = chain[chain.length - 1];
+    while (true) {
+      const next = all.find(p => p.replacesProductId === cursor.id && !seen.has(p.id));
+      if (!next) break;
+      seen.add(next.id);
+      chain.push(next);
+      cursor = next;
+    }
+
+    return chain;
+  }
+
+  const all = catalog || [];
+  const lineage = buildLineage();
+  const hasLineage = lineage.length > 1;
+
+  // Variations: same parentId (or this product is the parent — direct children)
+  const parentId = product.parentId || product.id;
+  const rootId = product.parentId || product.id;
+  const siblings = all.filter(p => p.id !== product.id && (p.parentId === rootId || (p.id !== rootId && p.parentId === product.parentId && product.parentId)));
+  const children = all.filter(p => p.parentId === product.id);
+  const variationPool = [...children, ...siblings.filter(s => !children.find(c => c.id === s.id))];
+
+  // Vendor family: same manufacturer, different lineage (not in lineage or variationPool)
+  const lineageIds = new Set(lineage.map(p => p.id));
+  const varIds = new Set(variationPool.map(p => p.id));
+  const vendorFamily = product.manufacturer
+    ? all.filter(p =>
+        p.id !== product.id &&
+        p.manufacturer === product.manufacturer &&
+        !lineageIds.has(p.id) &&
+        !varIds.has(p.id)
+      )
+    : [];
+
+  const empty = !hasLineage && variationPool.length === 0 && vendorFamily.length === 0;
+
+  return (
+    <div style={{ paddingTop: 8 }}>
+      {empty && (
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>
+          No relationships found. To link products, set <strong>Replaces</strong> or <strong>Platform Parent</strong> in the product edit form, or ensure the manufacturer name matches across products.
+        </div>
+      )}
+
+      {/* Version Lineage */}
+      {hasLineage && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Version Lineage</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap' }}>
+            {lineage.map((p, i) => (
+              <React.Fragment key={p.id}>
+                <ProductChip p={p} isCurrent={p.id === product.id} onViewProduct={onViewProduct} />
+                {i < lineage.length - 1 && (
+                  <div style={{ padding: '0 8px', color: 'var(--text-muted)', fontSize: 18, userSelect: 'none' }}>→</div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+            Oldest ← → Newest · Click any product to navigate to it
+          </div>
+        </div>
+      )}
+
+      {/* Variations / Siblings */}
+      {variationPool.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Platform Variations
+            <span style={{ marginLeft: 8, background: 'var(--primary)', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px', fontWeight: 700 }}>{variationPool.length}</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {variationPool.map(p => (
+              <ProductChip key={p.id} p={p} isCurrent={false} onViewProduct={onViewProduct} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Vendor Family */}
+      {vendorFamily.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Other Products from {product.manufacturer}
+            <span style={{ marginLeft: 8, background: 'var(--border)', color: 'var(--text)', borderRadius: 10, fontSize: 10, padding: '1px 6px', fontWeight: 700 }}>{vendorFamily.length}</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {vendorFamily.map(p => (
+              <ProductChip key={p.id} p={p} isCurrent={false} onViewProduct={onViewProduct} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1010,7 +1151,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
   const [comparisons, setComparisons] = useState([]);
 
   const variationProducts = (catalog || []).filter(p => p.parentId === product.id);
-  const tabs = [...BASE_TABS, ...(variationProducts.length > 0 ? ['Variations'] : [])];
+  const tabs = [...BASE_TABS, 'Relationships'];
   const parentProduct = product.parentId ? (catalog || []).find(p => p.id === product.parentId) : null;
 
   useEffect(() => {
@@ -1120,11 +1261,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
             className={`product-tab${activeTab === tab ? ' active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab}{tab === 'Variations' && variationProducts.length > 0 && (
-              <span style={{ marginLeft: 6, background: 'var(--primary)', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px' }}>
-                {variationProducts.length}
-              </span>
-            )}
+            {tab}
           </button>
         ))}
       </div>
@@ -1136,7 +1273,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} canEditMedia={canEditMedia} />}
       {activeTab === 'Accessories' && <AccessoriesTab product={product} onProductUpdate={onProductUpdate} canEdit={canEdit} />}
       {activeTab === 'Project Details' && <ProjectDetailsTab product={product} onProductUpdate={onProductUpdate} canEditMedia={canEditMedia} onOpenProject={onOpenProject} />}
-      {activeTab === 'Variations' && <VariationsTab variations={variationProducts} onViewProduct={onViewProduct} />}
+      {activeTab === 'Relationships' && <RelationshipsTab product={product} catalog={catalog} onViewProduct={onViewProduct} />}
     </div>
   );
 }

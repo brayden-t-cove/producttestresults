@@ -543,6 +543,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
     productType:       product?.type || 'production',
     imageUrl:          product?.imageUrl || null,
     parentId:          product?.parentId || null,
+    lineageId:         product?.lineageId || null,
     variationLabel:    product?.variationLabel || '',
   });
 
@@ -617,6 +618,7 @@ export default function NewProduct({ product, onSave, onBack, catalog, specSchem
         entity:           state.entity,
         type:             state.productType,
         parentId:         state.parentId || undefined,
+        lineageId:        state.lineageId || undefined,
         variationLabel:   state.variationLabel || undefined,
       });
     } catch (err) {
