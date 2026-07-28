@@ -234,7 +234,7 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
   );
 }
 
-function VendorDetail({ vendor, catalog, onEdit, onDelete, onBack }) {
+function VendorDetail({ vendor, catalog, onEdit, onDelete, onBack, onGoToProduct }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const linkedProducts = catalog.filter(p => p.vendorId === vendor.id || p.manufacturer === vendor.name);
 
@@ -332,9 +332,10 @@ function VendorDetail({ vendor, catalog, onEdit, onDelete, onBack }) {
           {linkedProducts.length > 0 ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {linkedProducts.map(p => (
-                <span key={p.id} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 4, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <button key={p.id} type="button" onClick={() => onGoToProduct && onGoToProduct(p)}
+                  style={{ fontSize: 12, padding: '4px 10px', borderRadius: 4, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--primary)', cursor: 'pointer', fontWeight: 500 }}>
                   {p.modelNumber || p.name}
-                </span>
+                </button>
               ))}
             </div>
           ) : (
@@ -348,7 +349,7 @@ function VendorDetail({ vendor, catalog, onEdit, onDelete, onBack }) {
   );
 }
 
-export default function VendorLibrary({ catalog = [], onBack, currentUser }) {
+export default function VendorLibrary({ catalog = [], onBack, currentUser, onGoToProduct }) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -382,11 +383,14 @@ export default function VendorLibrary({ catalog = [], onBack, currentUser }) {
     setSelectedVendor(null);
   }
 
-  const filtered = vendors.filter(v => {
-    const matchSearch = !search || v.name.toLowerCase().includes(search.toLowerCase()) || (v.industry || '').toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === 'All' || v.relationshipStatus === filterStatus;
-    return matchSearch && matchStatus;
-  });
+  const STATUS_ORDER = { 'Active Partner': 0, 'In Negotiation': 1, 'Under Evaluation': 2, 'Prospect': 3, 'Inactive': 4 };
+  const filtered = vendors
+    .filter(v => {
+      const matchSearch = !search || v.name.toLowerCase().includes(search.toLowerCase()) || (v.industry || '').toLowerCase().includes(search.toLowerCase());
+      const matchStatus = filterStatus === 'All' || v.relationshipStatus === filterStatus;
+      return matchSearch && matchStatus;
+    })
+    .sort((a, b) => (STATUS_ORDER[a.relationshipStatus] ?? 99) - (STATUS_ORDER[b.relationshipStatus] ?? 99));
 
   if (selectedVendor) {
     return (
@@ -406,6 +410,7 @@ export default function VendorLibrary({ catalog = [], onBack, currentUser }) {
           onEdit={() => { setEditingVendor(selectedVendor); setShowForm(true); }}
           onDelete={() => handleDelete(selectedVendor.id)}
           onBack={() => setSelectedVendor(null)}
+          onGoToProduct={onGoToProduct}
         />
       </div>
     );

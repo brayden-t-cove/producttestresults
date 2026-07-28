@@ -1002,6 +1002,7 @@ export default function App() {
           catalog={catalog}
           onBack={() => setView('dashboard')}
           currentUser={currentUser}
+          onGoToProduct={p => { setCurrentProduct(p); setView('productDetail'); }}
         />
       ) : (
         <>{setView('dashboard')}</>
