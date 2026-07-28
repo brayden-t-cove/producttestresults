@@ -44,6 +44,8 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [newContact, setNewContact] = useState({ name: '', role: '', entity: '', wechat: '', email: '' });
+  const [editingContactId, setEditingContactId] = useState(null);
+  const [editingContactData, setEditingContactData] = useState(null);
   const [newCatalog, setNewCatalog] = useState({ label: '', url: '' });
 
   function set(field, value) { setForm(f => ({ ...f, [field]: value })); }
@@ -54,6 +56,12 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
     setNewContact({ name: '', role: '', entity: '', wechat: '', email: '' });
   }
   function removeContact(id) { set('contacts', form.contacts.filter(c => c.id !== id)); }
+  function startEditContact(c) { setEditingContactId(c.id); setEditingContactData({ ...c }); }
+  function saveEditContact() {
+    set('contacts', form.contacts.map(c => c.id === editingContactId ? { ...editingContactData } : c));
+    setEditingContactId(null); setEditingContactData(null);
+  }
+  function cancelEditContact() { setEditingContactId(null); setEditingContactData(null); }
 
   function addCatalog() {
     if (!newCatalog.label.trim() || !newCatalog.url.trim()) return;
@@ -168,13 +176,34 @@ function VendorFormModal({ vendor, catalog, onSave, onClose, currentUser }) {
           <div className="form-group">
             <label style={{ marginBottom: 8, display: 'block' }}>Contacts</label>
             {form.contacts.map(c => (
-              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 13 }}>
-                <span style={{ fontWeight: 500, minWidth: 100 }}>{c.name}</span>
-                {c.role && <span style={{ color: 'var(--text-muted)', minWidth: 80 }}>{c.role}</span>}
-                {c.entity && <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '1px 7px', flexShrink: 0 }}>{c.entity}</span>}
-                {c.wechat && <span style={{ color: '#07c160', flex: 1 }}>💬 {c.wechat}</span>}
-                {c.email && <a href={`mailto:${c.email}`} style={{ color: 'var(--primary)', flex: c.wechat ? '0 0 auto' : 1 }}>{c.email}</a>}
-                <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)', flexShrink: 0 }} onClick={() => removeContact(c.id)}>✕</button>
+              <div key={c.id} style={{ marginBottom: 6 }}>
+                {editingContactId === c.id ? (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input value={editingContactData.name} onChange={e => setEditingContactData(v => ({ ...v, name: e.target.value }))} placeholder="Name" style={{ flex: '0 0 120px' }} />
+                    <input value={editingContactData.role} onChange={e => setEditingContactData(v => ({ ...v, role: e.target.value }))} placeholder="Role" style={{ flex: '0 0 90px' }} />
+                    <select value={editingContactData.entity} onChange={e => setEditingContactData(v => ({ ...v, entity: e.target.value }))} style={{ flex: '0 0 110px' }}>
+                      <option value="">Entity...</option>
+                      {form.entities.length > 0
+                        ? form.entities.map(en => <option key={en} value={en}>{en}</option>)
+                        : ENTITIES.map(en => <option key={en} value={en}>{en}</option>)
+                      }
+                    </select>
+                    <input value={editingContactData.wechat} onChange={e => setEditingContactData(v => ({ ...v, wechat: e.target.value }))} placeholder="WeChat ID" style={{ flex: '0 0 110px' }} />
+                    <input value={editingContactData.email} onChange={e => setEditingContactData(v => ({ ...v, email: e.target.value }))} placeholder="Email" style={{ flex: 1, minWidth: 130 }} />
+                    <button type="button" className="btn btn-primary btn-sm" onClick={saveEditContact}>Save</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={cancelEditContact}>Cancel</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                    <span style={{ fontWeight: 500, minWidth: 100 }}>{c.name}</span>
+                    {c.role && <span style={{ color: 'var(--text-muted)', minWidth: 80 }}>{c.role}</span>}
+                    {c.entity && <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '1px 7px', flexShrink: 0 }}>{c.entity}</span>}
+                    {c.wechat && <span style={{ color: '#07c160', flex: 1 }}>💬 {c.wechat}</span>}
+                    {c.email && <a href={`mailto:${c.email}`} style={{ color: 'var(--primary)', flex: c.wechat ? '0 0 auto' : 1 }}>{c.email}</a>}
+                    <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink: 0 }} onClick={() => startEditContact(c)}>✏️</button>
+                    <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)', flexShrink: 0 }} onClick={() => removeContact(c.id)}>✕</button>
+                  </div>
+                )}
               </div>
             ))}
             <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
