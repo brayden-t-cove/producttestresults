@@ -20,6 +20,7 @@ import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares,
 import {
   findOrCreateUser, createDomainRequest,
   getAllUsers, updateUserRole, updateUserEntity,
+  createPreregisteredUser, deleteUser,
   getAllDomains, createDomain, deleteDomain,
   getDomainRequests, approveDomainRequest, denyDomainRequest,
 } from './lib/auth.js';
@@ -217,6 +218,23 @@ app.patch('/api/admin/users/:id', requireSuperuser, async (req, res) => {
     if (role) user = await updateUserRole(req.params.id, role);
     if (entity !== undefined) user = await updateUserEntity(req.params.id, entity);
     res.json(user);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/users', requireSuperuser, async (req, res) => {
+  try {
+    const { email, name, role, entity } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+    const user = await createPreregisteredUser({ email, name, role, entity });
+    res.json(user);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/users/:id', requireSuperuser, async (req, res) => {
+  try {
+    if (req.params.id === req.user?.id) return res.status(400).json({ error: 'Cannot delete your own account.' });
+    await deleteUser(req.params.id);
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  adminGetUsers, adminPatchUser,
+  adminGetUsers, adminPatchUser, adminCreateUser, adminDeleteUser,
   adminGetDomains, adminCreateDomain, adminDeleteDomain,
   adminGetDomainRequests, adminApproveDomainRequest, adminDenyDomainRequest,
 } from '../lib/authApi.js';
@@ -22,6 +22,11 @@ export default function AdminPanel({ currentUser, onBack }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // New user form
+  const [newUser, setNewUser] = useState({ email: '', name: '', role: 'viewer', entity: '' });
+  const [newUserError, setNewUserError] = useState('');
+  const [newUserSaving, setNewUserSaving] = useState(false);
+
   // New domain form
   const [newDomain, setNewDomain] = useState('');
   const [newEntity, setNewEntity] = useState('Cove');
@@ -42,6 +47,26 @@ export default function AdminPanel({ currentUser, onBack }) {
       setPendingProducts(pend); setParentModels(pars); setSubmissions(subs);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
+  }
+
+  async function handleCreateUser(e) {
+    e.preventDefault();
+    if (!newUser.email.trim()) { setNewUserError('Email is required.'); return; }
+    setNewUserSaving(true); setNewUserError('');
+    try {
+      const created = await adminCreateUser(newUser);
+      setUsers(prev => [created, ...prev]);
+      setNewUser({ email: '', name: '', role: 'viewer', entity: '' });
+    } catch (err) { setNewUserError(err.message); }
+    finally { setNewUserSaving(false); }
+  }
+
+  async function handleDeleteUser(userId) {
+    if (!confirm('Remove this user? They will lose access on their next login.')) return;
+    try {
+      await adminDeleteUser(userId);
+      setUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (e) { setError(e.message); }
   }
 
   async function handleRoleChange(userId, role) {
@@ -143,55 +168,101 @@ export default function AdminPanel({ currentUser, onBack }) {
 
       {/* ── Users ── */}
       {tab === 'users' && !loading && (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Provider</th>
-                <th>Entity</th>
-                <th>Role</th>
-                <th>Last login</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.id}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      {u.avatar && <img src={u.avatar} alt="" style={{ width: 28, height: 28, borderRadius: '50%' }} />}
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{u.provider}</td>
-                  <td>
-                    <select
-                      value={u.entity || ''}
-                      onChange={e => handleEntityChange(u.id, e.target.value || null)}
-                      style={{ fontSize: 12 }}
-                    >
-                      <option value="">— None —</option>
-                      {ENTITIES.map(en => <option key={en} value={en}>{en}</option>)}
-                    </select>
-                  </td>
-                  <td>
-                    <select
-                      value={u.role}
-                      onChange={e => handleRoleChange(u.id, e.target.value)}
-                      disabled={u.email === currentUser.email}
-                      style={{ fontSize: 12 }}
-                    >
-                      {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </td>
-                  <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatDate(u.last_login)}</td>
+        <div>
+          {/* Add User Form */}
+          <form onSubmit={handleCreateUser} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px', marginBottom: 20 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Add / Pre-register User</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <input
+                placeholder="Email *"
+                type="email"
+                value={newUser.email}
+                onChange={e => setNewUser(v => ({ ...v, email: e.target.value }))}
+                style={{ flex: '1 1 180px', fontSize: 13 }}
+                required
+              />
+              <input
+                placeholder="Display name"
+                value={newUser.name}
+                onChange={e => setNewUser(v => ({ ...v, name: e.target.value }))}
+                style={{ flex: '1 1 140px', fontSize: 13 }}
+              />
+              <select value={newUser.entity} onChange={e => setNewUser(v => ({ ...v, entity: e.target.value }))} style={{ flex: '0 0 130px', fontSize: 13 }}>
+                <option value="">— Entity —</option>
+                {ENTITIES.map(en => <option key={en} value={en}>{en}</option>)}
+              </select>
+              <select value={newUser.role} onChange={e => setNewUser(v => ({ ...v, role: e.target.value }))} style={{ flex: '0 0 150px', fontSize: 13 }}>
+                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={newUserSaving} style={{ whiteSpace: 'nowrap' }}>
+                {newUserSaving ? 'Adding…' : '+ Add User'}
+              </button>
+            </div>
+            {newUserError && <div style={{ color: 'var(--fail)', fontSize: 12, marginTop: 8 }}>{newUserError}</div>}
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+              Pre-registered users are provisioned with their role before first login. If the email already exists, their role and entity will be updated.
+            </div>
+          </form>
+
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Provider</th>
+                  <th>Entity</th>
+                  <th>Role</th>
+                  <th>Last login</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {users.map(u => (
+                  <tr key={u.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {u.avatar && <img src={u.avatar} alt="" style={{ width: 28, height: 28, borderRadius: '50%' }} />}
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{u.name || <span style={{ color: 'var(--text-muted)' }}>—</span>}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.email}</div>
+                          {u.provider === 'pre-registered' && (
+                            <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>⏳ Awaiting first login</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{u.provider === 'pre-registered' ? '—' : u.provider}</td>
+                    <td>
+                      <select
+                        value={u.entity || ''}
+                        onChange={e => handleEntityChange(u.id, e.target.value || null)}
+                        style={{ fontSize: 12 }}
+                      >
+                        <option value="">— None —</option>
+                        {ENTITIES.map(en => <option key={en} value={en}>{en}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        value={u.role}
+                        onChange={e => handleRoleChange(u.id, e.target.value)}
+                        disabled={u.email === currentUser.email}
+                        style={{ fontSize: 12 }}
+                      >
+                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.last_login ? formatDate(u.last_login) : '—'}</td>
+                    <td>
+                      {u.email !== currentUser.email && (
+                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)' }} onClick={() => handleDeleteUser(u.id)}>Remove</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

@@ -25,6 +25,21 @@ export async function adminPatchUser(id, patch) {
   return res.json();
 }
 
+export async function adminCreateUser(data) {
+  const res = await fetch('/api/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to create user'); }
+  return res.json();
+}
+
+export async function adminDeleteUser(id) {
+  const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to delete user'); }
+}
+
 export async function adminGetDomains() {
   const res = await fetch('/api/admin/domains');
   if (!res.ok) throw new Error('Failed to load domains');
