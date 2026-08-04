@@ -568,7 +568,7 @@ export default function App() {
   const canEdit = !authEnabled || (currentUser && ['editor', 'project-manager', 'superuser'].includes(currentUser.role));
   const canEditMedia = !authEnabled || (currentUser && ['editor', 'designer', 'project-manager', 'superuser'].includes(currentUser.role));
   const canSeeVendors = !authEnabled || (currentUser && ['analyst', 'editor', 'designer', 'project-manager', 'superuser'].includes(currentUser.role));
-  const canSeeProjects = !authEnabled || (currentUser && ['project-manager', 'superuser'].includes(currentUser.role));
+  const canSeeProjects = !authEnabled || (currentUser && ['analyst', 'project-manager', 'superuser'].includes(currentUser.role));
 
   async function refreshSessions() {
     try {
