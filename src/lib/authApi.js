@@ -81,3 +81,19 @@ export async function adminDenyDomainRequest(id) {
   const res = await fetch(`/api/admin/domain-requests/${id}/deny`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to deny request');
 }
+
+export async function adminGetRoleDefaults() {
+  const res = await fetch('/api/admin/role-defaults');
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function adminSaveRoleDefaults(defaults) {
+  const res = await fetch('/api/admin/role-defaults', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(defaults),
+  });
+  if (!res.ok) throw new Error('Failed to save role defaults');
+  return res.json();
+}

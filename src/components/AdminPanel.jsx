@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   adminGetUsers, adminPatchUser, adminCreateUser, adminDeleteUser,
   adminGetDomains, adminCreateDomain, adminDeleteDomain,
   adminGetDomainRequests, adminApproveDomainRequest, adminDenyDomainRequest,
+  adminGetRoleDefaults, adminSaveRoleDefaults,
 } from '../lib/authApi.js';
+import { PERMISSION_REGISTRY, DEFAULT_ROLE_PERMISSIONS } from '../data/permissions.js';
 import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents, adminGetSubmissions, adminUpdateSubmission, adminDeleteSubmission } from '../lib/api.js';
 
 const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
@@ -33,18 +35,24 @@ export default function AdminPanel({ currentUser, onBack }) {
   const [pendingProducts, setPendingProducts] = useState([]);
   const [parentModels, setParentModels] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [roleDefaults, setRoleDefaults] = useState(null);
+  const [permSaving, setPermSaving] = useState(false);
+  const [permSaved, setPermSaved] = useState(false);
+  const [expandedUser, setExpandedUser] = useState(null);
 
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [u, d, r, pend, pars, subs] = await Promise.all([
+      const [u, d, r, pend, pars, subs, rd] = await Promise.all([
         adminGetUsers(), adminGetDomains(), adminGetDomainRequests(),
         adminGetPendingProducts(), getCatalogParents(), adminGetSubmissions(),
+        adminGetRoleDefaults(),
       ]);
       setUsers(u); setDomains(d); setRequests(r);
       setPendingProducts(pend); setParentModels(pars); setSubmissions(subs);
+      setRoleDefaults(rd || DEFAULT_ROLE_PERMISSIONS);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -116,6 +124,39 @@ export default function AdminPanel({ currentUser, onBack }) {
     } catch (e) { setError(e.message); }
   }
 
+  async function handleSaveRoleDefaults() {
+    setPermSaving(true);
+    try {
+      await adminSaveRoleDefaults(roleDefaults);
+      setPermSaved(true);
+      setTimeout(() => setPermSaved(false), 2000);
+    } catch (e) { setError(e.message); }
+    finally { setPermSaving(false); }
+  }
+
+  function toggleRolePerm(role, key) {
+    setRoleDefaults(prev => ({
+      ...prev,
+      [role]: { ...(prev[role] || {}), [key]: !((prev[role] || {})[key]) },
+    }));
+  }
+
+  async function handleUserPermOverride(userId, key, value) {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (key === '__clear__') {
+      const saved = await adminPatchUser(userId, { permissions: {} });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, permissions: saved.permissions || {} } : u));
+      return;
+    }
+    const current = user.permissions || {};
+    const updated = { ...current, [key]: value };
+    const roleDef = (roleDefaults || DEFAULT_ROLE_PERMISSIONS)[user.role] || {};
+    if (Boolean(updated[key]) === Boolean(roleDef[key])) delete updated[key];
+    const saved = await adminPatchUser(userId, { permissions: updated });
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, permissions: saved.permissions || {} } : u));
+  }
+
   const pendingCount = requests.length;
 
   return (
@@ -135,6 +176,7 @@ export default function AdminPanel({ currentUser, onBack }) {
           { id: 'pending',  label: `Pending Products${pendingProducts.length > 0 ? ` (${pendingProducts.length})` : ''}` },
           { id: 'submissions', label: `Submissions${submissions.filter(s => s.status === 'pending').length > 0 ? ` (${submissions.filter(s => s.status === 'pending').length})` : ''}` },
           { id: 'formlinks',   label: 'Form Links' },
+          { id: 'permissions', label: 'Permissions' },
         ].map(t => (
           <button
             key={t.id}
@@ -218,7 +260,8 @@ export default function AdminPanel({ currentUser, onBack }) {
               </thead>
               <tbody>
                 {users.map(u => (
-                  <tr key={u.id}>
+                  <React.Fragment key={u.id}>
+                  <tr>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         {u.avatar && <img src={u.avatar} alt="" style={{ width: 28, height: 28, borderRadius: '50%' }} />}
@@ -254,11 +297,64 @@ export default function AdminPanel({ currentUser, onBack }) {
                     </td>
                     <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.last_login ? formatDate(u.last_login) : '—'}</td>
                     <td>
-                      {u.email !== currentUser.email && (
-                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)' }} onClick={() => handleDeleteUser(u.id)}>Remove</button>
-                      )}
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setExpandedUser(expandedUser === u.id ? null : u.id)}>
+                          {expandedUser === u.id ? 'Close' : 'Override'}
+                        </button>
+                        {u.email !== currentUser.email && (
+                          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)' }} onClick={() => handleDeleteUser(u.id)}>Remove</button>
+                        )}
+                      </div>
                     </td>
                   </tr>
+                  {expandedUser === u.id && (
+                    <tr key={`${u.id}-perms`}>
+                      <td colSpan={6} style={{ background: 'var(--surface)', padding: '12px 16px' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>
+                          Permission Overrides for {u.name || u.email}
+                          <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>
+                            Highlighted = overridden from role default
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {PERMISSION_REGISTRY.map(p => {
+                            const roleVal = Boolean(((roleDefaults || DEFAULT_ROLE_PERMISSIONS)[u.role] || {})[p.key]);
+                            const override = u.permissions || {};
+                            const isOverridden = p.key in override;
+                            const effectiveVal = isOverridden ? Boolean(override[p.key]) : roleVal;
+                            return (
+                              <label key={p.key} style={{
+                                display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
+                                padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                                border: `1px solid ${isOverridden ? 'var(--primary)' : 'var(--border)'}`,
+                                background: isOverridden ? 'var(--primary-dim)' : 'var(--card)',
+                                color: isOverridden ? 'var(--primary)' : 'var(--text)',
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={effectiveVal}
+                                  style={{ width: 'auto', cursor: 'pointer' }}
+                                  onChange={e => handleUserPermOverride(u.id, p.key, e.target.checked)}
+                                />
+                                {p.label}
+                                {isOverridden && <span style={{ fontSize: 10, opacity: 0.7 }}>(override)</span>}
+                              </label>
+                            );
+                          })}
+                          {Object.keys(u.permissions || {}).length > 0 && (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ fontSize: 11 }}
+                              onClick={() => handleUserPermOverride(u.id, '__clear__', null)}
+                            >
+                              Clear all overrides
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -376,6 +472,69 @@ export default function AdminPanel({ currentUser, onBack }) {
               path="/submit/change-notice"
             />
           </div>
+        </div>
+      )}
+
+      {/* ── Permissions ── */}
+      {tab === 'permissions' && !loading && roleDefaults && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>Role Permission Defaults</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                Check/uncheck permissions per role. Individual user overrides are set in the Users tab.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {permSaved && <span style={{ color: 'var(--pass)', fontSize: 13 }}>&#10003; Saved</span>}
+              <button className="btn btn-primary" onClick={handleSaveRoleDefaults} disabled={permSaving}>
+                {permSaving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+
+          {(() => {
+            const ROLES_LIST = ['viewer', 'analyst', 'editor', 'designer', 'project-manager', 'superuser'];
+            const groups = [...new Set(PERMISSION_REGISTRY.map(p => p.group))];
+            return (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th style={{ minWidth: 180 }}>Permission</th>
+                      {ROLES_LIST.map(r => <th key={r} style={{ textAlign: 'center', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{r}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groups.map(group => (
+                      <>
+                        <tr key={`group-${group}`}>
+                          <td colSpan={ROLES_LIST.length + 1} style={{ fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', background: 'var(--surface)', paddingTop: 10, paddingBottom: 10 }}>
+                            {group}
+                          </td>
+                        </tr>
+                        {PERMISSION_REGISTRY.filter(p => p.group === group).map(p => (
+                          <tr key={p.key}>
+                            <td style={{ fontSize: 13 }}>{p.label}</td>
+                            {ROLES_LIST.map(r => (
+                              <td key={r} style={{ textAlign: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean((roleDefaults[r] || {})[p.key])}
+                                  onChange={() => toggleRolePerm(r, p.key)}
+                                  style={{ width: 'auto', cursor: 'pointer' }}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
       )}
 

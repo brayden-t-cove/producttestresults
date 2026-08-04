@@ -19,7 +19,7 @@ import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
 import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, projects, getPool } from './lib/storage.js';
 import {
   findOrCreateUser, createDomainRequest,
-  getAllUsers, updateUserRole, updateUserEntity,
+  getAllUsers, updateUserRole, updateUserEntity, updateUserPermissions,
   createPreregisteredUser, deleteUser,
   getAllDomains, createDomain, deleteDomain,
   getDomainRequests, approveDomainRequest, denyDomainRequest,
@@ -213,10 +213,11 @@ app.get('/api/admin/users', requireSuperuser, async (req, res) => {
 
 app.patch('/api/admin/users/:id', requireSuperuser, async (req, res) => {
   try {
-    const { role, entity } = req.body;
+    const { role, entity, permissions } = req.body;
     let user = null;
     if (role) user = await updateUserRole(req.params.id, role);
     if (entity !== undefined) user = await updateUserEntity(req.params.id, entity);
+    if (permissions !== undefined) user = await updateUserPermissions(req.params.id, permissions);
     res.json(user);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -234,6 +235,22 @@ app.delete('/api/admin/users/:id', requireSuperuser, async (req, res) => {
   try {
     if (req.params.id === req.user?.id) return res.status(400).json({ error: 'Cannot delete your own account.' });
     await deleteUser(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin: role defaults ──────────────────────────────────────────────────────
+
+app.get('/api/admin/role-defaults', requireSuperuser, async (req, res) => {
+  try {
+    const data = await config.get('roleDefaults');
+    res.json(data || null);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/admin/role-defaults', requireSuperuser, async (req, res) => {
+  try {
+    await config.set('roleDefaults', req.body);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

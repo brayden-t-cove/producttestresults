@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { listSessions, getCatalog, createCatalogEntry, updateCatalogEntry, deleteCatalogEntry, deleteSession, getSettings, saveSettings, getSpecSchema, saveSpecSchema, getCertSchema, saveCertSchema } from './lib/api.js';
-import { getMe, logout } from './lib/authApi.js';
+import { getMe, logout, adminGetRoleDefaults } from './lib/authApi.js';
+import { PERMISSION_REGISTRY, DEFAULT_ROLE_PERMISSIONS, computePerms } from './data/permissions.js';
 import LoginPage from './components/LoginPage.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
 import Particles from './components/Particles.jsx';
@@ -84,7 +85,7 @@ const TOP_LEVEL_VIEWS = {
   projects: 'projects',
 };
 
-function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onProjects, onSettings, currentUser, authEnabled, onAdmin, onLogout, canSeeVendors, canSeeProjects }) {
+function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onProjects, onSettings, currentUser, authEnabled, onAdmin, onLogout, canSeeVendors, canSeeProjects, canSeeAdmin }) {
   const active = TOP_LEVEL_VIEWS[view] || 'dashboard';
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   return (
@@ -145,7 +146,7 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
                     {currentUser.entity && <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>{currentUser.entity}</span>}
                   </div>
                 </div>
-                {currentUser.role === 'superuser' && (
+                {canSeeAdmin && (
                   <button className="user-menu-item" onClick={onAdmin}>Admin Panel</button>
                 )}
                 <button className="user-menu-item user-menu-item-danger" onClick={onLogout}>Sign out</button>
@@ -550,6 +551,7 @@ export default function App() {
   const [authProviders, setAuthProviders] = useState({});
   const [authLoading, setAuthLoading] = useState(true);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [roleDefaults, setRoleDefaults] = useState(null);
 
   useEffect(() => {
     getMe().then(({ user, authEnabled: ae, providers }) => {
@@ -565,10 +567,15 @@ export default function App() {
     setCurrentUser(null);
   }
 
-  const canEdit = !authEnabled || (currentUser && ['editor', 'project-manager', 'superuser'].includes(currentUser.role));
-  const canEditMedia = !authEnabled || (currentUser && ['editor', 'designer', 'project-manager', 'superuser'].includes(currentUser.role));
-  const canSeeVendors = !authEnabled || (currentUser && ['analyst', 'editor', 'designer', 'project-manager', 'superuser'].includes(currentUser.role));
-  const canSeeProjects = !authEnabled || (currentUser && ['analyst', 'project-manager', 'superuser'].includes(currentUser.role));
+  const perms = !authEnabled
+    ? Object.fromEntries(PERMISSION_REGISTRY.map(p => [p.key, true]))
+    : computePerms(currentUser?.role, currentUser?.permissions, roleDefaults || DEFAULT_ROLE_PERMISSIONS);
+
+  const canEdit = perms['catalog.edit'];
+  const canEditMedia = perms['media.edit'];
+  const canSeeVendors = perms['vendors.view'];
+  const canSeeProjects = perms['projects.view'];
+  const canSeeAdmin = perms['admin'];
 
   async function refreshSessions() {
     try {
@@ -596,6 +603,7 @@ export default function App() {
     refreshCatalog();
     getSpecSchema().then(setSpecSchema).catch(() => {});
     getCertSchema().then(setCertSchema).catch(() => {});
+    adminGetRoleDefaults().then(d => setRoleDefaults(d)).catch(() => {});
 
     const resumeId = sessionStorage.getItem('activeSessionId');
     if (resumeId) {
@@ -749,7 +757,7 @@ export default function App() {
   }
 
   // Admin panel overlay
-  if (showAdmin && currentUser?.role === 'superuser') {
+  if (showAdmin && canSeeAdmin) {
     return (
       <div className="app-layout">
         <div className="view-content">
@@ -801,6 +809,7 @@ export default function App() {
         onLogout={handleLogout}
         canSeeVendors={canSeeVendors}
         canSeeProjects={canSeeProjects}
+        canSeeAdmin={canSeeAdmin}
       />
 
       <div key={view} className="view-content fade-view">
@@ -994,6 +1003,7 @@ export default function App() {
           currentUser={currentUser}
           catalog={catalog}
           initialProjectId={initialProjectId}
+          canEdit={perms['projects.edit']}
         />
       ) : setView('dashboard'))}
 
