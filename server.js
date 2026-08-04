@@ -148,7 +148,7 @@ function requireAuth(req, res, next) {
 
 function requireEditor(req, res, next) {
   if (!AUTH_ENABLED) return next();
-  if (req.isAuthenticated() && ['editor', 'designer', 'superuser'].includes(req.user?.role)) return next();
+  if (req.isAuthenticated() && ['editor', 'designer', 'project-manager', 'superuser'].includes(req.user?.role)) return next();
   res.status(403).json({ error: 'Editor or higher required' });
 }
 
