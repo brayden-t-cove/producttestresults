@@ -146,8 +146,9 @@ function TechSpecsTab({ product }) {
 }
 
 function normalizeCert(entry) {
+  if (!entry) return { name: '', subcerts: [] };
   if (typeof entry === 'string') return { name: entry, subcerts: [] };
-  return { name: entry.name || entry, subcerts: entry.subcerts || [] };
+  return { name: entry.name || '', subcerts: Array.isArray(entry.subcerts) ? entry.subcerts : [] };
 }
 
 function CertificationsTab({ product, onCertUpdate, certSchema }) {
@@ -263,21 +264,23 @@ function CertificationsTab({ product, onCertUpdate, certSchema }) {
                 </tr>
               </thead>
               <tbody>
-                {(schema[selectedCountry] || []).map(rawCert => {
+                {(schema[selectedCountry] || []).map((rawCert, ci) => {
                   const cert = normalizeCert(rawCert);
                   if (!cert.subcerts || cert.subcerts.length === 0) {
-                    return renderCertRow(selectedCountry, cert.name, cert.name, false);
+                    return renderCertRow(selectedCountry, cert.name || `cert-${ci}`, cert.name || '(unnamed)', false);
                   }
-                  return [
-                    <tr key={`header-${cert.name}`}>
-                      <td colSpan={5} style={{ fontWeight: 700, background: 'var(--surface-alt, rgba(0,0,0,0.04))', fontSize: 13, paddingTop: 10, paddingBottom: 10 }}>
-                        {cert.name}
-                      </td>
-                    </tr>,
-                    ...cert.subcerts.map(sub =>
-                      renderCertRow(selectedCountry, `${cert.name} > ${sub}`, sub, true)
-                    ),
-                  ];
+                  return (
+                    <React.Fragment key={`group-${ci}-${cert.name}`}>
+                      <tr>
+                        <td colSpan={5} style={{ fontWeight: 700, background: 'var(--surface-alt, rgba(0,0,0,0.04))', fontSize: 13, paddingTop: 10, paddingBottom: 10 }}>
+                          {cert.name}
+                        </td>
+                      </tr>
+                      {cert.subcerts.map((sub, si) =>
+                        renderCertRow(selectedCountry, `${cert.name} > ${sub || si}`, sub || '(unnamed)', true)
+                      )}
+                    </React.Fragment>
+                  );
                 })}
               </tbody>
             </table>
