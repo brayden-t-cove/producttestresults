@@ -372,18 +372,40 @@ app.get('/api/firmwares', async (req, res) => {
   } catch { res.json([]); }
 });
 
-app.post('/api/firmwares', async (req, res) => {
+app.post('/api/firmwares', requireEditor, async (req, res) => {
   try {
-    const { catalogId, deviceName, version } = req.body;
+    const { catalogId, deviceName, version, binUrl, patchNotes, releasedAt } = req.body;
     const key = catalogId || deviceName;
     if (!key || !version) return res.status(400).json({ error: 'catalogId (or deviceName) and version required' });
-    const all = await firmwares.getAll();
-    const existing = all.find(f => (f.catalogId === key || f.deviceName === key) && f.version === version);
-    if (existing) return res.json(existing);
-    const entry = { id: uuidv4(), catalogId: catalogId || null, deviceName: deviceName || key, version: version.trim() };
+    const entry = {
+      id: uuidv4(),
+      catalogId: catalogId || null,
+      deviceName: deviceName || key,
+      version: version.trim(),
+      binUrl: binUrl || '',
+      patchNotes: patchNotes || '',
+      releasedAt: releasedAt || new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
     await firmwares.create(entry);
     res.status(201).json(entry);
   } catch { res.status(500).json({ error: 'Failed to save firmware' }); }
+});
+
+app.put('/api/firmwares/:id', requireEditor, async (req, res) => {
+  try {
+    const { version, binUrl, patchNotes, releasedAt } = req.body;
+    const updated = await firmwares.update(req.params.id, { version, binUrl, patchNotes, releasedAt });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch { res.status(500).json({ error: 'Failed to update firmware' }); }
+});
+
+app.delete('/api/firmwares/:id', requireEditor, async (req, res) => {
+  try {
+    await firmwares.delete(req.params.id);
+    res.json({ ok: true });
+  } catch { res.status(500).json({ error: 'Failed to delete firmware' }); }
 });
 
 // ── Debug / health ────────────────────────────────────────────────────────────

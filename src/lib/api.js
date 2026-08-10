@@ -113,14 +113,29 @@ export async function getFirmwares(deviceName, catalogId) {
   return res.json();
 }
 
-export async function addFirmware(catalogId, version, deviceName) {
+export async function addFirmware({ catalogId, deviceName, version, binUrl, patchNotes, releasedAt }) {
   const res = await fetch(`${BASE}/firmwares`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ catalogId, version, deviceName }),
+    body: JSON.stringify({ catalogId, deviceName, version, binUrl, patchNotes, releasedAt }),
   });
   if (!res.ok) throw new Error('Failed to save firmware');
   return res.json();
+}
+
+export async function updateFirmware(id, patch) {
+  const res = await fetch(`${BASE}/firmwares/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error('Failed to update firmware');
+  return res.json();
+}
+
+export async function deleteFirmware(id) {
+  const res = await fetch(`${BASE}/firmwares/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete firmware');
 }
 
 export async function getDevices() {

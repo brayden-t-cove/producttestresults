@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import { CERT_STATUS_LABELS, CERT_STATUS_COLORS } from '../data/certSchema.js';
-import { listComparisons, getProjects } from '../lib/api.js';
+import { listComparisons, getProjects, getFirmwares, addFirmware, updateFirmware, deleteFirmware } from '../lib/api.js';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -937,7 +937,133 @@ function AccessoriesTab({ product, onProductUpdate, canEdit }) {
   );
 }
 
-const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Media & Documents', 'Accessories', 'Project Details'];
+function FirmwareTab({ product, canEdit }) {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({ version: '', binUrl: '', patchNotes: '', releasedAt: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    getFirmwares(null, product.id)
+      .then(data => setEntries([...data].sort((a, b) => new Date(b.releasedAt || b.createdAt) - new Date(a.releasedAt || a.createdAt))))
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false));
+  }, [product.id]);
+
+  function resetForm() { setForm({ version: '', binUrl: '', patchNotes: '', releasedAt: '' }); setAdding(false); setEditingId(null); setError(''); }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    if (!form.version.trim()) { setError('Version is required.'); return; }
+    setSaving(true); setError('');
+    try {
+      if (editingId) {
+        const updated = await updateFirmware(editingId, form);
+        setEntries(prev => prev.map(f => f.id === editingId ? updated : f).sort((a, b) => new Date(b.releasedAt || b.createdAt) - new Date(a.releasedAt || a.createdAt)));
+      } else {
+        const created = await addFirmware({ catalogId: product.id, deviceName: product.name, ...form });
+        setEntries(prev => [created, ...prev]);
+      }
+      resetForm();
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete(id) {
+    if (!confirm('Remove this firmware entry?')) return;
+    await deleteFirmware(id);
+    setEntries(prev => prev.filter(f => f.id !== id));
+  }
+
+  function startEdit(f) {
+    setEditingId(f.id);
+    setForm({ version: f.version || '', binUrl: f.binUrl || '', patchNotes: f.patchNotes || '', releasedAt: f.releasedAt ? f.releasedAt.slice(0, 10) : '' });
+    setAdding(true);
+  }
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>Loading…</div>;
+
+  return (
+    <div style={{ paddingTop: 8 }}>
+      {canEdit && !adding && (
+        <button className="btn btn-primary btn-sm" style={{ marginBottom: 20 }} onClick={() => setAdding(true)}>+ Log Firmware Update</button>
+      )}
+
+      {adding && (
+        <form onSubmit={handleSave} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px', marginBottom: 24 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 14 }}>{editingId ? 'Edit Firmware Entry' : 'New Firmware Entry'}</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div className="form-group" style={{ marginBottom: 0, flex: '0 0 140px' }}>
+              <label>Version *</label>
+              <input value={form.version} onChange={e => setForm(v => ({ ...v, version: e.target.value }))} placeholder="e.g. 2.4.1" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0, flex: '0 0 160px' }}>
+              <label>Release Date</label>
+              <input type="date" value={form.releasedAt} onChange={e => setForm(v => ({ ...v, releasedAt: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 220 }}>
+              <label>Download URL (.bin)</label>
+              <input type="url" value={form.binUrl} onChange={e => setForm(v => ({ ...v, binUrl: e.target.value }))} placeholder="https://..." />
+            </div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label>Patch Notes / Changelog</label>
+            <textarea value={form.patchNotes} onChange={e => setForm(v => ({ ...v, patchNotes: e.target.value }))} rows={4} placeholder="Describe what changed, bugs fixed, new features…" style={{ resize: 'vertical' }} />
+          </div>
+          {error && <div style={{ color: 'var(--fail)', fontSize: 13, marginBottom: 10 }}>{error}</div>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Entry'}</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={resetForm}>Cancel</button>
+          </div>
+        </form>
+      )}
+
+      {entries.length === 0 && !adding ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>
+          No firmware entries logged yet.{canEdit && ' Click "Log Firmware Update" to add the first one.'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {entries.map((f, i) => (
+            <div key={f.id} style={{ display: 'flex', gap: 16, paddingBottom: 24, position: 'relative' }}>
+              {/* Timeline spine */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 28 }}>
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: i === 0 ? 'var(--primary)' : 'var(--border)', border: `2px solid ${i === 0 ? 'var(--primary)' : 'var(--text-muted)'}`, flexShrink: 0, marginTop: 2 }} />
+                {i < entries.length - 1 && <div style={{ width: 2, flex: 1, background: 'var(--border)', marginTop: 4 }} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 700, fontSize: 15 }}>v{f.version}</span>
+                  {i === 0 && <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--primary)', color: '#fff', borderRadius: 8, padding: '2px 8px' }}>LATEST</span>}
+                  {f.releasedAt && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{new Date(f.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                  {f.binUrl && (
+                    <a href={f.binUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ fontSize: 11, padding: '2px 10px' }}>⬇ Download .bin</a>
+                  )}
+                  {canEdit && (
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => startEdit(f)}>✏️</button>
+                      <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)' }} onClick={() => handleDelete(f.id)}>✕</button>
+                    </div>
+                  )}
+                </div>
+                {f.patchNotes && (
+                  <div style={{ fontSize: 13, color: 'var(--text)', whiteSpace: 'pre-wrap', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '10px 14px', lineHeight: 1.6 }}>
+                    {f.patchNotes}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Firmware', 'Media & Documents', 'Accessories', 'Project Details'];
 
 const STATUS_LABEL = {
   'active': 'Active',
@@ -1274,6 +1400,7 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Testing Results' && <TestingResultsTab sessions={sessions} onOpenSession={onOpenSession} />}
       {activeTab === 'Known Issues' && <KnownIssuesTab product={product} onOpenSession={onOpenSession} />}
       {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} canEditMedia={canEditMedia} />}
+      {activeTab === 'Firmware' && <FirmwareTab product={product} canEdit={canEdit} />}
       {activeTab === 'Accessories' && <AccessoriesTab product={product} onProductUpdate={onProductUpdate} canEdit={canEdit} />}
       {activeTab === 'Project Details' && <ProjectDetailsTab product={product} onProductUpdate={onProductUpdate} canEditMedia={canEditMedia} onOpenProject={onOpenProject} />}
       {activeTab === 'Relationships' && <RelationshipsTab product={product} catalog={catalog} onViewProduct={onViewProduct} />}
