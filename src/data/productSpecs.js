@@ -29,6 +29,7 @@ export const SPEC_SCHEMA = {
       label: 'Hardware',
       fields: [
         { id: 'cpuType', label: 'CPU Type & Speed', type: 'text' },
+        { id: 'soc', label: 'System on Chip (SoC)', type: 'text' },
         { id: 'memory', label: 'Memory', type: 'text' },
         { id: 'ledIndicator', label: 'LED Status Indicator', type: 'boolean' },
         { id: 'dimensions', label: 'Dimensions (mm)', type: 'text' },
