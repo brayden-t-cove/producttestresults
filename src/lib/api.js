@@ -532,6 +532,12 @@ export async function seedTestItemsFromLegacy() {
   return res.json();
 }
 
+export async function enrichTestItemDeviceTypes() {
+  const res = await fetch(`${BASE}/test-items/enrich-device-types`, { method: 'POST' });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Enrich failed'); }
+  return res.json();
+}
+
 // ── Test Item Library ─────────────────────────────────────────────────────────
 
 export async function listTestItems({ category, status } = {}) {

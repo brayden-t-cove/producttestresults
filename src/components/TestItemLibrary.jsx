@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   listTestItems, createTestItem, updateTestItem, deleteTestItem,
   getTestItemCategories, saveTestItemCategories, renameTestItemCategory, seedTestItemsFromLegacy,
+  enrichTestItemDeviceTypes,
 } from '../lib/api.js';
 
 // ── Category Manager ───────────────────────────────────────────────────────────
@@ -329,6 +330,17 @@ export default function TestItemLibrary({ canEdit, isSuperuser }) {
         {isSuperuser && (
           <button className="btn btn-ghost btn-sm" onClick={handleSeed} disabled={seeding}>
             {seeding ? 'Importing…' : '⬇ Import Legacy Tests'}
+          </button>
+        )}
+        {isSuperuser && items.some(i => i.createdBy === 'system-seed' && !i.deviceTypes?.length) && (
+          <button className="btn btn-ghost btn-sm" onClick={async () => {
+            try {
+              const r = await enrichTestItemDeviceTypes();
+              alert(`Enriched ${r.updated} items with device type tags.`);
+              await load();
+            } catch (e) { setError(e.message); }
+          }}>
+            ↺ Enrich Device Types
           </button>
         )}
         {canEdit && !showForm && (

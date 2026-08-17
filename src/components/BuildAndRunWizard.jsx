@@ -70,7 +70,7 @@ function StepIntent({ value, onChange }) {
             onClick={() => onChange(intent.id)}
             style={{
               border: `2px solid ${value === intent.id ? 'var(--accent, #1A5CF6)' : 'var(--border)'}`,
-              borderRadius: 10, padding: '16px 18px', background: value === intent.id ? 'var(--accent-subtle, #e8f0fe)' : 'var(--surface)',
+              borderRadius: 10, padding: '16px 18px', background: value === intent.id ? 'rgba(26,92,246,0.15)' : 'var(--surface)',
               textAlign: 'left', cursor: 'pointer', transition: 'border-color .15s',
             }}
           >
@@ -115,7 +115,7 @@ function StepProduct({ catalog, value, onChange }) {
       <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>Select a product from your catalog.</p>
 
       {value ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: '2px solid var(--accent, #1A5CF6)', borderRadius: 10, padding: '12px 16px', background: 'var(--accent-subtle, #e8f0fe)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: '2px solid var(--accent, #1A5CF6)', borderRadius: 10, padding: '12px 16px', background: 'rgba(26,92,246,0.12)' }}>
           <span style={{ fontSize: 28 }}>{CATEGORY_ICONS[value.category] || '📦'}</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{value.name}</div>
@@ -233,9 +233,10 @@ function StepTemplate({ productType, intentId, libraryItems, onSelectPreset, onB
 
 // ── Step 4: Build Plan ────────────────────────────────────────────────────────
 
-function StepBuild({ libraryItems, categories, plan, onPlanChange }) {
+function StepBuild({ libraryItems, categories, plan, onPlanChange, productCategory }) {
   const [expandedCats, setExpandedCats] = useState({});
   const [search, setSearch] = useState('');
+  const [showAll, setShowAll] = useState(false);
 
   const planIds = new Set(plan.map(i => i.id));
 
@@ -260,9 +261,13 @@ function StepBuild({ libraryItems, categories, plan, onPlanChange }) {
     onPlanChange(plan.filter(i => i.category !== cat));
   }
 
+  const deviceFiltered = (!productCategory || showAll)
+    ? libraryItems
+    : libraryItems.filter(i => !i.deviceTypes?.length || i.deviceTypes.includes(productCategory));
+
   const filteredLib = search.trim()
-    ? libraryItems.filter(i => i.name.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase()) || (i.tags || []).some(t => t.toLowerCase().includes(search.toLowerCase())))
-    : libraryItems;
+    ? deviceFiltered.filter(i => i.name.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase()) || (i.tags || []).some(t => t.toLowerCase().includes(search.toLowerCase())))
+    : deviceFiltered;
 
   const byCategory = filteredLib.reduce((acc, item) => {
     (acc[item.category] = acc[item.category] || []).push(item);
@@ -286,8 +291,16 @@ function StepBuild({ libraryItems, categories, plan, onPlanChange }) {
         {/* Library */}
         <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Test Library
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
+                Test Library
+              </span>
+              {productCategory && (
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} style={{ margin: 0 }} />
+                  Show all items
+                </label>
+              )}
             </div>
             <input
               type="text"
@@ -296,6 +309,11 @@ function StepBuild({ libraryItems, categories, plan, onPlanChange }) {
               onChange={e => setSearch(e.target.value)}
               style={{ width: '100%', fontSize: 12 }}
             />
+            {productCategory && !showAll && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                Showing items tagged for <strong>{productCategory}</strong> · <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => setShowAll(true)}>show all</span>
+              </div>
+            )}
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {Object.entries(byCategory).sort(([a], [b]) => a.localeCompare(b)).map(([cat, catItems]) => {
@@ -356,7 +374,7 @@ function StepBuild({ libraryItems, categories, plan, onPlanChange }) {
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>Your Plan</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent, #1A5CF6)', background: 'var(--accent-subtle, #e8f0fe)', borderRadius: 10, padding: '1px 8px' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent, #1A5CF6)', background: 'rgba(26,92,246,0.15)', borderRadius: 10, padding: '1px 8px' }}>
                 {plan.length} test{plan.length !== 1 ? 's' : ''}
               </span>
               {plan.length > 0 && (
@@ -612,7 +630,7 @@ export default function BuildAndRunWizard({ catalog, onBack, onCreated, currentU
         {step === 3 && (
           libraryLoading
             ? <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading library…</div>
-            : <StepBuild libraryItems={libraryItems} categories={categories} plan={plan} onPlanChange={setPlan} />
+            : <StepBuild libraryItems={libraryItems} categories={categories} plan={plan} onPlanChange={setPlan} productCategory={product?.category} />
         )}
         {step === 4 && <StepEnvironment product={product} env={env} onChange={setEnv} />}
       </div>

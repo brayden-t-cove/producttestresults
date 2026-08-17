@@ -363,7 +363,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           display: 'flex', alignItems: 'center', gap: 20,
           border: '2px solid var(--accent, #1A5CF6)',
           borderRadius: 12, padding: '20px 24px',
-          background: 'var(--accent-subtle, #e8f0fe)',
+          background: 'rgba(26,92,246,0.12)',
           cursor: 'pointer', marginBottom: 10,
         }}
       >

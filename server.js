@@ -1681,9 +1681,63 @@ app.post('/api/test-item-categories/rename', requireSuperuser, async (req, res) 
 
 // ── Seed test items from legacy test library ──────────────────────────────────
 
+app.post('/api/test-items/enrich-device-types', requireSuperuser, async (req, res) => {
+  try {
+    const { CAPABILITY_GROUPS } = await import('./src/data/capabilities.js');
+    // Build cap → deviceTypes from CAPABILITY_GROUPS
+    const CAP_DEVICE_TYPES = {};
+    for (const [deviceType, groups] of Object.entries(CAPABILITY_GROUPS)) {
+      for (const group of groups) {
+        for (const cap of group.capabilities || []) {
+          if (!CAP_DEVICE_TYPES[cap.id]) CAP_DEVICE_TYPES[cap.id] = [];
+          if (!CAP_DEVICE_TYPES[cap.id].includes(deviceType)) CAP_DEVICE_TYPES[cap.id].push(deviceType);
+        }
+      }
+    }
+    const all = await testItems.getAll();
+    let updated = 0;
+    for (const item of all) {
+      if (item.createdBy !== 'system-seed') continue;
+      const tags = item.tags || [];
+      let deviceTypes = item.deviceTypes || [];
+      if (deviceTypes.length > 0) continue; // already enriched
+      // Baseline items: first tag is the deviceType
+      if (tags.includes('baseline')) {
+        const dt = tags.find(t => t !== 'baseline');
+        if (dt) deviceTypes = [dt];
+      } else {
+        // Capability items: find device types from all cap tags
+        for (const tag of tags) {
+          const dts = CAP_DEVICE_TYPES[tag] || [];
+          for (const dt of dts) {
+            if (!deviceTypes.includes(dt)) deviceTypes.push(dt);
+          }
+        }
+      }
+      if (deviceTypes.length > 0) {
+        await testItems.update(item.id, { ...item, deviceTypes });
+        updated++;
+      }
+    }
+    res.json({ updated });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/test-items/seed-from-legacy', requireSuperuser, async (req, res) => {
   try {
     const { BASELINE_TESTS, TEST_LIBRARY } = await import('./src/data/testLibrary.js');
+    const { CAPABILITY_GROUPS } = await import('./src/data/capabilities.js');
+
+    // Build cap → deviceTypes from CAPABILITY_GROUPS
+    const CAP_DEVICE_TYPES = {};
+    for (const [deviceType, groups] of Object.entries(CAPABILITY_GROUPS)) {
+      for (const group of groups) {
+        for (const cap of group.capabilities || []) {
+          if (!CAP_DEVICE_TYPES[cap.id]) CAP_DEVICE_TYPES[cap.id] = [];
+          if (!CAP_DEVICE_TYPES[cap.id].includes(deviceType)) CAP_DEVICE_TYPES[cap.id].push(deviceType);
+        }
+      }
+    }
 
     // Map capability/baseline group → buffet category
     const CAP_CATEGORY = {
@@ -1766,6 +1820,7 @@ app.post('/api/test-items/seed-from-legacy', requireSuperuser, async (req, res) 
           steps: '',
           expectedResult: t.expected || '',
           tags: [deviceType, 'baseline'],
+          deviceTypes: [deviceType],
           status: 'active',
           legacyId: t.id,
           createdAt: now,
@@ -1789,6 +1844,7 @@ app.post('/api/test-items/seed-from-legacy', requireSuperuser, async (req, res) 
           steps: '',
           expectedResult: t.expected || '',
           tags: [capId],
+          deviceTypes: CAP_DEVICE_TYPES[capId] || [],
           status: 'active',
           legacyId: t.id,
           createdAt: now,
