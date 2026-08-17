@@ -481,6 +481,13 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
           </div>
         )}
 
+        {test.steps && (
+          <div className="test-detail-section">
+            <label>Steps</label>
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13 }}>{test.steps}</pre>
+          </div>
+        )}
+
         {type === 'feature' && test.featureArea && (
           <div className="test-detail-section">
             <label>Feature Area</label>
@@ -892,7 +899,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
 
       {/* Header */}
       <div className="test-runner-header">
-        <h2>{isMultiProduct ? (activeProduct?.modelNumber || activeProduct?.name) : session.productName}</h2>
+        <h2>{isMultiProduct ? (activeProduct?.modelNumber || activeProduct?.name) : (session.sessionName || session.productName)}</h2>
         {isMultiProduct && activeProduct?.modelNumber && (
           <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{activeProduct.name}</span>
         )}

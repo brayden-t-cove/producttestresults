@@ -29,6 +29,7 @@ import ProductDetail from './components/ProductDetail.jsx';
 import ChangeNoticeForm from './components/ChangeNoticeForm.jsx';
 import ProductInquiryForm from './components/ProductInquiryForm.jsx';
 import ProductSpecForm from './components/ProductSpecForm.jsx';
+import BuffetSessionBuilder from './components/BuffetSessionBuilder.jsx';
 
 const LOGO_URL = 'https://lh3.googleusercontent.com/d/1z-qNySTnx6Fo9EnmSf0WBsWSMF_P1mBP';
 
@@ -962,6 +963,16 @@ export default function App() {
           onGoToCatalog={() => setView('catalog')}
           onStartExploratory={() => setView('exploratoryStart')}
           onStartComparison={() => { setCurrentComparison(null); setView('comparisonBuilder'); }}
+          onStartBuffet={() => setView('buffetBuilder')}
+        />
+      )}
+
+      {view === 'buffetBuilder' && (
+        <BuffetSessionBuilder
+          catalog={catalog}
+          onBack={() => setView('sessionStart')}
+          onCreated={handleSessionCreated}
+          currentUser={currentUser}
         />
       )}
 

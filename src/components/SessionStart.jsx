@@ -13,6 +13,7 @@ const CATEGORY_ICONS = {
 };
 
 const SESSION_TYPES = [
+  { id: 'buffet',       label: 'Buffet',             icon: '🍽️', description: 'Pick exactly the tests you need from the shared library — no skips needed', external: true, highlight: true },
   { id: 'e2e',          label: 'E2E',                icon: '🔄', description: 'Full end-to-end product testing across all capabilities' },
   { id: 'regression',   label: 'Regression',         icon: '🔁', description: 'Verify previously fixed issues remain resolved after a new build' },
   { id: 'feature',      label: 'Feature / Targeted', icon: '🎯', description: 'Test a specific feature or acceptance criteria' },
@@ -99,7 +100,7 @@ function countTests(product) {
   return seen.size;
 }
 
-export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog, onStartExploratory, onStartComparison }) {
+export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog, onStartExploratory, onStartComparison, onStartBuffet }) {
   // --- Session type selection ---
   const [sessionType, setSessionType] = useState(null);
 
@@ -362,6 +363,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
               className={`session-type-card ${sessionType === st.id ? 'selected' : ''}`}
               onClick={() => {
                 if (st.external) {
+                  if (st.id === 'buffet' && onStartBuffet) onStartBuffet();
                   if (st.id === 'exploratory' && onStartExploratory) onStartExploratory();
                   if (st.id === 'comparison' && onStartComparison) onStartComparison();
                   return;

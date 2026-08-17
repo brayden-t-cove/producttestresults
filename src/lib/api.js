@@ -468,6 +468,42 @@ export async function adminDeleteSubmission(id) {
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
+// ── Test Item Library ─────────────────────────────────────────────────────────
+
+export async function listTestItems({ category, status } = {}) {
+  const params = new URLSearchParams();
+  if (category) params.set('category', category);
+  if (status) params.set('status', status);
+  const res = await fetch(`${BASE}/test-items?${params}`);
+  if (!res.ok) throw new Error('Failed to load test items');
+  return res.json();
+}
+
+export async function createTestItem(data) {
+  const res = await fetch(`${BASE}/test-items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to create test item'); }
+  return res.json();
+}
+
+export async function updateTestItem(id, data) {
+  const res = await fetch(`${BASE}/test-items/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to update test item'); }
+  return res.json();
+}
+
+export async function deleteTestItem(id) {
+  const res = await fetch(`${BASE}/test-items/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete test item');
+}
+
 export async function getProjects() {
   const res = await fetch(`${BASE}/projects`);
   if (!res.ok) throw new Error('Failed to load projects');

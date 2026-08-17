@@ -6,7 +6,8 @@ import {
   adminGetRoleDefaults, adminSaveRoleDefaults,
 } from '../lib/authApi.js';
 import { PERMISSION_REGISTRY, DEFAULT_ROLE_PERMISSIONS } from '../data/permissions.js';
-import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents, adminGetSubmissions, adminUpdateSubmission, adminDeleteSubmission } from '../lib/api.js';
+import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents, adminGetSubmissions, adminUpdateSubmission, adminDeleteSubmission, listSessions } from '../lib/api.js';
+import TestItemLibrary from './TestItemLibrary.jsx';
 
 const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
 const ROLES = ['viewer', 'analyst', 'editor', 'designer', 'project-manager', 'superuser'];
@@ -177,6 +178,8 @@ export default function AdminPanel({ currentUser, onBack }) {
           { id: 'submissions', label: `Submissions${submissions.filter(s => s.status === 'pending').length > 0 ? ` (${submissions.filter(s => s.status === 'pending').length})` : ''}` },
           { id: 'formlinks',   label: 'Form Links' },
           { id: 'permissions', label: 'Permissions' },
+          { id: 'testlibrary', label: 'Test Library' },
+          { id: 'legacy',      label: 'Legacy Sessions' },
         ].map(t => (
           <button
             key={t.id}
@@ -538,6 +541,19 @@ export default function AdminPanel({ currentUser, onBack }) {
         </div>
       )}
 
+      {/* ── Test Library ── */}
+      {tab === 'testlibrary' && (
+        <TestItemLibrary
+          canEdit={['editor', 'project-manager', 'superuser'].includes(currentUser?.role)}
+          isSuperuser={currentUser?.role === 'superuser'}
+        />
+      )}
+
+      {/* ── Legacy Sessions ── */}
+      {tab === 'legacy' && (
+        <LegacySessionsTab />
+      )}
+
       {/* ── Pending Products ── */}
       {tab === 'pending' && !loading && (
         <div>
@@ -564,6 +580,63 @@ export default function AdminPanel({ currentUser, onBack }) {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function LegacySessionsTab() {
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null);
+
+  useEffect(() => {
+    listSessions()
+      .then(all => setSessions(all.filter(s => s.type !== 'buffet')))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>Legacy Sessions</h3>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+          Read-only archive of all sessions created before the buffet system. {sessions.length} session{sessions.length !== 1 ? 's' : ''}.
+        </p>
+      </div>
+      {sessions.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>No legacy sessions found.</div>
+      ) : (
+        sessions.map(s => (
+          <div key={s.id} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, background: 'var(--surface)' }}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+              onClick={() => setExpanded(e => e === s.id ? null : s.id)}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 500, fontSize: 13 }}>{s.sessionName || s.productName || s.id}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {s.type} · {s.testerName || '—'} · {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—'}
+                  {' · '}{s.testCaseCount ?? 0} tests · {s.passCount ?? 0}P / {s.failCount ?? 0}F
+                </div>
+              </div>
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'var(--bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{s.status}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{expanded === s.id ? '−' : '+'}</span>
+            </div>
+            {expanded === s.id && (
+              <div style={{ padding: '0 14px 14px', borderTop: '1px solid var(--border)', fontSize: 12 }}>
+                <div style={{ marginTop: 10, color: 'var(--text-muted)' }}>
+                  <strong>Product:</strong> {s.productName} &nbsp;|&nbsp; <strong>Firmware:</strong> {s.firmware || '—'} &nbsp;|&nbsp; <strong>Entity:</strong> {s.entity || '—'}
+                </div>
+                {s.sessionNotes && <div style={{ marginTop: 6, color: 'var(--text)' }}><strong>Notes:</strong> {s.sessionNotes}</div>}
+                <div style={{ marginTop: 8, color: 'var(--text-muted)', fontStyle: 'italic' }}>Full test case detail is stored in the database and accessible via export if needed.</div>
+              </div>
+            )}
+          </div>
+        ))
       )}
     </div>
   );

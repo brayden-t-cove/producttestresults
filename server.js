@@ -16,7 +16,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
 import connectPgSimple from 'connect-pg-simple';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
-import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, projects, getPool } from './lib/storage.js';
+import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, projects, testItems, getPool } from './lib/storage.js';
 import {
   findOrCreateUser, createDomainRequest,
   getAllUsers, updateUserRole, updateUserEntity, updateUserPermissions,
@@ -1513,6 +1513,70 @@ app.delete('/api/projects/:id', requireProjectManager, async (req, res) => {
     await projects.delete(req.params.id);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Test Item Library ─────────────────────────────────────────────────────────
+
+app.get('/api/test-items', requireAuth, async (req, res) => {
+  try {
+    const { category, status } = req.query;
+    const items = await testItems.getAll({ category, status });
+    res.json(items);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/test-items/:id', requireAuth, async (req, res) => {
+  try {
+    const item = await testItems.getById(req.params.id);
+    if (!item) return res.status(404).json({ error: 'Not found' });
+    res.json(item);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/test-items', requireEditor, async (req, res) => {
+  try {
+    const { name, category, description, steps, expectedResult, tags } = req.body;
+    if (!name || !category) return res.status(400).json({ error: 'name and category are required' });
+    const item = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      category: category.trim(),
+      description: description || '',
+      steps: steps || '',
+      expectedResult: expectedResult || '',
+      tags: tags || [],
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      createdBy: req.user?.email || null,
+    };
+    await testItems.create(item);
+    res.status(201).json(item);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/test-items/:id', requireEditor, async (req, res) => {
+  try {
+    const { name, category, description, steps, expectedResult, tags, status } = req.body;
+    const updated = await testItems.update(req.params.id, {
+      ...(name !== undefined && { name: name.trim() }),
+      ...(category !== undefined && { category: category.trim() }),
+      ...(description !== undefined && { description }),
+      ...(steps !== undefined && { steps }),
+      ...(expectedResult !== undefined && { expectedResult }),
+      ...(tags !== undefined && { tags }),
+      ...(status !== undefined && { status }),
+      updatedAt: new Date().toISOString(),
+    });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/test-items/:id', requireSuperuser, async (req, res) => {
+  try {
+    await testItems.delete(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Static frontend (production only — must be after all API routes) ───────────
