@@ -342,6 +342,10 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   }
 
   const showForm = sessionType && !SESSION_TYPES.find(t => t.id === sessionType)?.external;
+  const [showLegacy, setShowLegacy] = useState(false);
+
+  const LEGACY_TYPES = SESSION_TYPES.filter(t => t.id !== 'buffet');
+  const SPECIAL_TYPES = ['exploratory', 'comparison'];
 
   return (
     <div className="session-start">
@@ -350,20 +354,74 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           ← Back
         </button>
         <h1>New Testing Session</h1>
-        <p>Choose a session type to get started.</p>
       </div>
 
-      {/* Session Type Picker */}
-      <div className="form-group">
-        <label>Session Type</label>
-        <div className="session-type-cards">
-          {SESSION_TYPES.map(st => (
+      {/* Primary — Build & Run */}
+      <div
+        onClick={onStartBuffet}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 20,
+          border: '2px solid var(--accent, #1A5CF6)',
+          borderRadius: 12, padding: '20px 24px',
+          background: 'var(--accent-subtle, #e8f0fe)',
+          cursor: 'pointer', marginBottom: 10,
+        }}
+      >
+        <span style={{ fontSize: 36 }}>🔨</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--accent, #1A5CF6)', marginBottom: 4 }}>
+            Build & Run
+            <span style={{ marginLeft: 10, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', background: 'var(--accent, #1A5CF6)', color: '#fff', borderRadius: 4, padding: '2px 7px', verticalAlign: 'middle' }}>Recommended</span>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Define your test plan from the shared library, then run it. No irrelevant tests, no skipping.
+          </div>
+        </div>
+        <span style={{ fontSize: 20, color: 'var(--accent, #1A5CF6)', fontWeight: 700 }}>→</span>
+      </div>
+
+      {/* Secondary — Exploratory & Comparison (always visible) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        {SESSION_TYPES.filter(t => SPECIAL_TYPES.includes(t.id)).map(st => (
+          <div
+            key={st.id}
+            onClick={() => {
+              if (st.id === 'exploratory' && onStartExploratory) onStartExploratory();
+              if (st.id === 'comparison' && onStartComparison) onStartComparison();
+            }}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 12,
+              border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px',
+              background: 'var(--surface)', cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: 22 }}>{st.icon}</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{st.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>{st.description}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Legacy toggle */}
+      <button
+        type="button"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)', padding: '6px 0', display: 'flex', alignItems: 'center', gap: 6, marginBottom: showLegacy ? 10 : 0 }}
+        onClick={() => setShowLegacy(v => !v)}
+      >
+        <span style={{ fontSize: 10 }}>{showLegacy ? '▾' : '▸'}</span>
+        {showLegacy ? 'Hide' : 'Show'} legacy session types
+      </button>
+
+      {showLegacy && (
+        <div className="session-type-cards" style={{ opacity: 0.75 }}>
+          {LEGACY_TYPES.filter(t => !SPECIAL_TYPES.includes(t.id)).map(st => (
             <div
               key={st.id}
               className={`session-type-card ${sessionType === st.id ? 'selected' : ''}`}
               onClick={() => {
                 if (st.external) {
-                  if (st.id === 'buffet' && onStartBuffet) onStartBuffet();
                   if (st.id === 'exploratory' && onStartExploratory) onStartExploratory();
                   if (st.id === 'comparison' && onStartComparison) onStartComparison();
                   return;
@@ -376,13 +434,10 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
               <span className="session-type-icon">{st.icon}</span>
               <span className="session-type-label">{st.label}</span>
               <span className="session-type-desc">{st.description}</span>
-              {st.external && (
-                <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 11, color: 'var(--text-muted)' }}>→</span>
-              )}
             </div>
           ))}
         </div>
-      </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit}>
