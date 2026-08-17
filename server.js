@@ -16,7 +16,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
 import connectPgSimple from 'connect-pg-simple';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
-import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, projects, testItems, getPool } from './lib/storage.js';
+import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, projects, testItems, testPlanPresets, getPool } from './lib/storage.js';
 import {
   findOrCreateUser, createDomainRequest,
   getAllUsers, updateUserRole, updateUserEntity, updateUserPermissions,
@@ -1575,6 +1575,65 @@ app.put('/api/test-items/:id', requireEditor, async (req, res) => {
 app.delete('/api/test-items/:id', requireSuperuser, async (req, res) => {
   try {
     await testItems.delete(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Test Plan Presets ─────────────────────────────────────────────────────────
+
+app.get('/api/test-plan-presets', requireAuth, async (req, res) => {
+  try {
+    const { productType } = req.query;
+    res.json(await testPlanPresets.getAll({ productType }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/test-plan-presets/:id', requireAuth, async (req, res) => {
+  try {
+    const preset = await testPlanPresets.getById(req.params.id);
+    if (!preset) return res.status(404).json({ error: 'Not found' });
+    res.json(preset);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/test-plan-presets', requireSuperuser, async (req, res) => {
+  try {
+    const { name, productType, intentType, description, itemIds } = req.body;
+    if (!name || !productType) return res.status(400).json({ error: 'name and productType required' });
+    const preset = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      productType,
+      intentType: intentType || null,
+      description: description || '',
+      itemIds: itemIds || [],
+      createdAt: new Date().toISOString(),
+      createdBy: req.user?.email || null,
+    };
+    await testPlanPresets.create(preset);
+    res.status(201).json(preset);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/test-plan-presets/:id', requireSuperuser, async (req, res) => {
+  try {
+    const { name, productType, intentType, description, itemIds } = req.body;
+    const updated = await testPlanPresets.update(req.params.id, {
+      ...(name !== undefined && { name: name.trim() }),
+      ...(productType !== undefined && { productType }),
+      ...(intentType !== undefined && { intentType }),
+      ...(description !== undefined && { description }),
+      ...(itemIds !== undefined && { itemIds }),
+      updatedAt: new Date().toISOString(),
+    });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/test-plan-presets/:id', requireSuperuser, async (req, res) => {
+  try {
+    await testPlanPresets.delete(req.params.id);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

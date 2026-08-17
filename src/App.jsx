@@ -29,7 +29,7 @@ import ProductDetail from './components/ProductDetail.jsx';
 import ChangeNoticeForm from './components/ChangeNoticeForm.jsx';
 import ProductInquiryForm from './components/ProductInquiryForm.jsx';
 import ProductSpecForm from './components/ProductSpecForm.jsx';
-import BuffetSessionBuilder from './components/BuffetSessionBuilder.jsx';
+import BuildAndRunWizard from './components/BuildAndRunWizard.jsx';
 
 const LOGO_URL = 'https://lh3.googleusercontent.com/d/1z-qNySTnx6Fo9EnmSf0WBsWSMF_P1mBP';
 
@@ -324,6 +324,11 @@ function SessionCard({ s, onOpen, onDelete }) {
           <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px', color: 'var(--fail)' }} onClick={e => { e.stopPropagation(); setConfirmDelete(true); }} title="Delete session">✕ Delete</button>
         )}
         <span className={`badge badge-${s.status}`}>{s.status}</span>
+        {(s.type === 'build-and-run' || s.testPlan === 'build-and-run') && (
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: 'rgba(26,92,246,0.10)', color: '#1A5CF6', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            Test Plan
+          </span>
+        )}
         {s.testPlan === 'vendor-eval' && (
           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: '#ede9fe', color: '#6d28d9', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
             Vendor Eval
@@ -963,12 +968,12 @@ export default function App() {
           onGoToCatalog={() => setView('catalog')}
           onStartExploratory={() => setView('exploratoryStart')}
           onStartComparison={() => { setCurrentComparison(null); setView('comparisonBuilder'); }}
-          onStartBuffet={() => setView('buffetBuilder')}
+          onStartBuffet={() => setView('buildAndRun')}
         />
       )}
 
-      {view === 'buffetBuilder' && (
-        <BuffetSessionBuilder
+      {view === 'buildAndRun' && (
+        <BuildAndRunWizard
           catalog={catalog}
           onBack={() => setView('sessionStart')}
           onCreated={handleSessionCreated}

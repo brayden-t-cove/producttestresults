@@ -13,7 +13,7 @@ const CATEGORY_ICONS = {
 };
 
 const SESSION_TYPES = [
-  { id: 'buffet',       label: 'Buffet',             icon: '🍽️', description: 'Pick exactly the tests you need from the shared library — no skips needed', external: true, highlight: true },
+  { id: 'buffet',       label: 'Build & Run',        icon: '🔨', description: 'Define your test plan from the shared library, then run it — no irrelevant tests', external: true, highlight: true },
   { id: 'e2e',          label: 'E2E',                icon: '🔄', description: 'Full end-to-end product testing across all capabilities' },
   { id: 'regression',   label: 'Regression',         icon: '🔁', description: 'Verify previously fixed issues remain resolved after a new build' },
   { id: 'feature',      label: 'Feature / Targeted', icon: '🎯', description: 'Test a specific feature or acceptance criteria' },

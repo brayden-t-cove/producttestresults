@@ -468,6 +468,36 @@ export async function adminDeleteSubmission(id) {
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
+// ── Test Plan Presets ─────────────────────────────────────────────────────────
+
+export async function listTestPlanPresets(productType) {
+  const params = productType ? `?productType=${encodeURIComponent(productType)}` : '';
+  const res = await fetch(`${BASE}/test-plan-presets${params}`);
+  if (!res.ok) throw new Error('Failed to load presets');
+  return res.json();
+}
+
+export async function createTestPlanPreset(data) {
+  const res = await fetch(`${BASE}/test-plan-presets`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to create preset'); }
+  return res.json();
+}
+
+export async function updateTestPlanPreset(id, data) {
+  const res = await fetch(`${BASE}/test-plan-presets/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to update preset'); }
+  return res.json();
+}
+
+export async function deleteTestPlanPreset(id) {
+  const res = await fetch(`${BASE}/test-plan-presets/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete preset');
+}
+
 // ── Test Item Categories ──────────────────────────────────────────────────────
 
 export async function getTestItemCategories() {

@@ -6,7 +6,7 @@ import {
   adminGetRoleDefaults, adminSaveRoleDefaults,
 } from '../lib/authApi.js';
 import { PERMISSION_REGISTRY, DEFAULT_ROLE_PERMISSIONS } from '../data/permissions.js';
-import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents, adminGetSubmissions, adminUpdateSubmission, adminDeleteSubmission, listSessions } from '../lib/api.js';
+import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents, adminGetSubmissions, adminUpdateSubmission, adminDeleteSubmission, listSessions, listTestItems, listTestPlanPresets, createTestPlanPreset, updateTestPlanPreset, deleteTestPlanPreset } from '../lib/api.js';
 import TestItemLibrary from './TestItemLibrary.jsx';
 
 const ENTITIES = ['Cove', 'Luna', 'Alder', 'InstaVision'];
@@ -179,6 +179,7 @@ export default function AdminPanel({ currentUser, onBack }) {
           { id: 'formlinks',   label: 'Form Links' },
           { id: 'permissions', label: 'Permissions' },
           { id: 'testlibrary', label: 'Test Library' },
+          { id: 'presets',     label: 'Plan Templates' },
           { id: 'legacy',      label: 'Legacy Sessions' },
         ].map(t => (
           <button
@@ -549,6 +550,11 @@ export default function AdminPanel({ currentUser, onBack }) {
         />
       )}
 
+      {/* ── Plan Templates ── */}
+      {tab === 'presets' && (
+        <PlanTemplatesTab />
+      )}
+
       {/* ── Legacy Sessions ── */}
       {tab === 'legacy' && (
         <LegacySessionsTab />
@@ -580,6 +586,213 @@ export default function AdminPanel({ currentUser, onBack }) {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+const PRODUCT_TYPES = ['camera', 'hub', 'sensor', 'touchpad', 'app'];
+const INTENTS = [
+  { id: 'smoke', label: 'Smoke Test' },
+  { id: 'intake', label: 'New Product Intake' },
+  { id: 'regression', label: 'Full Regression' },
+  { id: 'feature', label: 'Feature Validation' },
+];
+
+function PlanTemplatesTab() {
+  const [presets, setPresets] = useState([]);
+  const [libraryItems, setLibraryItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: '', productType: '', intentType: '', description: '', itemIds: [] });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [expandedPreset, setExpandedPreset] = useState(null);
+  const [search, setSearch] = useState('');
+  const [filterCat, setFilterCat] = useState('');
+
+  useEffect(() => {
+    Promise.all([listTestPlanPresets(), listTestItems({ status: 'active' })])
+      .then(([p, items]) => { setPresets(p); setLibraryItems(items); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const categories = [...new Set(libraryItems.map(i => i.category))].sort();
+
+  const filteredLib = libraryItems.filter(item => {
+    if (filterCat && item.category !== filterCat) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  const libByCategory = filteredLib.reduce((acc, i) => { (acc[i.category] = acc[i.category] || []).push(i); return acc; }, {});
+  const selectedIds = new Set(form.itemIds);
+
+  function startCreate() {
+    setEditing(null);
+    setForm({ name: '', productType: '', intentType: '', description: '', itemIds: [] });
+    setShowForm(true);
+  }
+
+  function startEdit(preset) {
+    setEditing(preset);
+    setForm({ name: preset.name, productType: preset.productType, intentType: preset.intentType || '', description: preset.description || '', itemIds: [...(preset.itemIds || [])] });
+    setShowForm(true);
+  }
+
+  function toggleItem(id) {
+    setForm(f => ({ ...f, itemIds: f.itemIds.includes(id) ? f.itemIds.filter(x => x !== id) : [...f.itemIds, id] }));
+  }
+
+  function addCategory(catItems) {
+    const ids = catItems.map(i => i.id).filter(id => !selectedIds.has(id));
+    setForm(f => ({ ...f, itemIds: [...f.itemIds, ...ids] }));
+  }
+
+  function removeCategory(cat) {
+    const catIds = new Set(libraryItems.filter(i => i.category === cat).map(i => i.id));
+    setForm(f => ({ ...f, itemIds: f.itemIds.filter(id => !catIds.has(id)) }));
+  }
+
+  async function handleSave() {
+    if (!form.name.trim() || !form.productType) { setError('Name and product type are required.'); return; }
+    setSaving(true);
+    try {
+      if (editing) {
+        const updated = await updateTestPlanPreset(editing.id, form);
+        setPresets(all => all.map(p => p.id === updated.id ? updated : p));
+      } else {
+        const created = await createTestPlanPreset(form);
+        setPresets(all => [created, ...all]);
+      }
+      setShowForm(false);
+      setEditing(null);
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete(preset) {
+    if (!confirm(`Delete template "${preset.name}"?`)) return;
+    try {
+      await deleteTestPlanPreset(preset.id);
+      setPresets(all => all.filter(p => p.id !== preset.id));
+    } catch (e) { setError(e.message); }
+  }
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, flex: 1 }}>Plan Templates</h3>
+        {!showForm && <button className="btn btn-primary btn-sm" onClick={startCreate}>+ New Template</button>}
+      </div>
+      <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)' }}>
+        Templates pre-fill the Build & Run plan step. Scoped by product type so testers only see relevant ones.
+      </p>
+
+      {error && <div className="error-msg" style={{ marginBottom: 12 }}>{error}</div>}
+
+      {showForm && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 20, marginBottom: 20, background: 'var(--surface)' }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>{editing ? 'Edit Template' : 'New Template'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
+              <label>Template Name <span className="req">*</span></label>
+              <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Camera — Full Regression" />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Product Type <span className="req">*</span></label>
+              <select value={form.productType} onChange={e => setForm(f => ({ ...f, productType: e.target.value }))}>
+                <option value="">— Select —</option>
+                {PRODUCT_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Intent <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
+              <select value={form.intentType} onChange={e => setForm(f => ({ ...f, intentType: e.target.value }))}>
+                <option value="">— Any intent —</option>
+                {INTENTS.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
+              <label>Description</label>
+              <input type="text" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description shown in the template picker" />
+            </div>
+          </div>
+
+          {/* Item picker */}
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+            Test Items <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({form.itemIds.length} selected)</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input type="text" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, fontSize: 12 }} />
+            <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ fontSize: 12 }}>
+              <option value="">All categories</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 8, maxHeight: 360, overflowY: 'auto' }}>
+            {Object.entries(libByCategory).sort(([a], [b]) => a.localeCompare(b)).map(([cat, catItems]) => {
+              const allSel = catItems.every(i => selectedIds.has(i.id));
+              return (
+                <div key={cat}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0 }}>
+                    <span style={{ flex: 1, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{cat}</span>
+                    {!allSel
+                      ? <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 10 }} onClick={() => addCategory(catItems)}>+ All</button>
+                      : <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 10, color: 'var(--text-muted)' }} onClick={() => removeCategory(cat)}>Remove all</button>
+                    }
+                  </div>
+                  {catItems.map(item => (
+                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 20px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleItem(item.id)} />
+                      <span style={{ fontSize: 12 }}>{item.name}</span>
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setShowForm(false); setEditing(null); setError(''); }}>Cancel</button>
+            <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save Template'}</button>
+          </div>
+        </div>
+      )}
+
+      {presets.length === 0 && !showForm ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '24px 0' }}>No templates yet. Create one above.</div>
+      ) : (
+        presets.map(preset => (
+          <div key={preset.id} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, background: 'var(--surface)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer' }} onClick={() => setExpandedPreset(e => e === preset.id ? null : preset.id)}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{preset.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {preset.productType} {preset.intentType ? `· ${INTENTS.find(i => i.id === preset.intentType)?.label}` : ''} · {(preset.itemIds || []).length} tests
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={e => { e.stopPropagation(); startEdit(preset); }}>Edit</button>
+              <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: 'var(--fail)' }} onClick={e => { e.stopPropagation(); handleDelete(preset); }}>Delete</button>
+              <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{expandedPreset === preset.id ? '−' : '+'}</span>
+            </div>
+            {expandedPreset === preset.id && (
+              <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border)', fontSize: 12 }}>
+                {preset.description && <p style={{ marginTop: 10, color: 'var(--text-muted)' }}>{preset.description}</p>}
+                <div style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  {(preset.itemIds || []).length} test items selected
+                </div>
+              </div>
+            )}
+          </div>
+        ))
       )}
     </div>
   );
