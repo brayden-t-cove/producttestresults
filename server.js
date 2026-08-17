@@ -1579,6 +1579,170 @@ app.delete('/api/test-items/:id', requireSuperuser, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Test Item Categories ──────────────────────────────────────────────────────
+
+const DEFAULT_ITEM_CATEGORIES = [
+  'Video Quality', 'Audio', 'Network & Connectivity', 'Motion Detection',
+  'Notifications', 'Recording & Playback', 'Cloud & Storage', 'App & UI',
+  'Interoperability', 'Security', 'Power & Hardware', 'Firmware & OTA',
+  'Accessibility', 'Performance', 'Other',
+];
+
+app.get('/api/test-item-categories', requireAuth, async (req, res) => {
+  try {
+    const val = await config.get('testItemCategories');
+    res.json(val || DEFAULT_ITEM_CATEGORIES);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/test-item-categories', requireSuperuser, async (req, res) => {
+  try {
+    const { categories } = req.body;
+    if (!Array.isArray(categories)) return res.status(400).json({ error: 'categories must be an array' });
+    await config.set('testItemCategories', categories);
+    res.json(categories);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Rename a category — updates all test items that reference the old name
+app.post('/api/test-item-categories/rename', requireSuperuser, async (req, res) => {
+  try {
+    const { from, to } = req.body;
+    if (!from || !to) return res.status(400).json({ error: 'from and to are required' });
+    const all = await testItems.getAll({ category: from });
+    for (const item of all) {
+      await testItems.update(item.id, { category: to });
+    }
+    const cats = await config.get('testItemCategories') || DEFAULT_ITEM_CATEGORIES;
+    const updated = cats.map(c => c === from ? to : c);
+    await config.set('testItemCategories', updated);
+    res.json({ updated: all.length, categories: updated });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Seed test items from legacy test library ──────────────────────────────────
+
+app.post('/api/test-items/seed-from-legacy', requireSuperuser, async (req, res) => {
+  try {
+    const { BASELINE_TESTS, TEST_LIBRARY } = await import('./src/data/testLibrary.js');
+
+    // Map capability/baseline group → buffet category
+    const CAP_CATEGORY = {
+      // Network & Connectivity
+      'z-wave': 'Network & Connectivity', 'rf-sensors': 'Network & Connectivity',
+      'wifi-devices': 'Network & Connectivity', 'bluetooth': 'Network & Connectivity',
+      'ethernet': 'Network & Connectivity', 'wifi': 'Network & Connectivity',
+      'wifi-2_4': 'Network & Connectivity', 'wifi-5': 'Network & Connectivity',
+      'ethernet-poe': 'Network & Connectivity', 'cellular-4g': 'Network & Connectivity',
+      'cellular-5g': 'Network & Connectivity', 'ble': 'Network & Connectivity',
+      'cellular-backup': 'Network & Connectivity', 'esp32': 'Network & Connectivity',
+      // Power & Hardware
+      'battery-backup': 'Power & Hardware', 'battery-powered': 'Power & Hardware',
+      'solar': 'Power & Hardware', 'poe': 'Power & Hardware',
+      'doorbell-wiring': 'Power & Hardware', 'wired': 'Power & Hardware',
+      'power-cable': 'Power & Hardware',
+      // Video Quality
+      'res-1080p': 'Video Quality', 'res-2k': 'Video Quality', 'res-4k': 'Video Quality',
+      'hdr': 'Video Quality', 'ir-night-vision': 'Video Quality',
+      'color-night-vision': 'Video Quality',
+      // Audio
+      'two-way-audio': 'Audio', 'listen-only': 'Audio', 'built-in-siren': 'Audio',
+      'onboard-siren': 'Audio',
+      // Motion Detection
+      'person-detection': 'Motion Detection', 'motion-detection': 'Motion Detection',
+      'package-detection': 'Motion Detection', 'animal-detection': 'Motion Detection',
+      'vehicle-detection': 'Motion Detection', 'activity-zones': 'Motion Detection',
+      'face-recognition': 'Motion Detection',
+      // Recording & Playback
+      'local-storage': 'Recording & Playback', 'cloud-storage': 'Recording & Playback',
+      'continuous-recording': 'Recording & Playback', 'event-recording': 'Recording & Playback',
+      'video-history': 'Recording & Playback', 'local-recording': 'Recording & Playback',
+      // Cloud & Storage
+      'cloud-backup': 'Cloud & Storage', 'nas': 'Cloud & Storage',
+      // App & UI
+      'live-view': 'App & UI', 'app': 'App & UI',
+      // Notifications
+      'push-notifications': 'Notifications', 'email-notifications': 'Notifications',
+      'sms-notifications': 'Notifications', 'self-monitoring': 'Notifications',
+      // Interoperability
+      'alexa': 'Interoperability', 'google-home': 'Interoperability',
+      'homekit': 'Interoperability', 'ifttt': 'Interoperability',
+      'professional-monitoring': 'Interoperability',
+      // Security
+      'encryption': 'Security', 'two-factor': 'Security',
+      // Firmware & OTA
+      'ota-update': 'Firmware & OTA',
+      // Peripherals → Interoperability
+      'touchpad': 'Interoperability', 'keypad': 'Interoperability',
+      'key-fob': 'Interoperability', 'rf-sensor-peripheral': 'Interoperability',
+      'zwave-devices': 'Interoperability',
+      // Form factor / placement → Other
+      'indoor': 'Other', 'outdoor': 'Other', 'doorbell': 'Other',
+      'lightbulb': 'Other', 'window': 'Other',
+      'form-doorbell': 'Other', 'form-bullet-dome': 'Other', 'form-floodlight': 'Other',
+      'form-spotlight': 'Other', 'form-pan-tilt': 'Other', 'form-bulb': 'Other',
+    };
+
+    // Baseline device type → category
+    const BASELINE_CATEGORY = {
+      hub: 'Power & Hardware', touchpad: 'App & UI', camera: 'Video Quality',
+      sensor: 'Network & Connectivity', app: 'App & UI',
+    };
+
+    const existing = await testItems.getAll();
+    const existingTemplateIds = new Set(existing.map(i => i.legacyId).filter(Boolean));
+    const now = new Date().toISOString();
+    let created = 0, skipped = 0;
+
+    // Baseline tests
+    for (const [deviceType, tests] of Object.entries(BASELINE_TESTS)) {
+      const category = BASELINE_CATEGORY[deviceType] || 'Other';
+      for (const t of tests) {
+        if (existingTemplateIds.has(t.id)) { skipped++; continue; }
+        await testItems.create({
+          id: crypto.randomUUID(),
+          name: t.title,
+          category,
+          description: t.description || '',
+          steps: '',
+          expectedResult: t.expected || '',
+          tags: [deviceType, 'baseline'],
+          status: 'active',
+          legacyId: t.id,
+          createdAt: now,
+          createdBy: 'system-seed',
+        });
+        created++;
+      }
+    }
+
+    // Capability tests
+    for (const [capId, tests] of Object.entries(TEST_LIBRARY)) {
+      const category = CAP_CATEGORY[capId] || 'Other';
+      for (const t of tests) {
+        if (!t.id || !t.title) continue;
+        if (existingTemplateIds.has(t.id)) { skipped++; continue; }
+        await testItems.create({
+          id: crypto.randomUUID(),
+          name: t.title,
+          category,
+          description: t.description || '',
+          steps: '',
+          expectedResult: t.expected || '',
+          tags: [capId],
+          status: 'active',
+          legacyId: t.id,
+          createdAt: now,
+          createdBy: 'system-seed',
+        });
+        created++;
+      }
+    }
+
+    res.json({ created, skipped });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Static frontend (production only — must be after all API routes) ───────────
 
 const DIST_DIR = join(__dirname, 'dist');

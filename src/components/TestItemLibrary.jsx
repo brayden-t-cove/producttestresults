@@ -1,28 +1,114 @@
 import { useState, useEffect } from 'react';
-import { listTestItems, createTestItem, updateTestItem, deleteTestItem } from '../lib/api.js';
+import {
+  listTestItems, createTestItem, updateTestItem, deleteTestItem,
+  getTestItemCategories, saveTestItemCategories, renameTestItemCategory, seedTestItemsFromLegacy,
+} from '../lib/api.js';
 
-const CATEGORIES = [
-  'Video Quality',
-  'Audio',
-  'Network & Connectivity',
-  'Motion Detection',
-  'Notifications',
-  'Recording & Playback',
-  'Cloud & Storage',
-  'App & UI',
-  'Interoperability',
-  'Security',
-  'Power & Hardware',
-  'Firmware & OTA',
-  'Accessibility',
-  'Performance',
-  'Other',
-];
+// ── Category Manager ───────────────────────────────────────────────────────────
 
-const BLANK_FORM = { name: '', category: '', description: '', steps: '', expectedResult: '', tags: '' };
+function CategoryManager({ categories, onCategoriesChange, onClose }) {
+  const [list, setList] = useState(categories);
+  const [renaming, setRenaming] = useState(null); // { index, value }
+  const [newCat, setNewCat] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-function ItemForm({ initial, onSave, onCancel, saving }) {
-  const [form, setForm] = useState(initial || BLANK_FORM);
+  async function handleRename(index) {
+    const from = list[index];
+    const to = renaming.value.trim();
+    if (!to || to === from) { setRenaming(null); return; }
+    setSaving(true);
+    try {
+      const result = await renameTestItemCategory(from, to);
+      onCategoriesChange(result.categories);
+      setList(result.categories);
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); setRenaming(null); }
+  }
+
+  async function handleAddCategory() {
+    const name = newCat.trim();
+    if (!name || list.includes(name)) return;
+    const updated = [...list, name];
+    setSaving(true);
+    try {
+      await saveTestItemCategories(updated);
+      setList(updated);
+      onCategoriesChange(updated);
+      setNewCat('');
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete(index) {
+    const updated = list.filter((_, i) => i !== index);
+    setSaving(true);
+    try {
+      await saveTestItemCategories(updated);
+      setList(updated);
+      onCategoriesChange(updated);
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 20, background: 'var(--surface)', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, flex: 1 }}>Manage Categories</div>
+        <button className="btn btn-ghost btn-sm" onClick={onClose}>Done</button>
+      </div>
+      {error && <div className="error-msg" style={{ marginBottom: 10 }}>{error}</div>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+        {list.map((cat, i) => (
+          <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {renaming?.index === i ? (
+              <>
+                <input
+                  type="text"
+                  value={renaming.value}
+                  onChange={e => setRenaming({ index: i, value: e.target.value })}
+                  onKeyDown={e => { if (e.key === 'Enter') handleRename(i); if (e.key === 'Escape') setRenaming(null); }}
+                  autoFocus
+                  style={{ flex: 1, fontSize: 13 }}
+                />
+                <button className="btn btn-primary btn-sm" onClick={() => handleRename(i)} disabled={saving}>Save</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setRenaming(null)}>Cancel</button>
+              </>
+            ) : (
+              <>
+                <span style={{ flex: 1, fontSize: 13 }}>{cat}</span>
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => setRenaming({ index: i, value: cat })}>Rename</button>
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: 'var(--fail)' }} onClick={() => handleDelete(i)}>✕</button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="text"
+          placeholder="New category name…"
+          value={newCat}
+          onChange={e => setNewCat(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleAddCategory(); }}
+          style={{ flex: 1, fontSize: 13 }}
+        />
+        <button className="btn btn-ghost btn-sm" onClick={handleAddCategory} disabled={!newCat.trim()}>+ Add</button>
+      </div>
+      <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+        Renaming a category updates all items in that category automatically.
+      </p>
+    </div>
+  );
+}
+
+// ── Item Form ─────────────────────────────────────────────────────────────────
+
+function ItemForm({ initial, categories, onSave, onCancel, saving }) {
+  const blank = { name: '', category: '', description: '', steps: '', expectedResult: '', tags: '' };
+  const [form, setForm] = useState(initial || blank);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   function handleSubmit(e) {
@@ -46,7 +132,7 @@ function ItemForm({ initial, onSave, onCancel, saving }) {
           <label>Category <span className="req">*</span></label>
           <select value={form.category} onChange={e => set('category', e.target.value)} required>
             <option value="">— Select —</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
       </div>
@@ -74,6 +160,8 @@ function ItemForm({ initial, onSave, onCancel, saving }) {
   );
 }
 
+// ── Item Row ──────────────────────────────────────────────────────────────────
+
 function ItemRow({ item, canEdit, isSuperuser, onEdit, onArchive, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const archived = item.status === 'archived';
@@ -85,14 +173,11 @@ function ItemRow({ item, canEdit, isSuperuser, onEdit, onArchive, onDelete }) {
         onClick={() => setExpanded(e => !e)}
       >
         <span style={{ flex: 1, fontWeight: 500, fontSize: 14 }}>{item.name}</span>
-        <span style={{
-          fontSize: 11, padding: '2px 8px', borderRadius: 12, fontWeight: 600,
-          background: 'var(--bg)', color: 'var(--text-muted)', border: '1px solid var(--border)',
-        }}>{item.category}</span>
-        {item.tags?.map(t => (
+        {(item.tags || []).map(t => (
           <span key={t} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 10, background: 'var(--accent-subtle, #e8f0fe)', color: 'var(--accent, #1A5CF6)' }}>{t}</span>
         ))}
         {archived && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>archived</span>}
+        {item.legacyId && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>legacy</span>}
         <span style={{ fontSize: 16, color: 'var(--text-muted)', marginLeft: 4 }}>{expanded ? '−' : '+'}</span>
       </div>
 
@@ -114,10 +199,9 @@ function ItemRow({ item, canEdit, isSuperuser, onEdit, onArchive, onDelete }) {
           {canEdit && (
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button className="btn btn-ghost btn-sm" onClick={() => onEdit(item)}>Edit</button>
-              {!archived && (
+              {!archived ? (
                 <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)' }} onClick={() => onArchive(item)}>Archive</button>
-              )}
-              {archived && (
+              ) : (
                 <button className="btn btn-ghost btn-sm" onClick={() => onArchive(item)}>Restore</button>
               )}
               {isSuperuser && archived && (
@@ -131,8 +215,11 @@ function ItemRow({ item, canEdit, isSuperuser, onEdit, onArchive, onDelete }) {
   );
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function TestItemLibrary({ canEdit, isSuperuser }) {
   const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterCat, setFilterCat] = useState('');
@@ -141,12 +228,19 @@ export default function TestItemLibrary({ canEdit, isSuperuser }) {
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedResult, setSeedResult] = useState(null);
 
   async function load() {
     setLoading(true);
     try {
-      const data = await listTestItems({ status: filterStatus || undefined });
+      const [data, cats] = await Promise.all([
+        listTestItems({ status: filterStatus || undefined }),
+        getTestItemCategories(),
+      ]);
       setItems(data);
+      setCategories(cats);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -157,7 +251,9 @@ export default function TestItemLibrary({ canEdit, isSuperuser }) {
     if (filterCat && item.category !== filterCat) return false;
     if (search) {
       const q = search.toLowerCase();
-      return item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || (item.tags || []).some(t => t.toLowerCase().includes(q));
+      return item.name.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        (item.tags || []).some(t => t.toLowerCase().includes(q));
     }
     return true;
   });
@@ -199,22 +295,63 @@ export default function TestItemLibrary({ canEdit, isSuperuser }) {
     } catch (e) { setError(e.message); }
   }
 
+  async function handleSeed() {
+    if (!confirm('Import all tests from the legacy test library? Items already imported will be skipped.')) return;
+    setSeeding(true);
+    setSeedResult(null);
+    try {
+      const result = await seedTestItemsFromLegacy();
+      setSeedResult(result);
+      await load();
+    } catch (e) { setError(e.message); }
+    finally { setSeeding(false); }
+  }
+
   function startEdit(item) {
     setEditingItem(item);
     setShowForm(true);
   }
 
+  // Unique categories across all items (catches any unmapped ones)
+  const allCatsInUse = [...new Set(items.map(i => i.category))];
+  const displayCategories = [...new Set([...categories, ...allCatsInUse])].sort();
+
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, flex: 1 }}>Test Item Library</h2>
+        {isSuperuser && (
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowCategoryManager(v => !v)}>
+            {showCategoryManager ? 'Close Category Editor' : '✎ Edit Categories'}
+          </button>
+        )}
+        {isSuperuser && (
+          <button className="btn btn-ghost btn-sm" onClick={handleSeed} disabled={seeding}>
+            {seeding ? 'Importing…' : '⬇ Import Legacy Tests'}
+          </button>
+        )}
         {canEdit && !showForm && (
           <button className="btn btn-primary btn-sm" onClick={() => { setEditingItem(null); setShowForm(true); }}>+ New Item</button>
         )}
       </div>
 
+      {seedResult && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>
+          ✓ Import complete: <strong>{seedResult.created}</strong> items added, <strong>{seedResult.skipped}</strong> already existed.
+        </div>
+      )}
+
       {error && <div className="error-msg" style={{ marginBottom: 12 }}>{error}</div>}
+
+      {/* Category manager */}
+      {showCategoryManager && isSuperuser && (
+        <CategoryManager
+          categories={categories}
+          onCategoriesChange={setCategories}
+          onClose={() => setShowCategoryManager(false)}
+        />
+      )}
 
       {/* New / Edit form */}
       {showForm && (
@@ -222,6 +359,7 @@ export default function TestItemLibrary({ canEdit, isSuperuser }) {
           <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 14 }}>{editingItem ? 'Edit Test Item' : 'New Test Item'}</div>
           <ItemForm
             initial={editingItem ? { ...editingItem, tags: (editingItem.tags || []).join(', ') } : undefined}
+            categories={categories}
             onSave={handleSave}
             onCancel={() => { setShowForm(false); setEditingItem(null); }}
             saving={saving}
@@ -240,7 +378,7 @@ export default function TestItemLibrary({ canEdit, isSuperuser }) {
         />
         <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ fontSize: 13 }}>
           <option value="">All categories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {displayCategories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ fontSize: 13 }}>
           <option value="active">Active</option>
@@ -255,7 +393,9 @@ export default function TestItemLibrary({ canEdit, isSuperuser }) {
         <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</div>
       ) : filtered.length === 0 ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 14, textAlign: 'center', padding: 40 }}>
-          {items.length === 0 ? 'No test items yet. Add your first item to get started.' : 'No items match your filters.'}
+          {items.length === 0
+            ? 'No test items yet. Use "Import Legacy Tests" to pre-populate, or add items manually.'
+            : 'No items match your filters.'}
         </div>
       ) : (
         Object.entries(byCategory).sort(([a], [b]) => a.localeCompare(b)).map(([cat, catItems]) => (

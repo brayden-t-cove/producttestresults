@@ -468,6 +468,40 @@ export async function adminDeleteSubmission(id) {
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
+// ── Test Item Categories ──────────────────────────────────────────────────────
+
+export async function getTestItemCategories() {
+  const res = await fetch(`${BASE}/test-item-categories`);
+  if (!res.ok) throw new Error('Failed to load categories');
+  return res.json();
+}
+
+export async function saveTestItemCategories(categories) {
+  const res = await fetch(`${BASE}/test-item-categories`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ categories }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to save'); }
+  return res.json();
+}
+
+export async function renameTestItemCategory(from, to) {
+  const res = await fetch(`${BASE}/test-item-categories/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to rename'); }
+  return res.json();
+}
+
+export async function seedTestItemsFromLegacy() {
+  const res = await fetch(`${BASE}/test-items/seed-from-legacy`, { method: 'POST' });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Seed failed'); }
+  return res.json();
+}
+
 // ── Test Item Library ─────────────────────────────────────────────────────────
 
 export async function listTestItems({ category, status } = {}) {

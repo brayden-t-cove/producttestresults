@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { listTestItems, createSession, updateSession, getFirmwares } from '../lib/api.js';
+import { listTestItems, createSession, updateSession, getFirmwares, getTestItemCategories } from '../lib/api.js';
 import { CATEGORY_LABELS } from '../data/capabilities.js';
 
 const CATEGORY_ICONS = {
@@ -35,11 +35,11 @@ function PlateItem({ item, onRemove }) {
 
 // ── Library panel ─────────────────────────────────────────────────────────────
 
-function LibraryPanel({ items, onAdd, plateItemIds }) {
+function LibraryPanel({ items, categories, onAdd, plateItemIds }) {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('');
 
-  const categories = [...new Set(items.map(i => i.category))].sort();
+  const availableCats = categories.length ? categories : [...new Set(items.map(i => i.category))].sort();
 
   const filtered = items.filter(item => {
     if (filterCat && item.category !== filterCat) return false;
@@ -70,7 +70,7 @@ function LibraryPanel({ items, onAdd, plateItemIds }) {
         />
         <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ fontSize: 12 }}>
           <option value="">All</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          {availableCats.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
@@ -141,6 +141,7 @@ export default function BuffetSessionBuilder({ catalog, onBack, onCreated, curre
 
   // Library + plate
   const [libraryItems, setLibraryItems] = useState([]);
+  const [libraryCategories, setLibraryCategories] = useState([]);
   const [plate, setPlate] = useState([]); // array of test item objects (preserves order)
   const [libraryLoading, setLibraryLoading] = useState(true);
 
@@ -151,10 +152,13 @@ export default function BuffetSessionBuilder({ catalog, onBack, onCreated, curre
   const plateItemIds = new Set(plate.map(i => i.id));
 
   useEffect(() => {
-    listTestItems({ status: 'active' })
-      .then(setLibraryItems)
-      .catch(() => {})
-      .finally(() => setLibraryLoading(false));
+    Promise.all([
+      listTestItems({ status: 'active' }),
+      getTestItemCategories(),
+    ]).then(([items, cats]) => {
+      setLibraryItems(items);
+      setLibraryCategories(cats);
+    }).catch(() => {}).finally(() => setLibraryLoading(false));
   }, []);
 
   useEffect(() => {
@@ -356,7 +360,7 @@ export default function BuffetSessionBuilder({ catalog, onBack, onCreated, curre
                 No test items in the library yet.<br />Add items in Admin → Test Library.
               </div>
             ) : (
-              <LibraryPanel items={libraryItems} onAdd={addToPlate} plateItemIds={plateItemIds} />
+              <LibraryPanel items={libraryItems} categories={libraryCategories} onAdd={addToPlate} plateItemIds={plateItemIds} />
             )}
           </div>
 
