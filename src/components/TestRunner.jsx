@@ -25,15 +25,20 @@ import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 import IssueLogger from './IssueLogger.jsx';
 import IssueVerification from './IssueVerification.jsx';
 
-const STATUS_ORDER = { fail: 0, 'reproduced': 0, 'regression-found': 0, pending: 1, pass: 2, skip: 3, na: 3, blocked: 0.5, 'cannot-reproduce': 2, 'fixed-verified': 2, 'needs-more-info': 1.5, 'cannot-test': 3 };
+const STATUS_ORDER = { fail: 0, 'reproduced': 0, 'regression-found': 0, pending: 1, pass: 2, dependent: 2.5, environmental: 2.5, blocked: 0.5, 'cannot-reproduce': 2, 'fixed-verified': 2, 'needs-more-info': 1.5, 'cannot-test': 3 };
 
 function badgeClass(status) {
+  // legacy statuses still displayable in old sessions
+
   const map = {
     pass: 'badge-pass',
     fail: 'badge-fail',
-    skip: 'badge-skip',
+    dependent: 'badge-dependent',
+    environmental: 'badge-environmental',
     blocked: 'badge-blocked',
     pending: 'badge-pending',
+    // legacy — kept so old sessions render correctly
+    skip: 'badge-skip',
     na: 'badge-na',
     reproduced: 'badge-reproduced',
     'cannot-reproduce': 'badge-cannot-reproduce',
@@ -49,9 +54,12 @@ function statusLabel(status) {
   const map = {
     pass: 'Pass',
     fail: 'Fail',
-    skip: 'Skip',
+    dependent: 'Dependent Block',
+    environmental: 'Environmental Block',
     blocked: 'Blocked',
     pending: 'Pending',
+    // legacy
+    skip: 'Skip',
     na: 'N/A',
     reproduced: 'Reproduced',
     'cannot-reproduce': 'Cannot Reproduce',
@@ -462,7 +470,7 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
       <div className="test-detail-content">
         {test.notAvailableInApp && (
           <div className="not-available-banner">
-            ⚠️ Not available in {appConfigName || 'this app'} — mark as N/A or test anyway
+            ⚠️ Not available in {appConfigName || 'this app'} — mark as Environmental Block or test anyway
           </div>
         )}
         <TestDetailHeader test={test} onDelete={onDelete} onRenameTitle={onRenameTitle} />
@@ -533,22 +541,18 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
             ✗ Fail
           </button>
           <button
-            className={`btn btn-skip ${test.status === 'skip' ? 'active' : ''}`}
-            onClick={() => onVerdict('skip')}
+            className={`btn btn-dependent ${test.status === 'dependent' ? 'active' : ''}`}
+            onClick={() => onVerdict('dependent')}
+            title="A prior failure is blocking this test from running"
           >
-            ⟳ Skip
+            ⛓ Dependent
           </button>
           <button
-            className={`btn btn-na ${test.status === 'na' ? 'active' : ''}`}
-            onClick={() => onVerdict('na')}
+            className={`btn btn-environmental ${test.status === 'environmental' ? 'active' : ''}`}
+            onClick={() => onVerdict('environmental')}
+            title="Setup, hardware, time, or account conditions prevent execution"
           >
-            — N/A
-          </button>
-          <button
-            className={`btn btn-blocked ${test.status === 'blocked' ? 'active' : ''}`}
-            onClick={() => onVerdict('blocked')}
-          >
-            ⊘ Blocked
+            ⚙ Environmental
           </button>
         </div>
 
@@ -562,7 +566,6 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const sessionType = session.type || 'e2e';
   const isMultiProduct = !!(session.products && session.products.length > 1);
   const [activeProductIndex, setActiveProductIndex] = useState(0);
-  const [showSkipProductModal, setShowSkipProductModal] = useState(false);
 
   const activeProduct = isMultiProduct ? (session.products[activeProductIndex] || session.products[0]) : null;
   const activeProductCatalogId = activeProduct?.catalogId || null;
@@ -600,9 +603,6 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
     }
   }, [session.id]);
 
-  const [showSkipAllModal, setShowSkipAllModal] = useState(false);
-  const [skipAllReason, setSkipAllReason] = useState('');
-  const [skipSectionState, setSkipSectionState] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   // Fail → issue popup
@@ -615,7 +615,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
   const selectedTest = localTestCases.find(t => t.id === selectedTestId);
 
   const completed = localTestCases.filter(t => t.status !== 'pending').length;
-  const naCount = localTestCases.filter(t => t.status === 'na').length;
+  const blockedCount = localTestCases.filter(t => t.status === 'dependent' || t.status === 'environmental').length;
   const total = localTestCases.length;
   const progress = total > 0 ? (completed / total) * 100 : 0;
 
@@ -788,52 +788,12 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
     onExit();
   }
 
-  async function handleConfirmSkipAll() {
-    const reason = skipAllReason.trim();
-    const newTestCases = localTestCases.map(t => {
-      if (t.status !== 'pending') return t;
-      if (isMultiProduct && t.productCatalogId !== activeProductCatalogId) return t;
-      return { ...t, status: 'skip', notes: reason || t.notes };
-    });
-    await saveTestCases(newTestCases);
-    setShowSkipAllModal(false);
-    setSkipAllReason('');
-  }
-
   function handleNextProduct() {
     const nextIndex = activeProductIndex + 1;
     const nextProduct = session.products[nextIndex];
     const firstTest = localTestCases.find(t => t.productCatalogId === nextProduct?.catalogId);
     setActiveProductIndex(nextIndex);
     setSelectedTestId(firstTest?.id || null);
-    setSkipSectionState(null);
-  }
-
-  async function handleSkipProduct() {
-    const newTestCases = localTestCases.map(t =>
-      t.productCatalogId === activeProductCatalogId && t.status === 'pending'
-        ? { ...t, status: 'skip' }
-        : t
-    );
-    await saveTestCases(newTestCases);
-    setShowSkipProductModal(false);
-    handleNextProduct();
-  }
-
-  async function handleConfirmSkipSection(sectionIndex, reason) {
-    const sectionPrefix = String(sectionIndex) + '.';
-    const newTestCases = localTestCases.map(t => {
-      const num = t.testNumber || '';
-      const inSection = sectionIndex === 0
-        ? num.startsWith('0.')
-        : num.startsWith(sectionPrefix);
-      if (inSection && t.status === 'pending') {
-        return { ...t, status: 'skip', notes: reason || t.notes };
-      }
-      return t;
-    });
-    await saveTestCases(newTestCases);
-    setSkipSectionState(null);
   }
 
   const testNote = notes[selectedTestId] !== undefined
@@ -924,7 +884,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
         <span className="progress-text">
           {isMultiProduct
             ? `${visibleCompleted}/${visibleTests.length} · overall ${completed}/${total}`
-            : `${completed}/${total} done${naCount > 0 ? ` · ${naCount} N/A` : ''}`}
+            : `${completed}/${total} done${blockedCount > 0 ? ` · ${blockedCount} blocked` : ''}`}
         </span>
         {saving && <span className="spinner" style={{ flexShrink: 0 }} />}
       </div>
@@ -939,45 +899,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                   <span className="section-group-label">
                     {group.sectionIndex} · {group.sectionLabel}
                   </span>
-                  <button
-                    className="btn btn-ghost btn-sm section-skip-btn"
-                    onClick={() => setSkipSectionState(
-                      skipSectionState?.sectionIndex === group.sectionIndex
-                        ? null
-                        : { sectionIndex: group.sectionIndex, reason: '' }
-                    )}
-                  >
-                    Skip Section
-                  </button>
                 </div>
-                {skipSectionState?.sectionIndex === group.sectionIndex && (
-                  <div className="section-skip-inline">
-                    <input
-                      type="text"
-                      placeholder="Reason (optional)"
-                      value={skipSectionState.reason}
-                      onChange={e => setSkipSectionState(s => ({ ...s, reason: e.target.value }))}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleConfirmSkipSection(group.sectionIndex, skipSectionState.reason);
-                        if (e.key === 'Escape') setSkipSectionState(null);
-                      }}
-                    />
-                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleConfirmSkipSection(group.sectionIndex, skipSectionState.reason)}
-                      >
-                        Skip
-                      </button>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => setSkipSectionState(null)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
                 {group.tests.map(t => (
                   <div
                     key={t.id}
@@ -1162,23 +1084,6 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
         <button className="btn btn-secondary" onClick={() => setShowVerification(true)}>
           ✓ Verify Known Issue
         </button>
-        <button
-          className="btn btn-secondary"
-          onClick={() => { setShowSkipAllModal(true); setSkipAllReason(''); }}
-          disabled={pendingCount === 0}
-        >
-          ⏭ Skip Remaining
-        </button>
-        {isMultiProduct && !isLastProduct && (
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowSkipProductModal(true)}
-            disabled={currentProductDone}
-            title="Skip all remaining tests for this product and move to the next"
-          >
-            ⏭ Skip Product
-          </button>
-        )}
         <div className="spacer" />
         <button className="btn btn-ghost" onClick={handleSaveAndExit}>
           Save &amp; Exit
@@ -1193,63 +1098,6 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
           </button>
         )}
       </div>
-
-      {/* Skip All Pending Modal */}
-      {showSkipAllModal && (
-        <div className="modal-overlay">
-          <div className="modal skip-modal">
-            <div className="modal-header">
-              <h3>Skip Remaining Pending Tests</h3>
-              <button className="modal-close" onClick={() => setShowSkipAllModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <p style={{ marginBottom: 16, color: 'var(--text-muted)' }}>
-                {pendingCount} test{pendingCount !== 1 ? 's are' : ' is'} still pending.
-              </p>
-              <div className="form-group">
-                <label>Reason for skipping (applied to all):</label>
-                <textarea
-                  rows={3}
-                  placeholder="e.g. Not applicable to this firmware version"
-                  value={skipAllReason}
-                  onChange={e => setSkipAllReason(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setShowSkipAllModal(false)}>
-                Cancel
-              </button>
-              <button className="btn btn-primary" onClick={handleConfirmSkipAll}>
-                Skip All Pending
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSkipProductModal && (
-        <div className="modal-overlay">
-          <div className="modal skip-modal">
-            <div className="modal-header">
-              <h3>Skip Product</h3>
-              <button className="modal-close" onClick={() => setShowSkipProductModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <p style={{ color: 'var(--text-muted)' }}>
-                Mark all {pendingCount} remaining pending test{pendingCount !== 1 ? 's' : ''} for <strong>{activeProduct?.name}</strong> as skipped and move to the next product?
-              </p>
-              <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
-                Skipped tests are excluded from pass rate calculations.
-              </p>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setShowSkipProductModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSkipProduct}>Skip &amp; Continue</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showIssueLogger && (
         <IssueLogger

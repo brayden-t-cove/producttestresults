@@ -108,6 +108,15 @@ h3 { font-size: 1rem; font-weight: 600; }
 .btn-fail:hover:not(:disabled) { background: var(--fail); color: #fff; }
 .btn-fail.active { background: var(--fail); color: #fff; }
 
+/* Dependent block — amber: prior failure cascading */
+.btn-dependent { background: rgba(245,158,11,0.12); color: #f59e0b; border-color: rgba(245,158,11,0.3); }
+.btn-dependent:hover:not(:disabled) { background: #f59e0b; color: #fff; }
+.btn-dependent.active { background: #f59e0b; color: #fff; }
+/* Environmental block — orange: setup/hardware/time conditions */
+.btn-environmental { background: rgba(234,88,12,0.12); color: #ea580c; border-color: rgba(234,88,12,0.3); }
+.btn-environmental:hover:not(:disabled) { background: #ea580c; color: #fff; }
+.btn-environmental.active { background: #ea580c; color: #fff; }
+/* Legacy — kept so old sessions render */
 .btn-skip { background: var(--skip-dim); color: var(--skip); border-color: rgba(107,114,128,0.3); }
 .btn-skip:hover:not(:disabled) { background: var(--skip); color: #fff; }
 .btn-skip.active { background: var(--skip); color: #fff; }
@@ -175,6 +184,9 @@ select { cursor: pointer; }
 }
 .badge-pass { background: var(--pass-dim); color: var(--pass); }
 .badge-fail { background: var(--fail-dim); color: var(--fail); }
+.badge-dependent { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.badge-environmental { background: rgba(234,88,12,0.12); color: #ea580c; }
+/* legacy */
 .badge-skip { background: var(--skip-dim); color: var(--skip); }
 .badge-blocked { background: rgba(234,88,12,0.12); color: #ea580c; }
 .badge-pending { background: var(--pending-dim); color: var(--pending); }
