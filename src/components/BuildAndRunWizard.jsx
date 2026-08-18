@@ -25,6 +25,89 @@ const CATEGORY_ICONS = {
 
 const STEPS = ['Intent', 'Product', 'Template', 'Build Plan', 'Environment'];
 
+const PRIORITY_STYLES = {
+  P0: { color: 'var(--fail)',           bg: 'var(--fail-dim,#fee2e2)' },
+  P1: { color: 'var(--warn,#d97706)',   bg: 'var(--warn-dim,#fef3c7)' },
+  P2: { color: 'var(--primary)',        bg: 'var(--primary-dim)' },
+  P3: { color: 'var(--text-muted)',     bg: 'var(--card)' },
+};
+
+function PlanPriorityChip({ value, onClick }) {
+  const s = value ? PRIORITY_STYLES[value] : null;
+  return (
+    <span
+      onClick={onClick}
+      title="Click to change priority"
+      style={{
+        fontSize: 10, fontWeight: 700, borderRadius: 8, padding: '1px 7px', flexShrink: 0,
+        background: s ? s.bg : 'var(--border)',
+        color: s ? s.color : 'var(--text-dim)',
+        cursor: 'pointer', userSelect: 'none',
+      }}
+    >
+      {value || '—'}
+    </span>
+  );
+}
+
+// Priority rules: intent → category → default priority
+// Items with a defaultPriority already set are never downgraded by these rules — only upgraded.
+const INTENT_PRIORITY_RULES = {
+  smoke: {
+    // Smoke: only essentials matter
+    _baseline: 'P0',
+    'Network & Connectivity': 'P1',
+    'Power & Hardware': 'P1',
+    'Video Quality': 'P1',
+    'App & UI': 'P1',
+    _default: 'P3',
+  },
+  intake: {
+    // Intake: broad first look — most things matter
+    _baseline: 'P0',
+    'Network & Connectivity': 'P1',
+    'Power & Hardware': 'P1',
+    'Video Quality': 'P1',
+    'Audio': 'P1',
+    'Motion Detection': 'P1',
+    'App & UI': 'P1',
+    'Interoperability': 'P2',
+    'Recording & Playback': 'P2',
+    'Notifications': 'P2',
+    _default: 'P2',
+  },
+  regression: {
+    // Regression: everything matters, baselines are P0
+    _baseline: 'P0',
+    _default: 'P1',
+  },
+  feature: {
+    // Feature: baseline P0, everything else is lower priority unless already set
+    _baseline: 'P0',
+    _default: 'P3',
+  },
+};
+
+const PRIORITY_ORDER = ['P0', 'P1', 'P2', 'P3'];
+function higherPriority(a, b) {
+  // Returns whichever priority is higher (lower index = higher priority)
+  const ia = PRIORITY_ORDER.indexOf(a ?? 'P3');
+  const ib = PRIORITY_ORDER.indexOf(b ?? 'P3');
+  return ia <= ib ? a : b;
+}
+
+function applyPriorityRules(items, intentId) {
+  const rules = INTENT_PRIORITY_RULES[intentId];
+  if (!rules) return items;
+  return items.map(item => {
+    const isBaseline = (item.tags || []).includes('baseline');
+    const ruleForCat = isBaseline ? rules._baseline : (rules[item.category] ?? rules._default);
+    // Never downgrade a static defaultPriority; take the higher of the two
+    const resolved = higherPriority(item.defaultPriority, ruleForCat);
+    return { ...item, priority: resolved };
+  });
+}
+
 // ── Step progress bar ─────────────────────────────────────────────────────────
 
 function StepBar({ current }) {
@@ -450,7 +533,9 @@ function StepTemplate({ productType, intentId, libraryItems, onSelectPreset, onB
 
 // ── Step 4: Build Plan ────────────────────────────────────────────────────────
 
-function StepBuild({ libraryItems, categories, plan, onPlanChange, productCategory }) {
+const PRIORITY_CYCLE = ['P0', 'P1', 'P2', 'P3', undefined];
+
+function StepBuild({ libraryItems, categories, plan, onPlanChange, productCategory, intentId }) {
   const [expandedCats, setExpandedCats] = useState({});
   const [search, setSearch] = useState('');
   const [showAll, setShowAll] = useState(false);
@@ -462,15 +547,26 @@ function StepBuild({ libraryItems, categories, plan, onPlanChange, productCatego
   }
 
   function addItem(item) {
-    if (!planIds.has(item.id)) onPlanChange([...plan, item]);
+    if (planIds.has(item.id)) return;
+    const [enriched] = applyPriorityRules([item], intentId);
+    onPlanChange([...plan, enriched]);
   }
 
   function removeItem(itemId) {
     onPlanChange(plan.filter(i => i.id !== itemId));
   }
 
+  function cyclePriority(itemId) {
+    onPlanChange(plan.map(i => {
+      if (i.id !== itemId) return i;
+      const cur = PRIORITY_CYCLE.indexOf(i.priority);
+      const next = PRIORITY_CYCLE[(cur + 1) % PRIORITY_CYCLE.length];
+      return { ...i, priority: next };
+    }));
+  }
+
   function addCategory(cat, catItems) {
-    const toAdd = catItems.filter(i => !planIds.has(i.id));
+    const toAdd = applyPriorityRules(catItems.filter(i => !planIds.has(i.id)), intentId);
     onPlanChange([...plan, ...toAdd]);
   }
 
@@ -594,6 +690,12 @@ function StepBuild({ libraryItems, categories, plan, onPlanChange, productCatego
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent, #1A5CF6)', background: 'rgba(26,92,246,0.15)', borderRadius: 10, padding: '1px 8px' }}>
                 {plan.length} test{plan.length !== 1 ? 's' : ''}
               </span>
+              {['P0','P1','P2','P3'].map(p => {
+                const count = plan.filter(i => i.priority === p).length;
+                if (!count) return null;
+                const s = PRIORITY_STYLES[p];
+                return <span key={p} style={{ fontSize: 10, fontWeight: 700, borderRadius: 8, padding: '1px 6px', background: s.bg, color: s.color }}>{p}×{count}</span>;
+              })}
               {plan.length > 0 && (
                 <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)' }} onClick={() => onPlanChange([])}>Clear all</button>
               )}
@@ -615,12 +717,7 @@ function StepBuild({ libraryItems, categories, plan, onPlanChange, productCatego
                   {catItems.map(item => (
                     <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ flex: 1, fontSize: 12 }}>{item.name}</span>
-                      {item.priority && (
-                        <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 8, padding: '1px 6px', flexShrink: 0,
-                          background: item.priority === 'P0' ? 'var(--fail-dim,#fee2e2)' : item.priority === 'P1' ? 'var(--warn-dim,#fef3c7)' : 'var(--primary-dim)',
-                          color: item.priority === 'P0' ? 'var(--fail)' : item.priority === 'P1' ? 'var(--warn,#d97706)' : 'var(--primary)',
-                        }}>{item.priority}</span>
-                      )}
+                      <PlanPriorityChip value={item.priority} onClick={() => cyclePriority(item.id)} />
                       <button type="button" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1 }} onClick={() => removeItem(item.id)}>×</button>
                     </div>
                   ))}
@@ -755,7 +852,7 @@ export default function BuildAndRunWizard({ catalog, onBack, onCreated, currentU
 
   function handleSelectPreset(preset) {
     const presetItems = libraryItems.filter(i => (preset.itemIds || []).includes(i.id));
-    setPlan(presetItems);
+    setPlan(applyPriorityRules(presetItems, intent));
     setStep(3);
   }
 
@@ -886,7 +983,7 @@ export default function BuildAndRunWizard({ catalog, onBack, onCreated, currentU
         {step === 3 && (
           libraryLoading
             ? <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading library…</div>
-            : <StepBuild libraryItems={libraryItems} categories={categories} plan={plan} onPlanChange={setPlan} productCategory={product?.category} />
+            : <StepBuild libraryItems={libraryItems} categories={categories} plan={plan} onPlanChange={setPlan} productCategory={product?.category} intentId={intent} />
         )}
         {step === 4 && <StepEnvironment product={product} env={env} onChange={setEnv} />}
       </div>

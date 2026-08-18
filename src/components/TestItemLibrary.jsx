@@ -107,9 +107,40 @@ function CategoryManager({ categories, onCategoriesChange, onClose }) {
 
 // ── Item Form ─────────────────────────────────────────────────────────────────
 
+const PRIORITY_OPTS = [
+  { value: 'P0', label: 'P0 — Non-negotiable', color: 'var(--fail)', bg: 'var(--fail-dim,#fee2e2)' },
+  { value: 'P1', label: 'P1 — High',            color: 'var(--warn,#d97706)', bg: 'var(--warn-dim,#fef3c7)' },
+  { value: 'P2', label: 'P2 — Standard',         color: 'var(--primary)',     bg: 'var(--primary-dim)' },
+  { value: 'P3', label: 'P3 — Low / Nice-to-have', color: 'var(--text-muted)', bg: 'var(--card)' },
+];
+
+export function PriorityChip({ value, onClick, size = 'sm' }) {
+  const opt = PRIORITY_OPTS.find(o => o.value === value);
+  if (!opt && !onClick) return null;
+  const pad = size === 'sm' ? '1px 6px' : '2px 9px';
+  const fs = size === 'sm' ? 10 : 12;
+  return (
+    <span
+      onClick={onClick}
+      title={onClick ? 'Click to change priority' : undefined}
+      style={{
+        fontSize: fs, fontWeight: 700, borderRadius: 8, padding: pad, flexShrink: 0,
+        background: opt ? opt.bg : 'var(--border)',
+        color: opt ? opt.color : 'var(--text-muted)',
+        cursor: onClick ? 'pointer' : 'default',
+        userSelect: 'none',
+      }}
+    >
+      {value || '—'}
+    </span>
+  );
+}
+
 function ItemForm({ initial, categories, onSave, onCancel, saving }) {
-  const blank = { name: '', category: '', description: '', steps: '', expectedResult: '', tags: '' };
-  const [form, setForm] = useState(initial || blank);
+  const blank = { name: '', category: '', description: '', steps: '', expectedResult: '', tags: '', defaultPriority: '' };
+  const [form, setForm] = useState(initial
+    ? { ...initial, tags: Array.isArray(initial.tags) ? initial.tags.join(', ') : (initial.tags || '') }
+    : blank);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   function handleSubmit(e) {
@@ -119,6 +150,7 @@ function ItemForm({ initial, categories, onSave, onCancel, saving }) {
       ...form,
       name: form.name.trim(),
       tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      defaultPriority: form.defaultPriority || undefined,
     });
   }
 
@@ -136,6 +168,16 @@ function ItemForm({ initial, categories, onSave, onCancel, saving }) {
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
+      </div>
+      <div className="form-group" style={{ margin: 0 }}>
+        <label>Default Priority</label>
+        <select value={form.defaultPriority || ''} onChange={e => set('defaultPriority', e.target.value)}>
+          <option value="">— Context-dependent —</option>
+          {PRIORITY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+          P0 = always required regardless of test type. Leave blank for context-dependent items.
+        </p>
       </div>
       <div className="form-group" style={{ margin: 0 }}>
         <label>Description</label>
@@ -174,8 +216,9 @@ function ItemRow({ item, canEdit, isSuperuser, onEdit, onArchive, onDelete }) {
         onClick={() => setExpanded(e => !e)}
       >
         <span style={{ flex: 1, fontWeight: 500, fontSize: 14 }}>{item.name}</span>
+        {item.defaultPriority && <PriorityChip value={item.defaultPriority} />}
         {(item.tags || []).map(t => (
-          <span key={t} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 10, background: 'var(--accent-subtle, #e8f0fe)', color: 'var(--accent, #1A5CF6)' }}>{t}</span>
+          <span key={t} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 10, background: 'rgba(26,92,246,0.12)', color: 'var(--accent, #1A5CF6)' }}>{t}</span>
         ))}
         {archived && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>archived</span>}
         {item.legacyId && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>legacy</span>}
