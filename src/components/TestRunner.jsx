@@ -463,8 +463,78 @@ function RegressionDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdic
   );
 }
 
+// ── Attempts table ────────────────────────────────────────────────────────────
+
+const ATTEMPT_STATUSES = [
+  { value: 'pass',          label: 'Pass' },
+  { value: 'fail',          label: 'Fail' },
+  { value: 'dependent',     label: 'Dependent' },
+  { value: 'environmental', label: 'Environmental' },
+];
+
+function AttemptsTable({ attempts, onChange }) {
+  function setField(idx, field, value) {
+    const next = attempts.map((a, i) => i === idx ? { ...a, [field]: value } : a);
+    onChange(next);
+  }
+
+  function addAttempt() {
+    onChange([...attempts, { id: crypto.randomUUID(), number: attempts.length + 1, status: 'pending', notes: '' }]);
+  }
+
+  return (
+    <div className="test-detail-section" style={{ marginTop: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <label style={{ margin: 0 }}>Attempts</label>
+        <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={addAttempt}>
+          + Add Attempt
+        </button>
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--border)' }}>
+            <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', width: 72 }}>#</th>
+            <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', width: 160 }}>Result</th>
+            <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, fontSize: 11, color: 'var(--text-muted)' }}>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {attempts.map((a, idx) => (
+            <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              <td style={{ padding: '5px 8px', color: 'var(--text-muted)', fontSize: 12 }}>
+                #{a.number}
+              </td>
+              <td style={{ padding: '5px 8px' }}>
+                <select
+                  value={a.status}
+                  onChange={e => setField(idx, 'status', e.target.value)}
+                  style={{ fontSize: 12, width: '100%' }}
+                >
+                  <option value="pending">— Pending —</option>
+                  {ATTEMPT_STATUSES.map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </td>
+              <td style={{ padding: '5px 8px' }}>
+                <input
+                  type="text"
+                  value={a.notes}
+                  onChange={e => setField(idx, 'notes', e.target.value)}
+                  placeholder="Optional notes…"
+                  style={{ fontSize: 12, width: '100%' }}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // E2E / Feature detail panel
-function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, type, appConfigName, onEvidenceChange, onExtraTestsChange, onDelete, onRenameTitle }) {
+function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict, onAttemptsChange, type, appConfigName, onEvidenceChange, onExtraTestsChange, onDelete, onRenameTitle }) {
   return (
     <>
       <div className="test-detail-content">
@@ -525,8 +595,16 @@ function StandardDetail({ test, testNote, onNotesChange, onNotesBlur, onVerdict,
           />
         </div>
 
+        <AttemptsTable
+          attempts={test.attempts || []}
+          onChange={onAttemptsChange}
+        />
+
         <EvidenceFields test={test} onEvidenceChange={onEvidenceChange} />
 
+        <div style={{ marginTop: 16, marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Final Verdict</span>
+        </div>
         <div className="verdict-buttons">
           <button
             className={`btn btn-pass ${test.status === 'pass' ? 'active' : ''}`}
@@ -673,13 +751,23 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
       return;
     }
     const testNotes = notes[selectedTestId] ?? selectedTest?.notes ?? '';
-    saveTestUpdate(selectedTestId, { status, notes: testNotes });
+    const existingAttempts = selectedTest?.attempts || [];
+    // Auto-seed Attempt 1 when final verdict is set and no attempts recorded yet
+    const attempts = existingAttempts.length === 0
+      ? [{ id: crypto.randomUUID(), number: 1, status, notes: testNotes }]
+      : existingAttempts;
+    saveTestUpdate(selectedTestId, { status, notes: testNotes, attempts });
     advanceToNextTest();
   }
 
   function handleFailJustMark() {
     const testNotes = notes[failPopup.testId] ?? localTestCases.find(t => t.id === failPopup.testId)?.notes ?? '';
-    saveTestUpdate(failPopup.testId, { status: 'fail', notes: testNotes });
+    const tc = localTestCases.find(t => t.id === failPopup.testId);
+    const existingAttempts = tc?.attempts || [];
+    const attempts = existingAttempts.length === 0
+      ? [{ id: crypto.randomUUID(), number: 1, status: 'fail', notes: testNotes }]
+      : existingAttempts;
+    saveTestUpdate(failPopup.testId, { status: 'fail', notes: testNotes, attempts });
     setFailPopup(null);
     advanceToNextTest();
   }
@@ -914,6 +1002,9 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                       {sessionType === 'e2e' && t.area && <AreaBadge area={t.area} />}
                       {(sessionType === 'e2e' || sessionType === 'custom') && t.priority && <PriorityBadge priority={t.priority} />}
                       {sessionType === 'regression' && t.regressionRisk && <RegressionRiskBadge risk={t.regressionRisk} />}
+                      {t.attempts?.length > 1 && (
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'rgba(255,255,255,0.07)', borderRadius: 4, padding: '1px 5px' }}>×{t.attempts.length}</span>
+                      )}
                       {t.status === 'na' || (t.notAvailableInApp && t.status === 'pending')
                         ? <span className="badge badge-na">N/A</span>
                         : <span className={badgeClass(t.status)}>{statusLabel(t.status)}</span>
@@ -980,6 +1071,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
                 onNotesChange={val => setNotes(n => ({ ...n, [selectedTestId]: val }))}
                 onNotesBlur={handleNotesBlur}
                 onVerdict={handleVerdict}
+                onAttemptsChange={attempts => saveTestUpdate(selectedTestId, { attempts })}
                 type={sessionType}
                 appConfigName={session.appConfigName}
                 onEvidenceChange={updates => handleEvidenceChange(selectedTestId, updates)}
@@ -1008,7 +1100,7 @@ export default function TestRunner({ session, onUpdate, onEnd, onExit, allSessio
 
             {failPopupMode === null && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }} onClick={() => { setFailPopup(null); setShowIssueLogger(true); const testNotes = notes[failPopup.testId] ?? localTestCases.find(t => t.id === failPopup.testId)?.notes ?? ''; saveTestUpdate(failPopup.testId, { status: 'fail', notes: testNotes }); advanceToNextTest(); }}>
+                <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }} onClick={() => { setFailPopup(null); setShowIssueLogger(true); const testNotes = notes[failPopup.testId] ?? localTestCases.find(t => t.id === failPopup.testId)?.notes ?? ''; const _tc = localTestCases.find(t => t.id === failPopup.testId); const _ea = _tc?.attempts || []; const _attempts = _ea.length === 0 ? [{ id: crypto.randomUUID(), number: 1, status: 'fail', notes: testNotes }] : _ea; saveTestUpdate(failPopup.testId, { status: 'fail', notes: testNotes, attempts: _attempts }); advanceToNextTest(); }}>
                   🐛 Log as New Issue
                 </button>
                 <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }} onClick={handleFailChooseExisting}>
