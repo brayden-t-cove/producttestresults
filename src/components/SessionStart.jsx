@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { CATEGORY_LABELS, CAPABILITY_GROUPS } from '../data/capabilities.js';
 import { BASELINE_TESTS, TEST_LIBRARY } from '../data/testLibrary.js';
 import { createSession, updateSession, getFirmwares, addFirmware, listIssuesForProduct } from '../lib/api.js';
-import CustomSessionBuilder from './CustomSessionBuilder.jsx';
 
 const CATEGORY_ICONS = {
   hub: '🏠',
@@ -12,23 +11,16 @@ const CATEGORY_ICONS = {
   app: '📱',
 };
 
-const SESSION_TYPES = [
-  { id: 'buffet',       label: 'Build & Run',        icon: '🔨', description: 'Define your test plan from the shared library, then run it — no irrelevant tests', external: true, highlight: true },
-  { id: 'e2e',          label: 'E2E',                icon: '🔄', description: 'Full end-to-end product testing across all capabilities' },
-  { id: 'regression',   label: 'Regression',         icon: '🔁', description: 'Verify previously fixed issues remain resolved after a new build' },
-  { id: 'feature',      label: 'Feature / Targeted', icon: '🎯', description: 'Test a specific feature or acceptance criteria' },
-  { id: 'reproduction', label: 'Issue Reproduction',  icon: '🐛', description: 'Reproduce and document a reported issue with full traceability' },
-  { id: 'exploratory',  label: 'Exploratory',         icon: '🔍', description: 'Open-ended structured exploration with notes per category', external: true },
+// Active session types — 4 distinct modes
+const PRIMARY_TYPE = { id: 'buffet', label: 'Build & Run', icon: '🔨', description: 'Define your test plan from the shared library, then run it. No irrelevant tests, no skipping.', external: true };
+const SECONDARY_TYPES = [
+  { id: 'exploratory',  label: 'Exploratory',        icon: '🔍', description: 'Open-ended structured exploration with notes per category', external: true },
   { id: 'comparison',   label: 'Comparison',          icon: '⚖️', description: 'Side-by-side evaluation of two or more products', external: true },
-  { id: 'custom',       label: 'Custom',              icon: '📋', description: 'Import a test sheet or build a custom checklist from scratch' },
+  { id: 'reproduction', label: 'Issue Reproduction',  icon: '🐛', description: 'Reproduce and document a specific reported issue with full traceability' },
 ];
 
 const SESSION_TYPE_LABELS = {
-  e2e: 'E2E Session',
-  regression: 'Regression Session',
-  feature: 'Feature / Targeted Session',
   reproduction: 'Issue Reproduction Session',
-  custom: 'Custom Session',
 };
 
 function getCapabilityPosition(category, capabilityId) {
@@ -117,9 +109,6 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
   // --- Issue Reproduction ---
   const [documentedIssues, setDocumentedIssues] = useState([]);
   const [selectedIssueId, setSelectedIssueId] = useState('');
-
-  // --- Custom session ---
-  const [customTestCases, setCustomTestCases] = useState(null);
 
   // --- Products ---
   const [selectedProducts, setSelectedProducts] = useState([]);
@@ -248,7 +237,6 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     e.preventDefault();
     if (!sessionType) { setError('Please select a session type.'); return; }
     if (selectedProducts.length === 0) { setError('Please select at least one product.'); return; }
-    if (sessionType === 'custom' && !customTestCases?.length) { setError('Please add at least one test case before starting.'); return; }
     setError('');
     setLoading(true);
     setLoadingMsg('Creating session...');
@@ -305,9 +293,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
       });
 
       let testCases;
-      if (sessionType === 'custom') {
-        testCases = customTestCases.map(tc => ({ ...tc, id: crypto.randomUUID(), templateId: tc.templateId || tc.id, status: tc.status || 'pending' }));
-      } else if (isMulti) {
+      if (isMulti) {
         const allTestCases = [];
         for (let i = 0; i < selectedProducts.length; i++) {
           const { product, appConfig } = selectedProducts[i];
@@ -341,11 +327,7 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
     );
   }
 
-  const showForm = sessionType && !SESSION_TYPES.find(t => t.id === sessionType)?.external;
-  const [showLegacy, setShowLegacy] = useState(false);
-
-  const LEGACY_TYPES = SESSION_TYPES.filter(t => t.id !== 'buffet');
-  const SPECIAL_TYPES = ['exploratory', 'comparison'];
+  const showForm = sessionType === 'reproduction';
 
   return (
     <div className="session-start">
@@ -380,19 +362,26 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
         <span style={{ fontSize: 20, color: 'var(--accent, #1A5CF6)', fontWeight: 700 }}>→</span>
       </div>
 
-      {/* Secondary — Exploratory & Comparison (always visible) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-        {SESSION_TYPES.filter(t => SPECIAL_TYPES.includes(t.id)).map(st => (
+      {/* Secondary — Exploratory, Comparison, Issue Reproduction */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 10 }}>
+        {SECONDARY_TYPES.map(st => (
           <div
             key={st.id}
             onClick={() => {
-              if (st.id === 'exploratory' && onStartExploratory) onStartExploratory();
-              if (st.id === 'comparison' && onStartComparison) onStartComparison();
+              if (st.external) {
+                if (st.id === 'exploratory' && onStartExploratory) onStartExploratory();
+                if (st.id === 'comparison' && onStartComparison) onStartComparison();
+                return;
+              }
+              setSessionType(st.id === sessionType ? null : st.id);
+              setError('');
             }}
             style={{
               display: 'flex', alignItems: 'flex-start', gap: 12,
-              border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px',
-              background: 'var(--surface)', cursor: 'pointer',
+              border: `1px solid ${sessionType === st.id ? 'var(--accent, #1A5CF6)' : 'var(--border)'}`,
+              borderRadius: 10, padding: '14px 16px',
+              background: sessionType === st.id ? 'rgba(26,92,246,0.10)' : 'var(--surface)',
+              cursor: 'pointer',
             }}
           >
             <span style={{ fontSize: 22 }}>{st.icon}</span>
@@ -403,41 +392,6 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
           </div>
         ))}
       </div>
-
-      {/* Legacy toggle */}
-      <button
-        type="button"
-        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)', padding: '6px 0', display: 'flex', alignItems: 'center', gap: 6, marginBottom: showLegacy ? 10 : 0 }}
-        onClick={() => setShowLegacy(v => !v)}
-      >
-        <span style={{ fontSize: 10 }}>{showLegacy ? '▾' : '▸'}</span>
-        {showLegacy ? 'Hide' : 'Show'} legacy session types
-      </button>
-
-      {showLegacy && (
-        <div className="session-type-cards" style={{ opacity: 0.75 }}>
-          {LEGACY_TYPES.filter(t => !SPECIAL_TYPES.includes(t.id)).map(st => (
-            <div
-              key={st.id}
-              className={`session-type-card ${sessionType === st.id ? 'selected' : ''}`}
-              onClick={() => {
-                if (st.external) {
-                  if (st.id === 'exploratory' && onStartExploratory) onStartExploratory();
-                  if (st.id === 'comparison' && onStartComparison) onStartComparison();
-                  return;
-                }
-                setSessionType(st.id);
-                setError('');
-              }}
-              style={{ cursor: 'pointer', position: 'relative' }}
-            >
-              <span className="session-type-icon">{st.icon}</span>
-              <span className="session-type-label">{st.label}</span>
-              <span className="session-type-desc">{st.description}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {showForm && (
         <form onSubmit={handleSubmit}>
@@ -556,17 +510,6 @@ export default function SessionStart({ catalog, onBack, onCreated, onGoToCatalog
               rows={3}
             />
           </div>
-
-          {/* Custom test case builder */}
-          {sessionType === 'custom' && (
-            <div className="form-group">
-              <label>Test Cases</label>
-              <CustomSessionBuilder
-                onTestCasesReady={cases => setCustomTestCases(cases)}
-                onClear={() => setCustomTestCases(null)}
-              />
-            </div>
-          )}
 
           {/* Product Picker */}
           <div className="form-group">

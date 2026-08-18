@@ -804,8 +804,9 @@ function LegacySessionsTab() {
   const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
+    const ACTIVE_TYPES = new Set(['buffet', 'build-and-run', 'exploratory', 'comparison', 'reproduction']);
     listSessions()
-      .then(all => setSessions(all.filter(s => s.type !== 'buffet')))
+      .then(all => setSessions(all.filter(s => !ACTIVE_TYPES.has(s.type))))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -817,7 +818,7 @@ function LegacySessionsTab() {
       <div style={{ marginBottom: 16 }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>Legacy Sessions</h3>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-          Read-only archive of all sessions created before the buffet system. {sessions.length} session{sessions.length !== 1 ? 's' : ''}.
+          Read-only archive of sessions from retired session types (E2E, Regression, Feature, Custom). {sessions.length} session{sessions.length !== 1 ? 's' : ''}.
         </p>
       </div>
       {sessions.length === 0 ? (
