@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
-  listTestItems, getTestItemCategories, listTestPlanPresets,
+  listTestItems, getTestItemCategories, listTestPlanPresets, createTestPlanPreset,
   createSession, updateSession, getFirmwares,
 } from '../lib/api.js';
 import { CATEGORY_LABELS } from '../data/capabilities.js';
@@ -158,11 +159,202 @@ function StepProduct({ catalog, value, onChange }) {
   );
 }
 
+// ── Import helpers (shared with CustomSessionBuilder) ─────────────────────────
+
+const IMPORT_COLUMN_ALIASES = {
+  id:             ['id', 'test id', 'test_id', 'case id', 'no', '#'],
+  title:          ['test item', 'title', 'name', 'test name', 'test case', 'case', 'description', 'summary', 'item'],
+  expectedResult: ['expected result', 'expected', 'expected behavior', 'acceptance criteria', 'criteria'],
+  priority:       ['priority', 'p', 'pri', 'severity', 'level', 'rank'],
+  notes:          ['notes', 'note', 'comments', 'remarks'],
+  category:       ['category', 'cat', 'group', 'section', 'area'],
+};
+const PRIORITY_NORM = { p0: 'P0', critical: 'P0', p1: 'P1', high: 'P1', p2: 'P2', medium: 'P2', p3: 'P3', low: 'P3' };
+
+function xlsxAutoMap(headers) {
+  const mapping = {};
+  headers.forEach((h, i) => {
+    const n = h.toLowerCase().trim();
+    for (const [field, aliases] of Object.entries(IMPORT_COLUMN_ALIASES)) {
+      if (!mapping[field] && aliases.some(a => n === a || n.includes(a))) { mapping[field] = i; break; }
+    }
+  });
+  return mapping;
+}
+
+function xlsxParseFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+        if (rows.length < 2) { reject(new Error('File needs a header row and at least one data row.')); return; }
+        resolve({ headers: rows[0].map(h => String(h).trim()), dataRows: rows.slice(1).filter(r => r.some(c => String(c).trim())) });
+      } catch { reject(new Error('Could not parse file — make sure it is .xlsx, .xls, or .csv.')); }
+    };
+    reader.onerror = () => reject(new Error('Failed to read file.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function xlsxBuildItems(headers, dataRows, mapping) {
+  return dataRows.map((row, i) => {
+    const get = f => mapping[f] !== undefined ? String(row[mapping[f]] ?? '').trim() : '';
+    const rawPri = get('priority').toLowerCase();
+    const priority = PRIORITY_NORM[rawPri] || (get('priority') || undefined);
+    return {
+      id: crypto.randomUUID(),
+      name: get('title') || `Test ${i + 1}`,
+      category: get('category') || 'Imported',
+      description: get('expectedResult'),
+      expectedResult: get('expectedResult'),
+      notes: get('notes'),
+      priority,
+      tags: ['imported'],
+      status: 'pending',
+      _importedRow: i,
+    };
+  });
+}
+
+// ── Import from File sub-component (used inside StepTemplate) ─────────────────
+
+function ImportFromFile({ onImported }) {
+  const [subStep, setSubStep] = useState('upload'); // upload | mapping | preview
+  const [headers, setHeaders] = useState([]);
+  const [dataRows, setDataRows] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [fileName, setFileName] = useState('');
+  const [error, setError] = useState('');
+  const fileRef = useRef(null);
+
+  const FIELDS = [
+    { key: 'title',          label: 'Test Item / Title',  required: true },
+    { key: 'expectedResult', label: 'Expected Result',    required: false },
+    { key: 'priority',       label: 'Priority',           required: false },
+    { key: 'category',       label: 'Category / Group',   required: false },
+    { key: 'notes',          label: 'Notes',              required: false },
+  ];
+
+  async function handleFile(file) {
+    if (!file) return;
+    setError('');
+    setFileName(file.name);
+    try {
+      const { headers: h, dataRows: d } = await xlsxParseFile(file);
+      setHeaders(h); setDataRows(d); setMapping(xlsxAutoMap(h)); setSubStep('mapping');
+    } catch (err) { setError(err.message); }
+  }
+
+  const preview = subStep === 'preview' ? xlsxBuildItems(headers, dataRows, mapping) : [];
+  const p0 = preview.filter(t => t.priority === 'P0').length;
+  const p1 = preview.filter(t => t.priority === 'P1').length;
+  const p2 = preview.filter(t => t.priority === 'P2').length;
+
+  if (subStep === 'upload') return (
+    <div>
+      <input ref={fileRef} type="file" accept=".xlsx,.csv,.xls" style={{ display: 'none' }}
+        onChange={e => { handleFile(e.target.files[0]); e.target.value = ''; }} />
+      <div
+        style={{ border: '2px dashed var(--border)', borderRadius: 8, padding: '32px 20px', textAlign: 'center', cursor: 'pointer' }}
+        onClick={() => fileRef.current?.click()}
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); }}
+      >
+        <div style={{ fontSize: 32, marginBottom: 8 }}>📂</div>
+        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Drop your file here or click to browse</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Supports .xlsx, .xls, .csv</div>
+      </div>
+      {error && <div className="error-msg" style={{ marginTop: 8 }}>{error}</div>}
+    </div>
+  );
+
+  if (subStep === 'mapping') return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>📄 {fileName} · {dataRows.length} rows</span>
+        <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setSubStep('upload')}>← Change file</button>
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+        Column Mapping
+        <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6, fontSize: 12 }}>Auto-detected — adjust if needed</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+        {FIELDS.map(f => (
+          <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 160, fontSize: 13, fontWeight: f.required ? 600 : 400 }}>
+              {f.label}{f.required && <span style={{ color: 'var(--fail)', marginLeft: 2 }}>*</span>}
+            </div>
+            <select value={mapping[f.key] !== undefined ? mapping[f.key] : ''} onChange={e => {
+              const next = { ...mapping };
+              if (e.target.value === '') delete next[f.key]; else next[f.key] = parseInt(e.target.value);
+              setMapping(next);
+            }} style={{ flex: 1, fontSize: 13 }}>
+              <option value="">— not mapped —</option>
+              {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
+            </select>
+            {mapping[f.key] !== undefined && <span style={{ fontSize: 11, color: 'var(--pass)' }}>✓</span>}
+          </div>
+        ))}
+      </div>
+      {/* Raw preview */}
+      <div style={{ background: 'var(--card)', borderRadius: 6, border: '1px solid var(--border)', overflowX: 'auto', marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '5px 10px', borderBottom: '1px solid var(--border)' }}>First 3 rows</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead><tr>{headers.map((h, i) => <th key={i} style={{ padding: '4px 8px', textAlign: 'left', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>{h}</th>)}</tr></thead>
+          <tbody>{dataRows.slice(0, 3).map((row, ri) => <tr key={ri}>{headers.map((_, ci) => <td key={ci} style={{ padding: '3px 8px', borderBottom: '1px solid var(--border)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(row[ci] ?? '').slice(0, 80)}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+      {error && <div className="error-msg" style={{ marginBottom: 8 }}>{error}</div>}
+      <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => {
+        if (mapping.title === undefined) { setError('Map at least the "Test Item / Title" column.'); return; }
+        setError(''); setSubStep('preview');
+      }}>Preview {dataRows.length} Test Cases →</button>
+    </div>
+  );
+
+  // Preview step
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>{preview.length} test cases ready</span>
+        {p0 > 0 && <span style={{ fontSize: 11, background: 'var(--fail-dim,#fee2e2)', color: 'var(--fail)', borderRadius: 10, padding: '2px 8px', fontWeight: 700 }}>P0 ×{p0}</span>}
+        {p1 > 0 && <span style={{ fontSize: 11, background: 'var(--warn-dim,#fef3c7)', color: 'var(--warn,#d97706)', borderRadius: 10, padding: '2px 8px', fontWeight: 700 }}>P1 ×{p1}</span>}
+        {p2 > 0 && <span style={{ fontSize: 11, background: 'var(--primary-dim)', color: 'var(--primary)', borderRadius: 10, padding: '2px 8px', fontWeight: 700 }}>P2 ×{p2}</span>}
+        <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', fontSize: 12 }} onClick={() => setSubStep('mapping')}>← Edit mapping</button>
+      </div>
+      <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6, marginBottom: 14 }}>
+        {preview.map((item, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', borderBottom: i < preview.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0, marginTop: 2, minWidth: 28 }}>{i + 1}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600 }}>{item.name}</div>
+              {item.category !== 'Imported' && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.category}</div>}
+              {item.expectedResult && <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>{item.expectedResult.slice(0, 120)}{item.expectedResult.length > 120 ? '…' : ''}</div>}
+            </div>
+            {item.priority && (
+              <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 10, padding: '2px 8px', flexShrink: 0,
+                background: item.priority === 'P0' ? 'var(--fail-dim,#fee2e2)' : item.priority === 'P1' ? 'var(--warn-dim,#fef3c7)' : 'var(--primary-dim)',
+                color: item.priority === 'P0' ? 'var(--fail)' : item.priority === 'P1' ? 'var(--warn,#d97706)' : 'var(--primary)',
+              }}>{item.priority}</span>
+            )}
+          </div>
+        ))}
+      </div>
+      <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => onImported(preview)}>
+        Use These {preview.length} Test Cases →
+      </button>
+    </div>
+  );
+}
+
 // ── Step 3: Template ──────────────────────────────────────────────────────────
 
-function StepTemplate({ productType, intentId, libraryItems, onSelectPreset, onBlank }) {
+function StepTemplate({ productType, intentId, libraryItems, onSelectPreset, onBlank, onImport }) {
   const [presets, setPresets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     listTestPlanPresets(productType)
@@ -172,6 +364,16 @@ function StepTemplate({ productType, intentId, libraryItems, onSelectPreset, onB
   }, [productType]);
 
   const filtered = intentId ? presets.filter(p => !p.intentType || p.intentType === intentId) : presets;
+
+  if (showImport) return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => setShowImport(false)}>← Back</button>
+        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Import from File</h3>
+      </div>
+      <ImportFromFile onImported={onImport} />
+    </div>
+  );
 
   return (
     <div>
@@ -210,10 +412,25 @@ function StepTemplate({ productType, intentId, libraryItems, onSelectPreset, onB
 
           {filtered.length === 0 && (
             <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 0' }}>
-              No templates available for this product type yet. Start blank and save it as a template later.
+              No templates available for this product type yet.
             </div>
           )}
 
+          {/* Import from file */}
+          <button
+            type="button"
+            onClick={() => setShowImport(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 14, border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', background: 'var(--surface)', textAlign: 'left', cursor: 'pointer' }}
+          >
+            <span style={{ fontSize: 22 }}>📂</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>Import from File</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Load a sign-off list or test sheet from .xlsx, .xls, or .csv</div>
+            </div>
+            <span style={{ fontSize: 18, color: 'var(--text-muted)' }}>→</span>
+          </button>
+
+          {/* Start blank */}
           <button
             type="button"
             onClick={onBlank}
@@ -398,6 +615,12 @@ function StepBuild({ libraryItems, categories, plan, onPlanChange, productCatego
                   {catItems.map(item => (
                     <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ flex: 1, fontSize: 12 }}>{item.name}</span>
+                      {item.priority && (
+                        <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 8, padding: '1px 6px', flexShrink: 0,
+                          background: item.priority === 'P0' ? 'var(--fail-dim,#fee2e2)' : item.priority === 'P1' ? 'var(--warn-dim,#fef3c7)' : 'var(--primary-dim)',
+                          color: item.priority === 'P0' ? 'var(--fail)' : item.priority === 'P1' ? 'var(--warn,#d97706)' : 'var(--primary)',
+                        }}>{item.priority}</span>
+                      )}
                       <button type="button" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1 }} onClick={() => removeItem(item.id)}>×</button>
                     </div>
                   ))}
@@ -500,6 +723,10 @@ export default function BuildAndRunWizard({ catalog, onBack, onCreated, currentU
   const [libraryLoading, setLibraryLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // Import-then-save-as-preset flow
+  const [savePresetModal, setSavePresetModal] = useState(null); // { items } | null
+  const [presetName, setPresetName] = useState('');
+  const [savingPreset, setSavingPreset] = useState(false);
 
   useEffect(() => {
     Promise.all([listTestItems({ status: 'active' }), getTestItemCategories()])
@@ -537,6 +764,33 @@ export default function BuildAndRunWizard({ catalog, onBack, onCreated, currentU
     setStep(3);
   }
 
+  function handleImport(items) {
+    // Prompt to save as preset before continuing to build step
+    const suggestedName = product ? `${product.name} — ${INTENTS.find(i => i.id === intent)?.label || ''} Sign-Off` : 'Imported Plan';
+    setPresetName(suggestedName);
+    setSavePresetModal({ items });
+  }
+
+  async function handleSavePreset(save) {
+    const items = savePresetModal.items;
+    if (save && presetName.trim()) {
+      setSavingPreset(true);
+      try {
+        await createTestPlanPreset({
+          name: presetName.trim(),
+          productType: product?.category || '',
+          intentType: intent || '',
+          description: `Imported sign-off list · ${items.length} items`,
+          itemIds: [], // imported items aren't in the library; store empty for now
+        });
+      } catch { /* non-fatal */ }
+      setSavingPreset(false);
+    }
+    setSavePresetModal(null);
+    setPlan(items);
+    setStep(3);
+  }
+
   async function handleSubmit() {
     setError('');
     if (!env.name?.trim()) { setError('Plan name is required.'); return; }
@@ -551,8 +805,9 @@ export default function BuildAndRunWizard({ catalog, onBack, onCreated, currentU
         steps: item.steps || '',
         category: item.category,
         tags: item.tags || [],
+        priority: item.priority || undefined,
         status: 'pending',
-        notes: '',
+        notes: item.notes || '',
         testNumber: String(idx + 1),
         evidenceUrl: '',
       }));
@@ -625,6 +880,7 @@ export default function BuildAndRunWizard({ catalog, onBack, onCreated, currentU
                 libraryItems={libraryItems}
                 onSelectPreset={handleSelectPreset}
                 onBlank={handleBlank}
+                onImport={handleImport}
               />
         )}
         {step === 3 && (
@@ -634,6 +890,36 @@ export default function BuildAndRunWizard({ catalog, onBack, onCreated, currentU
         )}
         {step === 4 && <StepEnvironment product={product} env={env} onChange={setEnv} />}
       </div>
+
+      {/* Save as preset modal */}
+      {savePresetModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 28, width: 440, maxWidth: '90vw' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700 }}>Save as a template?</h3>
+            <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Save this imported list as a Plan Template so anyone can start from it next time — without re-uploading the file.
+            </p>
+            <div className="form-group" style={{ margin: '0 0 20px' }}>
+              <label>Template name</label>
+              <input
+                type="text"
+                value={presetName}
+                onChange={e => setPresetName(e.target.value)}
+                placeholder="e.g. OmniCam 4K Release Gate"
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => handleSavePreset(false)} disabled={savingPreset}>
+                Skip, just continue
+              </button>
+              <button className="btn btn-primary" onClick={() => handleSavePreset(true)} disabled={savingPreset || !presetName.trim()}>
+                {savingPreset ? 'Saving…' : 'Save Template & Continue →'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer nav */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
