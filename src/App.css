@@ -585,6 +585,66 @@ select { cursor: pointer; }
 .login-btn:hover { opacity: 0.9; transform: translateY(-1px); }
 .login-btn-google    { background: #fff; color: #3c4043; }
 .login-btn-microsoft { background: #2a2a2a; color: #fff; border-color: #444; }
+.login-btn-email     { background: transparent; color: var(--text); border-color: var(--border); }
+.login-btn-email:hover { background: rgba(255,255,255,0.05); }
+.login-btn-submit    { background: var(--accent); color: #fff; border-color: var(--accent); justify-content: center; }
+.login-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.login-email-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.login-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.login-field input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.login-field input:focus { border-color: var(--accent); }
+.login-field input::placeholder { color: var(--text-muted); }
+
+.login-back-link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+.login-back-link:hover { color: var(--text); }
 
 .login-footer {
   font-size: 11px;

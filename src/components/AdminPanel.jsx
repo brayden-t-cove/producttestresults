@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  adminGetUsers, adminPatchUser, adminCreateUser, adminDeleteUser,
+  adminGetUsers, adminPatchUser, adminCreateUser, adminDeleteUser, adminSetPassword,
   adminGetDomains, adminCreateDomain, adminDeleteDomain,
   adminGetDomainRequests, adminApproveDomainRequest, adminDenyDomainRequest,
   adminGetRoleDefaults, adminSaveRoleDefaults,
@@ -76,6 +76,15 @@ export default function AdminPanel({ currentUser, onBack }) {
       await adminDeleteUser(userId);
       setUsers(prev => prev.filter(u => u.id !== userId));
     } catch (e) { setError(e.message); }
+  }
+
+  async function handleSetPassword(userId) {
+    const pw = prompt('Set a new password for this user (min 8 characters):');
+    if (!pw) return;
+    try {
+      await adminSetPassword(userId, pw);
+      alert('Password updated.');
+    } catch (e) { alert(e.message); }
   }
 
   async function handleRoleChange(userId, role) {
@@ -305,6 +314,7 @@ export default function AdminPanel({ currentUser, onBack }) {
                         <button className="btn btn-ghost btn-sm" onClick={() => setExpandedUser(expandedUser === u.id ? null : u.id)}>
                           {expandedUser === u.id ? 'Close' : 'Override'}
                         </button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleSetPassword(u.id)}>Set Password</button>
                         {u.email !== currentUser.email && (
                           <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)' }} onClick={() => handleDeleteUser(u.id)}>Remove</button>
                         )}

@@ -35,6 +35,16 @@ export async function adminCreateUser(data) {
   return res.json();
 }
 
+export async function adminSetPassword(id, password) {
+  const res = await fetch(`/api/admin/users/${id}/set-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to set password'); }
+  return res.json();
+}
+
 export async function adminDeleteUser(id) {
   const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to delete user'); }

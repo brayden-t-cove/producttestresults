@@ -5,6 +5,10 @@ const LOGO_URL = 'https://lh3.googleusercontent.com/d/1z-qNySTnx6Fo9EnmSf0WBsWSM
 
 export default function LoginPage({ providers = {} }) {
   const [authError, setAuthError] = useState('');
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -16,6 +20,31 @@ export default function LoginPage({ providers = {} }) {
     }
     if (err) window.history.replaceState({}, '', '/');
   }, []);
+
+  async function handleEmailLogin(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    setAuthError('');
+    try {
+      const res = await fetch('/auth/local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (res.ok) {
+        window.location.href = '/';
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setAuthError(data.error || 'Invalid email or password.');
+      }
+    } catch {
+      setAuthError('Could not reach the server. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const hasOAuth = providers.google !== false || providers.microsoft;
 
   return (
     <div className="login-page">
@@ -42,7 +71,7 @@ export default function LoginPage({ providers = {} }) {
         </div>
 
         <h1 className="login-title">Welcome back</h1>
-        <p className="login-subtitle">Sign in with your work account to continue.</p>
+        <p className="login-subtitle">Sign in to continue.</p>
 
         {authError && (
           <div className="login-error">{authError}</div>
@@ -74,8 +103,72 @@ export default function LoginPage({ providers = {} }) {
           )}
         </div>
 
+        {hasOAuth && providers.local && (
+          <div className="login-divider">
+            <span>or</span>
+          </div>
+        )}
+
+        {providers.local && !showEmailForm && (
+          <button
+            className="login-btn login-btn-email"
+            onClick={() => setShowEmailForm(true)}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            </svg>
+            Sign in with email
+          </button>
+        )}
+
+        {providers.local && showEmailForm && (
+          <form className="login-email-form" onSubmit={handleEmailLogin}>
+            <div className="login-field">
+              <label htmlFor="login-email">Email</label>
+              <input
+                id="login-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+            <div className="login-field">
+              <label htmlFor="login-password">Password</label>
+              <input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            <button
+              type="submit"
+              className="login-btn login-btn-submit"
+              disabled={submitting}
+            >
+              {submitting ? 'Signing in…' : 'Sign in'}
+            </button>
+            {hasOAuth && (
+              <button
+                type="button"
+                className="login-back-link"
+                onClick={() => { setShowEmailForm(false); setAuthError(''); }}
+              >
+                ← Back to other sign-in options
+              </button>
+            )}
+          </form>
+        )}
+
         <p className="login-footer">
-          Access is restricted to authorized work domains. If your domain isn't recognized, your sign-in attempt will be submitted for admin review.
+          Access is restricted to authorized accounts. Contact your admin if you need access.
         </p>
       </div>
     </div>

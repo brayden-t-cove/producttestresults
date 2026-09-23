@@ -14,6 +14,7 @@ import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
+import { Strategy as LocalStrategy } from 'passport-local';
 import connectPgSimple from 'connect-pg-simple';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
 import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, projects, testItems, testPlanPresets, getPool } from './lib/storage.js';
@@ -23,6 +24,7 @@ import {
   createPreregisteredUser, deleteUser,
   getAllDomains, createDomain, deleteDomain,
   getDomainRequests, approveDomainRequest, denyDomainRequest,
+  findUserByEmail, verifyPassword, setUserPassword,
 } from './lib/auth.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -139,6 +141,16 @@ if (MICROSOFT_ENABLED) {
   }));
 }
 
+passport.use(new LocalStrategy({ usernameField: 'email' }, async (email, password, done) => {
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) return done(null, false, { message: 'Invalid email or password' });
+    const ok = await verifyPassword(user, password);
+    if (!ok) return done(null, false, { message: 'Invalid email or password' });
+    return done(null, user);
+  } catch (e) { done(e); }
+}));
+
 // ── Auth middleware helpers ────────────────────────────────────────────────────
 
 function requireAuth(req, res, next) {
@@ -170,7 +182,7 @@ function entityFilter(req) {
 // ── Auth routes ───────────────────────────────────────────────────────────────
 
 app.get('/api/me', (req, res) => {
-  const providers = { google: GOOGLE_ENABLED, microsoft: MICROSOFT_ENABLED };
+  const providers = { google: GOOGLE_ENABLED, microsoft: MICROSOFT_ENABLED, local: true };
   if (!AUTH_ENABLED) return res.json({ user: null, authEnabled: false, providers });
   if (!req.isAuthenticated()) return res.json({ user: null, authEnabled: true, providers });
   const { id, email, name, avatar, role, entity } = req.user;
@@ -196,6 +208,18 @@ if (MICROSOFT_ENABLED) {
 } else {
   app.get('/auth/microsoft', (req, res) => res.redirect('/?auth_error=provider_not_configured'));
 }
+
+app.post('/auth/local', (req, res, next) => {
+  passport.authenticate('local', (err, user, info) => {
+    if (err) return next(err);
+    if (!user) return res.status(401).json({ error: info?.message || 'Invalid email or password' });
+    req.logIn(user, err2 => {
+      if (err2) return next(err2);
+      const { id, email, name, avatar, role, entity } = user;
+      res.json({ user: { id, email, name, avatar, role, entity } });
+    });
+  })(req, res, next);
+});
 
 app.post('/auth/logout', (req, res, next) => {
   req.logout(err => {
@@ -228,6 +252,16 @@ app.post('/api/admin/users', requireSuperuser, async (req, res) => {
     if (!email) return res.status(400).json({ error: 'Email is required.' });
     const user = await createPreregisteredUser({ email, name, role, entity });
     res.json(user);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/users/:id/set-password', requireSuperuser, async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    const user = await setUserPassword(req.params.id, password);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
