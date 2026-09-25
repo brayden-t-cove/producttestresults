@@ -7,6 +7,7 @@ import multer from 'multer';
 import { join, dirname } from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
+import { timingSafeEqual } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
 import QRCode from 'qrcode';
@@ -17,6 +18,7 @@ import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
 import { Strategy as LocalStrategy } from 'passport-local';
 import connectPgSimple from 'connect-pg-simple';
 import { CSV_TEMPLATES } from './src/data/csvTemplates.js';
+import { computePerms, DEFAULT_ROLE_PERMISSIONS } from './src/data/permissions.js';
 import { initDb, initAuthDb, catalog, sessions, comparisons, devices, firmwares, config, vendors, vendorSubmissions, projects, testItems, testPlanPresets, getPool } from './lib/storage.js';
 import {
   findOrCreateUser, createDomainRequest,
@@ -82,6 +84,26 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+// ── Service key for Aether (Luna's readiness hub) ─────────────────────────────
+// Aether calls the API with "Authorization: Bearer <AETHER_SERVICE_KEY>" and is
+// treated as a Luna editor. Unset AETHER_SERVICE_KEY to turn this off.
+const AETHER_SERVICE_KEY = process.env.AETHER_SERVICE_KEY || '';
+
+function isAetherKey(header) {
+  if (!AETHER_SERVICE_KEY || !header?.startsWith('Bearer ')) return false;
+  const given = Buffer.from(header.slice(7));
+  const expected = Buffer.from(AETHER_SERVICE_KEY);
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
+
+app.use((req, res, next) => {
+  if (!req.user && isAetherKey(req.get('authorization'))) {
+    req.user = { id: 'aether-service', name: 'Aether', email: '', role: 'editor', entity: 'Luna', service: 'aether' };
+    req.isAuthenticated = () => true;
+  }
+  next();
+});
 
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
@@ -169,6 +191,21 @@ function requireSuperuser(req, res, next) {
   if (!AUTH_ENABLED) return next();
   if (req.isAuthenticated() && req.user?.role === 'superuser') return next();
   res.status(403).json({ error: 'Superuser required' });
+}
+
+// Checks one permission from src/data/permissions.js, using the role defaults an
+// admin saved and the user's own overrides, the same way the UI does.
+function requirePermission(key) {
+  return async (req, res, next) => {
+    if (!AUTH_ENABLED) return next();
+    if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+    try {
+      const roleDefaults = await config.get('roleDefaults');
+      const perms = computePerms(req.user?.role, req.user?.permissions, roleDefaults || DEFAULT_ROLE_PERMISSIONS);
+      if (req.user?.role === 'superuser' || perms[key]) return next();
+      res.status(403).json({ error: 'Insufficient permissions' });
+    } catch (e) { next(e); }
+  };
 }
 
 // Returns entity filter for a user. Superusers get null (no filter).
@@ -800,22 +837,30 @@ app.post('/api/devices', async (req, res) => {
 
 // ── Vendors ───────────────────────────────────────────────────────────────────
 
-app.get('/api/vendors', async (req, res) => {
-  try { res.json(await vendors.getAll()); }
+// Vendors carry the organisations they work with in entity/entities.
+const vendorEntities = (v) => [].concat(v?.entities ?? [], v?.entity ?? []).filter(Boolean);
+
+app.get('/api/vendors', requirePermission('vendors.view'), async (req, res) => {
+  try {
+    const all = await vendors.getAll();
+    // Aether only gets Luna's vendors. People keep seeing the whole library, as before.
+    if (req.user?.service === 'aether') return res.json(all.filter(v => vendorEntities(v).includes(req.user.entity)));
+    res.json(all);
+  }
   catch { res.status(500).json({ error: 'Failed to list vendors' }); }
 });
 
-app.get('/api/vendors/:id', async (req, res) => {
+app.get('/api/vendors/:id', requirePermission('vendors.view'), async (req, res) => {
   try {
     const v = await vendors.getById(req.params.id);
-    if (!v) return res.status(404).json({ error: 'Vendor not found' });
+    if (!v || (req.user?.service === 'aether' && !vendorEntities(v).includes(req.user.entity))) return res.status(404).json({ error: 'Vendor not found' });
     res.json(v);
   } catch { res.status(500).json({ error: 'Failed to get vendor' }); }
 });
 
-app.post('/api/vendors', async (req, res) => {
+app.post('/api/vendors', requirePermission('vendors.edit'), async (req, res) => {
   try {
-    const { name, website, relationshipStatus, industry, notes, contacts, catalogs } = req.body;
+    const { name, website, relationshipStatus, industry, notes, contacts, catalogs, entity, entities } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'name is required' });
     const vendor = {
       id: uuidv4(),
@@ -826,6 +871,9 @@ app.post('/api/vendors', async (req, res) => {
       notes: notes || '',
       contacts: contacts || [],
       catalogs: catalogs || [],
+      // Keep the organisations the vendor library sends, so new vendors aren't left untagged.
+      entities: Array.isArray(entities) ? entities : [],
+      entity: entity || (Array.isArray(entities) ? entities[0] || '' : ''),
       createdAt: new Date().toISOString(),
     };
     await vendors.create(vendor);
@@ -833,7 +881,7 @@ app.post('/api/vendors', async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to create vendor' }); }
 });
 
-app.put('/api/vendors/:id', async (req, res) => {
+app.put('/api/vendors/:id', requirePermission('vendors.edit'), async (req, res) => {
   try {
     const updated = await vendors.update(req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: 'Vendor not found' });
@@ -841,7 +889,7 @@ app.put('/api/vendors/:id', async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to update vendor' }); }
 });
 
-app.delete('/api/vendors/:id', async (req, res) => {
+app.delete('/api/vendors/:id', requirePermission('vendors.edit'), async (req, res) => {
   try {
     await vendors.delete(req.params.id);
     res.json({ ok: true });
