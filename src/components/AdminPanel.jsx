@@ -6,6 +6,7 @@ import {
   adminGetRoleDefaults, adminSaveRoleDefaults,
 } from '../lib/authApi.js';
 import { PERMISSION_REGISTRY, DEFAULT_ROLE_PERMISSIONS } from '../data/permissions.js';
+import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import { adminGetPendingProducts, adminApprovePendingProduct, adminRejectPendingProduct, getCatalogParents, adminGetSubmissions, adminUpdateSubmission, adminDeleteSubmission, listSessions, listTestItems, listTestPlanPresets, createTestPlanPreset, updateTestPlanPreset, deleteTestPlanPreset } from '../lib/api.js';
 import TestItemLibrary from './TestItemLibrary.jsx';
 
@@ -910,10 +911,95 @@ const URGENCY_COLORS = {
   high:   { bg: 'var(--fail-dim)',        color: 'var(--fail)' },
 };
 
+// specs is keyed by group label: { "Hardware": { cpuType: "...", ... }, "Optics (Per Lens)": [lens, ...], ... }
+function SpecSheetDetail({ specs = {} }) {
+  function renderValue(v) {
+    if (v === '' || v === null || v === undefined) return null;
+    if (v === 'yes') return <span style={{ color: 'var(--pass)' }}>Yes</span>;
+    if (v === 'no') return <span style={{ color: 'var(--fail)' }}>No</span>;
+    return String(v);
+  }
+
+  const lenses = specs['Optics (Per Lens)'] || [];
+  const LENS_LABELS = {
+    lensLabel: 'Role', imageSensor: 'Sensor', resolutionHorizontal: 'Width (px)', resolutionVertical: 'Height (px)',
+    horizontalFov: 'H-FOV', verticalFov: 'V-FOV', diagonalFov: 'D-FOV', aspectRatio: 'Aspect',
+    aperture: 'Aperture', focalLength: 'Focal Length', digitalZoom: 'Digital Zoom', opticalZoom: 'Optical Zoom',
+    colorNightVision: 'Color NV', pirNightVision: 'PIR NV', irRange: 'IR Range (m)', wideDynamicRange: 'WDR',
+  };
+
+  // All groups except the lens array (rendered separately) and Identity (shown in card header)
+  const groupEntries = Object.entries(specs).filter(([k]) => k !== 'Optics (Per Lens)' && k !== 'Identity & Record');
+
+  const hasAnything = lenses.length > 0 || groupEntries.some(([, v]) => typeof v === 'object' && v !== null && Object.values(v).some(x => x !== '' && x !== null && x !== undefined));
+
+  if (!hasAnything) {
+    return <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>No spec fields were filled in.</div>;
+  }
+
+  return (
+    <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Lenses */}
+      {lenses.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+            Optics — {lenses.length} Lens{lenses.length > 1 ? 'es' : ''}
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {lenses.map((lens, i) => (
+              <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', minWidth: 200 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Lens {i + 1}{lens.lensLabel ? ` — ${lens.lensLabel}` : ''}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px', fontSize: 12 }}>
+                  {Object.entries(LENS_LABELS).map(([k, label]) => {
+                    const v = renderValue(lens[k]);
+                    if (!v) return null;
+                    return [
+                      <span key={`l-${k}`} style={{ color: 'var(--text-muted)' }}>{label}</span>,
+                      <span key={`v-${k}`} style={{ color: 'var(--text)' }}>{v}</span>,
+                    ];
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All other spec groups */}
+      {groupEntries.map(([groupLabel, fields]) => {
+        if (typeof fields !== 'object' || fields === null) return null;
+        // Build a fieldId→label map from schema for this group
+        const schemaGroup = SPEC_SCHEMA.camera?.find(g => g.label === groupLabel);
+        const labelMap = {};
+        (schemaGroup?.fields || []).forEach(f => { labelMap[f.id] = f.label; });
+        const rows = Object.entries(fields)
+          .map(([k, val]) => ({ k, label: labelMap[k] || k, value: renderValue(val) }))
+          .filter(r => r.value);
+        if (rows.length === 0) return null;
+        return (
+          <div key={groupLabel}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>{groupLabel}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '4px 24px' }}>
+              {rows.map(({ k, label, value }) => (
+                <div key={k} style={{ display: 'flex', gap: 8, fontSize: 12, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ color: 'var(--text-muted)', flexShrink: 0, minWidth: 130 }}>{label}</span>
+                  <span style={{ color: 'var(--text)' }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function SubmissionRow({ submission: s, onReview, onDismiss }) {
   const urg = URGENCY_COLORS[s.urgency] || URGENCY_COLORS.normal;
   const isReviewed = s.status === 'reviewed';
   const [selectedEntities, setSelectedEntities] = useState(s.entities || []);
+  const [showSpecs, setShowSpecs] = useState(false);
+  const hasSpecs = s.formType === 'product-specs' && s.specs;
 
   function toggleEntity(en) {
     setSelectedEntities(prev =>
@@ -982,7 +1068,12 @@ function SubmissionRow({ submission: s, onReview, onDismiss }) {
           ))}
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        {hasSpecs && (
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowSpecs(v => !v)}>
+            {showSpecs ? 'Hide Specs' : 'View Spec Sheet'}
+          </button>
+        )}
         {!isReviewed && (
           <button className="btn btn-primary btn-sm" onClick={() => onReview(s.id, selectedEntities)}>Mark Reviewed</button>
         )}
@@ -990,6 +1081,9 @@ function SubmissionRow({ submission: s, onReview, onDismiss }) {
           Dismiss
         </button>
       </div>
+      {hasSpecs && showSpecs && (
+        <SpecSheetDetail specs={s.specs || {}} />
+      )}
     </div>
   );
 }
