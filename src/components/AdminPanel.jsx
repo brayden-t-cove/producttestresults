@@ -1118,12 +1118,17 @@ function FormLinkCard({ title, description, path }) {
 function PendingProductRow({ product, parents, onApprove, onReject }) {
   const [linkParentId, setLinkParentId] = useState('');
   const [variationLabel, setVariationLabel] = useState('');
+  const [selectedEntities, setSelectedEntities] = useState(Array.isArray(product.entity) ? product.entity : []);
   const [busy, setBusy] = useState(false);
+
+  function toggleEntity(en) {
+    setSelectedEntities(prev => prev.includes(en) ? prev.filter(e => e !== en) : [...prev, en]);
+  }
 
   async function handleApprove() {
     setBusy(true);
     try {
-      const patch = {};
+      const patch = { entity: selectedEntities };
       if (linkParentId) { patch.parentId = linkParentId; patch.variationLabel = variationLabel || undefined; }
       await onApprove(product.id, patch);
     } finally { setBusy(false); }
@@ -1169,9 +1174,34 @@ function PendingProductRow({ product, parents, onApprove, onReject }) {
             onChange={e => setVariationLabel(e.target.value)}
           />
         )}
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+            Assign to entity <span style={{ color: 'var(--fail)', marginLeft: 2 }}>*</span>
+            <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 6 }}>(required — product won't appear in catalog without one)</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {ENTITIES.map(en => (
+              <button
+                key={en}
+                type="button"
+                onClick={() => toggleEntity(en)}
+                style={{
+                  fontSize: 12, padding: '4px 12px', borderRadius: 99, border: '1px solid', cursor: 'pointer',
+                  background: selectedEntities.includes(en) ? 'var(--primary-dim)' : 'transparent',
+                  borderColor: selectedEntities.includes(en) ? 'var(--primary)' : 'var(--border)',
+                  color: selectedEntities.includes(en) ? 'var(--primary)' : 'var(--text-muted)',
+                  fontWeight: selectedEntities.includes(en) ? 700 : 400,
+                }}
+              >{en}</button>
+            ))}
+          </div>
+          {selectedEntities.length === 0 && (
+            <div style={{ fontSize: 11, color: 'var(--fail)', marginTop: 4 }}>Select at least one entity before approving.</div>
+          )}
+        </div>
       </div>
       <div className="pending-product-card-actions">
-        <button className="btn btn-primary btn-sm" onClick={handleApprove} disabled={busy}>Approve</button>
+        <button className="btn btn-primary btn-sm" onClick={handleApprove} disabled={busy || selectedEntities.length === 0}>Approve</button>
         <button className="btn btn-ghost btn-sm" style={{ color: 'var(--fail)' }} onClick={handleReject} disabled={busy}>Reject</button>
       </div>
     </div>

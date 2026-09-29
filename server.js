@@ -380,10 +380,11 @@ app.get('/api/admin/pending-products', requireSuperuser, async (req, res) => {
 
 app.post('/api/admin/pending-products/:id/approve', requireSuperuser, async (req, res) => {
   try {
-    const { parentId, variationLabel } = req.body;
+    const { parentId, variationLabel, entity } = req.body;
     const patch = { status: 'active' };
     if (parentId !== undefined) patch.parentId = parentId || null;
     if (variationLabel !== undefined) patch.variationLabel = variationLabel || null;
+    if (entity !== undefined) patch.entity = entity;
     const updated = await catalog.update(req.params.id, patch);
     if (!updated) return res.status(404).json({ error: 'Not found' });
     res.json(updated);
