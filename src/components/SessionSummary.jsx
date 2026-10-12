@@ -115,6 +115,7 @@ export default function SessionSummary({ session, onBack }) {
   const [showPdfOptions, setShowPdfOptions] = useState(false);
   const [includePassed, setIncludePassed] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const [evidenceQrMap, setEvidenceQrMap] = useState({});
 
   useEffect(() => {
     const url = `${window.location.origin}${window.location.pathname}#session-${session.id}`;
@@ -122,6 +123,24 @@ export default function SessionSummary({ session, onBack }) {
       .then(r => r.json())
       .then(d => { if (d.dataUrl) setQrDataUrl(d.dataUrl); })
       .catch(() => {});
+  }, [session.id]);
+
+  useEffect(() => {
+    const testCases = session.testCases || [];
+    const urls = [...new Set(testCases.map(t => t.evidenceUrl).filter(Boolean))];
+    if (urls.length === 0) return;
+    Promise.all(
+      urls.map(u =>
+        fetch(`/api/qr?url=${encodeURIComponent(u)}`)
+          .then(r => r.json())
+          .then(d => [u, d.dataUrl])
+          .catch(() => [u, null])
+      )
+    ).then(pairs => {
+      const map = {};
+      pairs.forEach(([u, dataUrl]) => { if (dataUrl) map[u] = dataUrl; });
+      setEvidenceQrMap(map);
+    });
   }, [session.id]);
 
   const testCases = session.testCases || [];
@@ -411,6 +430,19 @@ export default function SessionSummary({ session, onBack }) {
                             </div>
                             {t.notes && (
                               <div style={{ marginTop: 3, color: 'var(--text-muted)', paddingLeft: 4 }}>{t.notes}</div>
+                            )}
+                            {t.evidenceUrl && (
+                              <div style={{ marginTop: 4, paddingLeft: 4, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                <div style={{ flex: 1 }}>
+                                  <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Evidence</span>
+                                  <div style={{ marginTop: 2 }}>
+                                    <a href={t.evidenceUrl} style={{ fontSize: 11, color: 'var(--accent)', wordBreak: 'break-all' }}>{t.evidenceUrl}</a>
+                                  </div>
+                                </div>
+                                {evidenceQrMap[t.evidenceUrl] && (
+                                  <img src={evidenceQrMap[t.evidenceUrl]} alt="QR" style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 4 }} />
+                                )}
+                              </div>
                             )}
                           </div>
                         ))}
