@@ -466,8 +466,6 @@ export async function adminDeleteSubmission(id) {
   if (!res.ok) throw new Error('Failed to delete submission');
 }
 
-// ── Projects ──────────────────────────────────────────────────────────────────
-
 // ── Test Plan Presets ─────────────────────────────────────────────────────────
 
 export async function listTestPlanPresets(productType) {
@@ -574,39 +572,3 @@ export async function deleteTestItem(id) {
   if (!res.ok) throw new Error('Failed to delete test item');
 }
 
-export async function getProjects() {
-  const res = await fetch(`${BASE}/projects`);
-  if (!res.ok) throw new Error('Failed to load projects');
-  return res.json();
-}
-
-export async function getProject(id) {
-  const res = await fetch(`${BASE}/projects/${id}`);
-  if (!res.ok) throw new Error('Failed to load project');
-  return res.json();
-}
-
-export async function createProject(data) {
-  const res = await fetch(`${BASE}/projects`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error('Failed to create project');
-  return res.json();
-}
-
-export async function updateProject(id, data) {
-  const res = await fetch(`${BASE}/projects/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error('Failed to update project');
-  return res.json();
-}
-
-export async function deleteProject(id) {
-  const res = await fetch(`${BASE}/projects/${id}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error('Failed to delete project');
-}

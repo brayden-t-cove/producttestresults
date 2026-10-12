@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SPEC_SCHEMA } from '../data/productSpecs.js';
 import { CERT_STATUS_LABELS, CERT_STATUS_COLORS } from '../data/certSchema.js';
-import { listComparisons, getProjects, getFirmwares, addFirmware, updateFirmware, deleteFirmware } from '../lib/api.js';
+import { listComparisons, getFirmwares, addFirmware, updateFirmware, deleteFirmware } from '../lib/api.js';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -560,194 +560,6 @@ function MediaTab({ product, onProductUpdate, comparisons, onOpenComparison, onS
   );
 }
 
-const PROJECT_DOC_TYPES = [
-  { id: 'gantt', label: 'Gantt / Project Timeline', icon: '📅' },
-  { id: 'checklist', label: 'Checklist / Task List', icon: '✅' },
-  { id: 'spec', label: 'Specification Document', icon: '📋' },
-  { id: 'roadmap', label: 'Roadmap', icon: '🗺' },
-  { id: 'other', label: 'Other', icon: '📎' },
-];
-
-function ProjectMiniCard({ project, onOpen }) {
-  let approved = 0, total = 0;
-  for (const stage of Object.values(project.stages || {})) {
-    for (const item of stage.items || []) {
-      total++;
-      if (item.status === 'approved') approved++;
-    }
-  }
-  const pct = total === 0 ? 0 : Math.round((approved / total) * 100);
-  const statusColors = { active: 'var(--primary)', 'on-hold': '#f59e0b', completed: 'var(--pass)', scrapped: 'var(--fail)' };
-  const statusLabels = { active: 'Active', 'on-hold': 'On Hold', completed: 'Completed', scrapped: 'Scrapped' };
-  const color = statusColors[project.status] || 'var(--primary)';
-
-  return (
-    <div
-      onClick={() => onOpen && onOpen(project.id)}
-      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', cursor: onOpen ? 'pointer' : 'default', marginBottom: 8 }}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{project.name}</div>
-        <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-          <span style={{ color, fontWeight: 600 }}>{statusLabels[project.status] || project.status}</span>
-          {project.entity && <span>{project.entity}</span>}
-          {project.deadline && (() => {
-            const days = Math.ceil((new Date(project.deadline) - new Date()) / 86400000);
-            return <span style={{ color: days < 0 ? 'var(--fail)' : days < 14 ? '#f59e0b' : 'var(--text-dim)' }}>
-              {days < 0 ? `${Math.abs(days)}d overdue` : `${days}d remaining`}
-            </span>;
-          })()}
-        </div>
-      </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: pct === 100 ? 'var(--pass)' : pct >= 67 ? 'var(--primary)' : pct >= 34 ? '#f59e0b' : 'var(--fail)' }}>{pct}%</div>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{approved}/{total} done</div>
-      </div>
-      {onOpen && <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>→</span>}
-    </div>
-  );
-}
-
-function ProjectDetailsTab({ product, onProductUpdate, canEditMedia = true, onOpenProject }) {
-  const [linkedProjects, setLinkedProjects] = useState([]);
-  const [loadingProjects, setLoadingProjects] = useState(true);
-
-  useEffect(() => {
-    getProjects()
-      .then(all => setLinkedProjects(all.filter(p => p.catalogProductId === product.id)))
-      .catch(() => {})
-      .finally(() => setLoadingProjects(false));
-  }, [product.id]);
-
-  // Docs state (unchanged)
-  return <ProjectDetailsTabInner
-    product={product}
-    onProductUpdate={onProductUpdate}
-    canEditMedia={canEditMedia}
-    onOpenProject={onOpenProject}
-    linkedProjects={linkedProjects}
-    loadingProjects={loadingProjects}
-  />;
-}
-
-function ProjectDetailsTabInner({ product, onProductUpdate, canEditMedia, onOpenProject, linkedProjects, loadingProjects }) {
-  const projectDocs = product.projectDocs || [];
-  const [adding, setAdding] = useState(false);
-  const [newLabel, setNewLabel] = useState('');
-  const [newUrl, setNewUrl] = useState('');
-  const [newType, setNewType] = useState('gantt');
-  const [saving, setSaving] = useState(false);
-
-  async function handleAdd() {
-    if (!newUrl.trim()) return;
-    setSaving(true);
-    const entry = { id: crypto.randomUUID(), label: newLabel.trim() || newUrl.trim(), url: newUrl.trim(), type: newType };
-    await onProductUpdate({ projectDocs: [...projectDocs, entry] });
-    setNewLabel(''); setNewUrl(''); setNewType('gantt'); setAdding(false); setSaving(false);
-  }
-
-  async function handleRemove(id) {
-    await onProductUpdate({ projectDocs: projectDocs.filter(d => d.id !== id) });
-  }
-
-  return (
-    <div style={{ padding: '4px 0' }}>
-      {/* Linked Projects Section */}
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-            Linked Projects
-          </div>
-          {onOpenProject && (
-            <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => onOpenProject(null)}>
-              Open Projects →
-            </button>
-          )}
-        </div>
-        {loadingProjects ? (
-          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading…</div>
-        ) : linkedProjects.length === 0 ? (
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 0' }}>
-            No projects linked to this product yet.
-            {onOpenProject && <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => onOpenProject(null)}>Create one in Projects →</button>}
-          </div>
-        ) : (
-          linkedProjects.map(p => (
-            <ProjectMiniCard key={p.id} project={p} onOpen={onOpenProject} />
-          ))
-        )}
-      </div>
-
-      {/* Docs Section */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-          Project Documents
-        </div>
-        {!adding && canEditMedia && (
-          <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }} onClick={() => setAdding(true)}>
-            + Add Link
-          </button>
-        )}
-      </div>
-
-      {adding && (
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 16, marginBottom: 20 }}>
-          <div className="form-group" style={{ marginBottom: 10 }}>
-            <label>Document Type</label>
-            <select value={newType} onChange={e => setNewType(e.target.value)}>
-              {PROJECT_DOC_TYPES.map(t => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
-            </select>
-          </div>
-          <div className="form-group" style={{ marginBottom: 10 }}>
-            <label>Label <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 12 }}>(optional)</span></label>
-            <input type="text" placeholder="e.g. Q3 Launch Timeline, Integration Checklist" value={newLabel} onChange={e => setNewLabel(e.target.value)} />
-          </div>
-          <div className="form-group" style={{ marginBottom: 12 }}>
-            <label>URL</label>
-            <input type="url" placeholder="https://..." value={newUrl} onChange={e => setNewUrl(e.target.value)} />
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary btn-sm" onClick={handleAdd} disabled={!newUrl.trim() || saving}>
-              {saving ? 'Saving...' : 'Add'}
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => { setAdding(false); setNewLabel(''); setNewUrl(''); }}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {projectDocs.length === 0 && !adding ? (
-        <div className="empty-state" style={{ padding: '40px 0' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
-          <p>No project documents linked yet.</p>
-          {canEditMedia && <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add Link</button>}
-        </div>
-      ) : (
-        PROJECT_DOC_TYPES.map(docType => {
-          const items = projectDocs.filter(d => d.type === docType.id);
-          if (items.length === 0) return null;
-          return (
-            <div key={docType.id} style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10 }}>
-                {docType.icon} {docType.label}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {items.map(d => (
-                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-                    <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, color: 'var(--primary)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {d.label || d.url}
-                    </a>
-                    {canEditMedia && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', padding: '2px 6px' }} onClick={() => handleRemove(d.id)}>×</button>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
 const SEVERITY_COLORS = { critical: '#dc2626', high: '#ea580c', medium: '#d97706', low: '#16a34a' };
 const STATUS_COLORS_ISSUE = { Open: 'var(--fail)', investigating: '#f59e0b', Fixed: 'var(--pass)', 'Cannot Reproduce': 'var(--text-muted)' };
 
@@ -1063,7 +875,7 @@ function FirmwareTab({ product, canEdit }) {
   );
 }
 
-const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Firmware', 'Media & Documents', 'Accessories', 'Project Details'];
+const BASE_TABS = ['Tech Specs', 'Certifications', 'Testing Results', 'Known Issues', 'Firmware', 'Media & Documents', 'Accessories'];
 
 const STATUS_LABEL = {
   'active': 'Active',
@@ -1274,7 +1086,7 @@ function PdfExportModal({ product, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate, catalog, onViewProduct, canEdit = true, canEditMedia = true, onOpenProject }) {
+export default function ProductDetail({ product, sessions, onBack, onEdit, onDelete, onOpenSession, onStartComparison, onOpenComparison, onCertUpdate, certSchema, onProductUpdate, catalog, onViewProduct, canEdit = true, canEditMedia = true }) {
   const [activeTab, setActiveTab] = useState('Tech Specs');
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [comparisons, setComparisons] = useState([]);
@@ -1402,7 +1214,6 @@ export default function ProductDetail({ product, sessions, onBack, onEdit, onDel
       {activeTab === 'Media & Documents' && <MediaTab product={product} onProductUpdate={onProductUpdate} comparisons={comparisons} onOpenComparison={onOpenComparison} onStartComparison={onStartComparison} canEditMedia={canEditMedia} />}
       {activeTab === 'Firmware' && <FirmwareTab product={product} canEdit={canEdit} />}
       {activeTab === 'Accessories' && <AccessoriesTab product={product} onProductUpdate={onProductUpdate} canEdit={canEdit} />}
-      {activeTab === 'Project Details' && <ProjectDetailsTab product={product} onProductUpdate={onProductUpdate} canEditMedia={canEditMedia} onOpenProject={onOpenProject} />}
       {activeTab === 'Relationships' && <RelationshipsTab product={product} catalog={catalog} onViewProduct={onViewProduct} />}
     </div>
   );

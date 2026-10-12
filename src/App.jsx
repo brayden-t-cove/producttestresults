@@ -7,7 +7,6 @@ import AdminPanel from './components/AdminPanel.jsx';
 import Particles from './components/Particles.jsx';
 import AstronautPhysics from './components/AstronautPhysics.jsx';
 import VendorLibrary from './components/VendorLibrary.jsx';
-import ProjectsPage from './components/ProjectsPage.jsx';
 import CatalogImport from './components/CatalogImport.jsx';
 import { CAPABILITY_GROUPS } from './data/capabilities.js';
 import { BUILD_VERSION, BUILD_DATE } from './version.js';
@@ -83,10 +82,9 @@ const TOP_LEVEL_VIEWS = {
   issues: 'issues',
   analytics: 'analytics',
   vendors: 'vendors',
-  projects: 'projects',
 };
 
-function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onProjects, onSettings, currentUser, authEnabled, onAdmin, onLogout, canSeeVendors, canSeeProjects, canSeeAdmin }) {
+function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics, onVendors, onSettings, currentUser, authEnabled, onAdmin, onLogout, canSeeVendors, canSeeAdmin }) {
   const active = TOP_LEVEL_VIEWS[view] || 'dashboard';
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   return (
@@ -110,12 +108,7 @@ function TopNav({ view, onDashboard, onTesting, onCatalog, onIssues, onAnalytics
             <IconVendors /> Vendors
           </button>
         )}
-        {canSeeProjects && (
-          <button className={`top-nav-link${active === 'projects' ? ' active' : ''}`} onClick={onProjects}>
-            📋 Projects
-          </button>
-        )}
-        <button className={`top-nav-link${active === 'issues' ? ' active' : ''}`} onClick={onIssues}>
+<button className={`top-nav-link${active === 'issues' ? ' active' : ''}`} onClick={onIssues}>
           <IconIssues /> Issues
         </button>
         <button className={`top-nav-link${active === 'analytics' ? ' active' : ''}`} onClick={onAnalytics}>
@@ -380,7 +373,7 @@ const IconCardVendors = () => (
   </svg>
 );
 
-function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors, onProjects, canSeeVendors, canSeeProjects }) {
+function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors, canSeeVendors }) {
   return (
     <div className="dashboard home-dashboard">
       <div className="home-hero">
@@ -406,14 +399,7 @@ function HomePage({ onCatalog, onTesting, onIssues, onAnalytics, onVendors, onPr
             <p className="home-card-desc">Track companies, catalog links, and contacts</p>
           </div>
         )}
-        {canSeeProjects && (
-          <div className="home-card" onClick={onProjects}>
-            <div className="home-card-icon" style={{ fontSize: 28 }}>📋</div>
-            <h3 className="home-card-title">Projects</h3>
-            <p className="home-card-desc">Launch readiness tracker and sign-off workflow</p>
-          </div>
-        )}
-        <div className="home-card" onClick={onIssues}>
+<div className="home-card" onClick={onIssues}>
           <div className="home-card-icon"><IconCardIssues /></div>
           <h3 className="home-card-title">Issues</h3>
           <p className="home-card-desc">View and track all open issues</p>
@@ -538,8 +524,7 @@ export default function App() {
   const isPublicRoute = window.location.pathname.startsWith('/submit/');
 
   const [view, setView] = useState('dashboard');
-  const [initialProjectId, setInitialProjectId] = useState(null);
-  const [currentSession, setCurrentSession] = useState(null);
+const [currentSession, setCurrentSession] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [catalog, setCatalog] = useState([]);
@@ -580,7 +565,6 @@ export default function App() {
   const canEdit = perms['catalog.edit'];
   const canEditMedia = perms['media.edit'];
   const canSeeVendors = perms['vendors.view'];
-  const canSeeProjects = perms['projects.view'];
   const canSeeAdmin = perms['admin'];
 
   async function refreshSessions() {
@@ -805,7 +789,6 @@ export default function App() {
         onCatalog={() => setView('catalog')}
         onTesting={() => setView('testing')}
         onVendors={() => setView('vendors')}
-        onProjects={() => setView('projects')}
         onIssues={() => setView('issues')}
         onAnalytics={() => setView('analytics')}
         onSettings={() => setShowSettings(true)}
@@ -814,7 +797,6 @@ export default function App() {
         onAdmin={() => setShowAdmin(true)}
         onLogout={handleLogout}
         canSeeVendors={canSeeVendors}
-        canSeeProjects={canSeeProjects}
         canSeeAdmin={canSeeAdmin}
       />
 
@@ -825,11 +807,9 @@ export default function App() {
           onCatalog={() => setView('catalog')}
           onTesting={() => setView('testing')}
           onVendors={() => setView('vendors')}
-          onProjects={() => setView('projects')}
           onIssues={() => setView('issues')}
           onAnalytics={() => setView('analytics')}
           canSeeVendors={canSeeVendors}
-          canSeeProjects={canSeeProjects}
         />
       )}
 
@@ -909,7 +889,6 @@ export default function App() {
             onViewProduct={handleOpenProduct}
             canEdit={canEdit}
             canEditMedia={canEditMedia}
-            onOpenProject={canSeeProjects ? (projectId) => { setInitialProjectId(projectId || null); setView('projects'); } : undefined}
           />
         </div>
       )}
@@ -1013,17 +992,7 @@ export default function App() {
         />
       )}
 
-      {view === 'projects' && (canSeeProjects ? (
-        <ProjectsPage
-          onBack={() => { setInitialProjectId(null); setView('dashboard'); }}
-          currentUser={currentUser}
-          catalog={catalog}
-          initialProjectId={initialProjectId}
-          canEdit={perms['projects.edit']}
-        />
-      ) : setView('dashboard'))}
-
-      {view === 'vendors' && (canSeeVendors ? (
+{view === 'vendors' && (canSeeVendors ? (
         <VendorLibrary
           catalog={catalog}
           onBack={() => setView('dashboard')}
