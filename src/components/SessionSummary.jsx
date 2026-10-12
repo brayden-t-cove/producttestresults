@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { aiSummarize } from '../lib/api.js';
-import { CAPABILITY_GROUPS } from '../data/capabilities.js';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -69,27 +68,44 @@ function renderMarkdown(text) {
   return html;
 }
 
-function groupTestsBySection(tests, category) {
-  const groups = CAPABILITY_GROUPS[category] || [];
+function groupTestsBySection(tests) {
+  // Prefer the test's own category field as the section label.
+  // Fall back to testNumber-derived label only when category is absent.
   const sectionMap = {};
+  let insertionOrder = 0;
+
   for (const test of tests) {
-    const num = test.testNumber || '';
-    const parts = num.split('.');
-    const sectionNum = parseInt(parts[0], 10);
-    let sectionLabel;
-    if (isNaN(sectionNum) || sectionNum === 0) {
-      sectionLabel = 'General';
+    const label = test.category?.trim() || test.area?.trim() || null;
+    let key, sectionLabel, order;
+
+    if (label) {
+      key = label;
+      sectionLabel = label;
+      // Assign stable insertion order so sections appear in the order
+      // the first test of that group was encountered.
+      if (!(key in sectionMap)) {
+        order = insertionOrder++;
+      } else {
+        order = sectionMap[key].order;
+      }
     } else {
-      const grp = groups[sectionNum - 1];
-      sectionLabel = grp ? grp.label : `Section ${sectionNum}`;
+      // Legacy fallback: use numeric test number
+      const num = test.testNumber || '';
+      const sectionNum = parseInt(num.split('.')[0], 10);
+      if (isNaN(sectionNum) || sectionNum === 0) {
+        key = 'general'; sectionLabel = 'General'; order = -1;
+      } else {
+        key = `num-${sectionNum}`; sectionLabel = `Section ${sectionNum}`; order = sectionNum + 10000;
+      }
     }
-    const key = isNaN(sectionNum) ? 'general' : String(sectionNum);
+
     if (!sectionMap[key]) {
-      sectionMap[key] = { sectionLabel, sectionIndex: isNaN(sectionNum) ? 0 : sectionNum, tests: [] };
+      sectionMap[key] = { sectionLabel, order, tests: [] };
     }
     sectionMap[key].tests.push(test);
   }
-  return Object.values(sectionMap).sort((a, b) => a.sectionIndex - b.sectionIndex);
+
+  return Object.values(sectionMap).sort((a, b) => a.order - b.order);
 }
 
 export default function SessionSummary({ session, onBack }) {
@@ -342,7 +358,7 @@ export default function SessionSummary({ session, onBack }) {
 
       {/* Test Results by Section */}
       {(() => {
-        const sections = groupTestsBySection(testCases, session.category);
+        const sections = groupTestsBySection(testCases);
         if (sections.length === 0) return null;
         return (
           <div className="summary-section">
