@@ -18,7 +18,7 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function AdminPanel({ currentUser, onBack }) {
+export default function AdminPanel({ currentUser, onBack, onCreateProduct }) {
   const [tab, setTab] = useState('requests');
   const [users, setUsers] = useState([]);
   const [domains, setDomains] = useState([]);
@@ -455,6 +455,7 @@ export default function AdminPanel({ currentUser, onBack }) {
                           await adminDeleteSubmission(id);
                           setSubmissions(prev => prev.filter(x => x.id !== id));
                         }}
+                        onCreateProduct={onCreateProduct}
                       />
                     ))}
                   </div>
@@ -1032,12 +1033,24 @@ function exportSpecsCsv(s) {
   URL.revokeObjectURL(url);
 }
 
-function SubmissionRow({ submission: s, onReview, onDismiss }) {
+function SubmissionRow({ submission: s, onReview, onDismiss, onCreateProduct }) {
   const urg = URGENCY_COLORS[s.urgency] || URGENCY_COLORS.normal;
   const isReviewed = s.status === 'reviewed';
   const [selectedEntities, setSelectedEntities] = useState(s.entities || []);
   const [showSpecs, setShowSpecs] = useState(false);
   const hasSpecs = s.formType === 'product-specs' && s.specs;
+
+  function handleCreateProduct() {
+    const seed = {
+      name: s.productName || '',
+      manufacturer: s.companyName || s.vendorName || '',
+      modelNumber: s.modelNumber || '',
+      category: s.category || '',
+      specs: s.specs || {},
+      entity: selectedEntities.length > 0 ? selectedEntities : [],
+    };
+    onCreateProduct?.(seed);
+  }
 
   function toggleEntity(en) {
     setSelectedEntities(prev =>
@@ -1115,6 +1128,11 @@ function SubmissionRow({ submission: s, onReview, onDismiss }) {
         {hasSpecs && (
           <button className="btn btn-ghost btn-sm" onClick={() => exportSpecsCsv(s)}>
             Export CSV
+          </button>
+        )}
+        {hasSpecs && onCreateProduct && (
+          <button className="btn btn-ghost btn-sm" onClick={handleCreateProduct}>
+            Create Product
           </button>
         )}
         {!isReviewed && (

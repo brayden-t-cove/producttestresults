@@ -751,7 +751,15 @@ const [currentSession, setCurrentSession] = useState(null);
     return (
       <div className="app-layout">
         <div className="view-content">
-          <AdminPanel currentUser={currentUser} onBack={() => setShowAdmin(false)} />
+          <AdminPanel
+            currentUser={currentUser}
+            onBack={() => setShowAdmin(false)}
+            onCreateProduct={seed => {
+              setEditingProduct(seed);
+              setShowAdmin(false);
+              setView('newProduct');
+            }}
+          />
         </div>
       </div>
     );
