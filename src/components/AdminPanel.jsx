@@ -994,6 +994,44 @@ function SpecSheetDetail({ specs = {} }) {
   );
 }
 
+function exportSpecsCsv(s) {
+  const rows = [['Section', 'Field', 'Value']];
+  const specs = s.specs || {};
+  Object.entries(specs).forEach(([section, fields]) => {
+    if (Array.isArray(fields)) {
+      fields.forEach((item, idx) => {
+        Object.entries(item).forEach(([k, v]) => {
+          if (v !== '' && v != null) rows.push([`${section} ${idx + 1}`, k, String(v)]);
+        });
+      });
+    } else if (typeof fields === 'object' && fields !== null) {
+      Object.entries(fields).forEach(([k, v]) => {
+        if (v !== '' && v != null) rows.push([section, k, String(v)]);
+      });
+    }
+  });
+  const meta = [
+    ['Product Name', s.productName || ''],
+    ['Model Number', s.modelNumber || ''],
+    ['Company', s.companyName || s.vendorName || ''],
+    ['Contact', s.vendorName || s.contactName || ''],
+    ['Email', s.vendorEmail || s.contactEmail || ''],
+    ['Category', s.category || ''],
+    ['Submitted', s.submittedAt ? new Date(s.submittedAt).toLocaleString() : ''],
+    [],
+    ['--- Spec Sheet ---'],
+  ];
+  const allRows = [...meta, ...rows];
+  const csv = allRows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `spec-sheet-${(s.productName || 'product').replace(/\s+/g, '-').toLowerCase()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function SubmissionRow({ submission: s, onReview, onDismiss }) {
   const urg = URGENCY_COLORS[s.urgency] || URGENCY_COLORS.normal;
   const isReviewed = s.status === 'reviewed';
@@ -1072,6 +1110,11 @@ function SubmissionRow({ submission: s, onReview, onDismiss }) {
         {hasSpecs && (
           <button className="btn btn-ghost btn-sm" onClick={() => setShowSpecs(v => !v)}>
             {showSpecs ? 'Hide Specs' : 'View Spec Sheet'}
+          </button>
+        )}
+        {hasSpecs && (
+          <button className="btn btn-ghost btn-sm" onClick={() => exportSpecsCsv(s)}>
+            Export CSV
           </button>
         )}
         {!isReviewed && (
